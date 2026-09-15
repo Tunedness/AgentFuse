@@ -362,11 +362,12 @@ describe('loadInstaller', () => {
 describe('the real loader', () => {
   it('goes through the companion package`s real specifier, whatever it resolves to', async () => {
     // Inside this monorepo the specifier *does* resolve: npm workspaces
-    // symlinks every package into `node_modules`, so the import finds phase
-    // 1's stub — which exports neither factory. A published `agentfuse`
-    // installed on its own finds nothing and rejects instead. Both states are
-    // covered by the tables above; what this pins is that the real loader is
-    // the only path to the package and that neither state escapes as a crash.
+    // symlinks every package into `node_modules`, so the import finds the real
+    // `@agentfuse/embeddings-local` — provided it has been built, which the
+    // gate does before it runs the tests. A published `agentfuse` installed on
+    // its own finds nothing and rejects instead. Both states are covered by
+    // the tables above; what this pins is that the real loader is the only
+    // path to the package and that neither state escapes as a crash.
     const outcome = await loadEmbeddingsPackage().then(
       (module) => ({ resolved: true, module }) as const,
       () => ({ resolved: false }) as const,
@@ -374,15 +375,18 @@ describe('the real loader', () => {
 
     if (outcome.resolved) {
       const module = outcome.module as Record<string, unknown>;
-      expect(typeof module.createEmbeddingProvider).not.toBe('function');
-      // Phase 4's acceptance criterion, from the other side: until it lands,
-      // the resolvable stub must be treated exactly like a missing package.
-      await expect(
-        resolveEmbeddingProvider({
-          request: semanticRequestOf(compiled({})),
-          mode: 'enforce',
-        }),
-      ).rejects.toThrow(/does not export createEmbeddingProvider/);
+      // Phase 4's acceptance criterion, from this side: the companion package
+      // exports both halves of the contract this file documents, so neither
+      // the "installed but too old" row nor the "not installed" row applies to
+      // it any more.
+      expect(typeof module.createEmbeddingProvider).toBe('function');
+      expect(typeof module.installModel).toBe('function');
+      await expect(loadInstaller()).resolves.toBe(module.installModel);
+
+      // Deliberately not calling `createEmbeddingProvider` here: it loads a
+      // 23 MB model and the ONNX runtime, and this suite runs offline. The
+      // package's own `model.test.ts` covers that, gated on the model being
+      // cached.
     } else {
       await expect(loadInstaller()).rejects.toThrow(/is not installed/);
     }

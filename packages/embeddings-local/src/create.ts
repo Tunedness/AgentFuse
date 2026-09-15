@@ -60,17 +60,41 @@ export async function createEmbeddingProvider(options: CreateOptions): Promise<E
     ...(options.threads !== undefined ? { threads: options.threads } : undefined),
   });
 
-  try {
-    return new LocalEmbeddingProvider({
-      spec,
-      tokenizer: tokenizer.tokenizer,
-      session,
-      special: tokenizer.special,
-    });
-  } catch (error) {
-    await session.close();
-    throw error;
+  // The tokenizer is loaded before the session on purpose: it is the cheap
+  // half, and a tokenizer this package cannot pack batches with should fail
+  // before a hundred megabytes of native runtime are resident.
+  return new LocalEmbeddingProvider({
+    spec,
+    tokenizer: tokenizer.tokenizer,
+    session,
+    special: tokenizer.special,
+  });
+}
+
+/**
+ * The two special token ids {@link packBatch} needs, or a refusal.
+ *
+ * Separated from the loading so the refusal is reachable in a test without a
+ * 700 KB tokenizer file that has had its vocabulary edited.
+ */
+export function specialTokensOf(
+  tokenizer: Pick<TokenizerVocabulary, 'token_to_id'>,
+  describe: string,
+): SpecialTokens {
+  const sep = tokenizer.token_to_id('[SEP]');
+  const pad = tokenizer.token_to_id('[PAD]');
+  if (sep === undefined || pad === undefined) {
+    throw new Error(
+      `${describe} defines no [SEP]/[PAD]; this package packs BERT-style batches ` +
+        'and cannot truncate or pad without them',
+    );
   }
+  return { sep, pad };
+}
+
+/** The part of a loaded tokenizer {@link specialTokensOf} reads. */
+export interface TokenizerVocabulary {
+  token_to_id(token: string): number | undefined;
 }
 
 /** A tokenizer plus the two special token ids the batch packer needs. */
@@ -98,16 +122,10 @@ async function loadTokenizer(spec: ModelSpec, root: string): Promise<LoadedToken
   ]);
 
   const tokenizer = new Tokenizer(definition, config);
-  const sep = tokenizer.token_to_id('[SEP]');
-  const pad = tokenizer.token_to_id('[PAD]');
-  if (sep === undefined || pad === undefined) {
-    throw new Error(
-      `${spec.tokenizer.name} for ${spec.id} defines no [SEP]/[PAD]; this package packs ` +
-        'BERT-style batches and cannot truncate or pad without them',
-    );
-  }
-
-  return { tokenizer: tokenizer as Tokenizing, special: { sep, pad } };
+  return {
+    tokenizer: tokenizer as Tokenizing,
+    special: specialTokensOf(tokenizer, `${spec.tokenizer.name} for ${spec.id}`),
+  };
 }
 
 async function readJson(

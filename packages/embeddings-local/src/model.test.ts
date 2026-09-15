@@ -9,6 +9,7 @@ import { cacheRoot, filePath } from './cache.js';
 import { createEmbeddingProvider } from './create.js';
 import { installModel } from './install.js';
 import { KNOWN_MODELS, type ModelSpec } from './models.js';
+import { openSession } from './session.js';
 
 /**
  * The only tests in this package that need the real model, and the only one
@@ -195,6 +196,19 @@ describe.runIf(cached())('the real model', () => {
       // threshold to a resolution finer than it.
       expect(cosine(batched[index] as Float32Array, alone as Float32Array)).toBeGreaterThan(0.995);
     }
+  });
+
+  it('handles a long text by truncating it rather than failing', async () => {
+    // `semanticEmbeddingText` caps its output at a little over a kilobyte, but
+    // a kilobyte of CJK is well past 256 tokens, so the truncation path is
+    // reachable in production and has to produce a usable vector.
+    const [vector] = await (await provider()).embed(['查询 '.repeat(500)]);
+
+    expect(norm(vector as Float32Array)).toBeCloseTo(1, 5);
+  });
+
+  it('refuses a file that is not a model rather than loading it', async () => {
+    await expect(openSession(filePath(cacheRoot(), SPEC, SPEC.tokenizer))).rejects.toThrow();
   });
 });
 
