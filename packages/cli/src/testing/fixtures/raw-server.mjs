@@ -25,6 +25,9 @@
  * - `FIXTURE_DIE_AFTER_MS` — exit this long after the first request arrives.
  * - `FIXTURE_EXIT_CODE` — the status to exit with then. Default 3.
  * - `FIXTURE_IDEMPOTENT` — advertise `idempotentHint` on the `echo` tool.
+ * - `FIXTURE_ECHO_META` — have `echo` answer with the request's `_meta` as well
+ *   as its arguments, which is how a test sees what the proxy forwarded
+ *   upstream (SEP-414's `traceparent` lives there).
  */
 
 const PROTOCOL_VERSION = '2025-11-25';
@@ -98,8 +101,12 @@ function handle(message) {
         });
         return;
       }
+      const echoed =
+        process.env.FIXTURE_ECHO_META === '1'
+          ? { arguments: params.arguments ?? {}, _meta: params._meta ?? {} }
+          : (params.arguments ?? {});
       result(message.id, {
-        content: [{ type: 'text', text: JSON.stringify(params.arguments ?? {}) }],
+        content: [{ type: 'text', text: JSON.stringify(echoed) }],
       });
       return;
     }

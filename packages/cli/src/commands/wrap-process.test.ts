@@ -3,6 +3,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { OtlpReceiver } from '../testing/otlp-receiver.js';
 import { nonProtocolLines, WireClient } from '../testing/wire.js';
 
 /**
@@ -396,5 +397,153 @@ describe.runIf(built)('the unglamorous endings', () => {
     } finally {
       await agent.dispose();
     }
+  });
+});
+
+/**
+ * Telemetry, from the agent's `_meta` to a collector's socket.
+ *
+ * This is the one claim of phase 8 that in-process tests cannot make: a real
+ * agent, a real proxy, a real child server and a real OTLP receiver, with the
+ * W3C trace context travelling the whole way. It is here rather than in
+ * `telemetry/` because it needs the built entry point, like its neighbours.
+ */
+describe.runIf(built)('a real wrap with telemetry switched on', () => {
+  const TRACE_ID = '4bf92f3577b34da6a3ce929d0e0e4736';
+  const PARENT_SPAN = '00f067aa0ba902b7';
+  const TRACEPARENT = `00-${TRACE_ID}-${PARENT_SPAN}-01`;
+
+  let collector: OtlpReceiver;
+
+  beforeEach(async () => {
+    collector = await OtlpReceiver.start();
+    policyPath = writePolicy([
+      ...WARN_POLICY,
+      'telemetry:',
+      '  enabled: true',
+      `  otlp_endpoint: ${collector.endpoint}`,
+      '  service_name: agentfuse-e2e',
+    ]);
+  });
+
+  afterEach(async () => {
+    await collector.close();
+  });
+
+  it('puts the span in the agent’s trace and leaves the wire context alone', async () => {
+    const agent = startWrap({ env: { FIXTURE_ECHO_META: '1' } });
+    try {
+      await agent.initialize();
+      const called = await agent.call('tools/call', {
+        name: 'echo',
+        arguments: { greeting: 'hello' },
+        _meta: { traceparent: TRACEPARENT },
+      });
+
+      // The wrapped server sees the agent's context, forwarded by the proxy and
+      // not rewritten: AgentFuse's span is a child of the agent's span, and
+      // the upstream call stays a sibling rather than being re-parented onto a
+      // context AgentFuse invented.
+      const echoed = JSON.parse(textOf(called)) as { _meta: Record<string, string> };
+      expect(echoed._meta['traceparent']).toBe(TRACEPARENT);
+
+      agent.endInput();
+      expect((await agent.exit()).code).toBe(0);
+    } finally {
+      await agent.dispose();
+    }
+
+    await collector.waitFor(() => collector.spans.length > 0);
+    const [span] = collector.spans;
+    expect(span?.name).toBe('mcp.tools/call');
+    expect(span?.traceId).toBe(TRACE_ID);
+    expect(span?.parentSpanId).toBe(PARENT_SPAN);
+    // Ours, not the agent's: a proxy that reported the caller's span id would
+    // overwrite the caller's own span in every backend.
+    expect(span?.spanId).not.toBe(PARENT_SPAN);
+
+    const names = collector.logRecords.map((entry) => entry.eventName);
+    expect(names).toContain('tunedness.tool_call');
+    // Four types, and no more, whatever a session does.
+    expect([...new Set(names)].every((name) => String(name).startsWith('tunedness.'))).toBe(true);
+  });
+
+  it('roots a trace here when the agent sent no context, and names the session', async () => {
+    const agent = startWrap();
+    try {
+      await agent.initialize();
+      await agent.call('tools/call', { name: 'echo', arguments: {} });
+
+      agent.endInput();
+      await agent.exit();
+    } finally {
+      await agent.dispose();
+    }
+
+    await collector.waitFor(() => collector.spans.length > 0);
+    const [span] = collector.spans;
+    expect(span).not.toHaveProperty('parentSpanId');
+    const attributes = (span?.attributes ?? []) as {
+      key: string;
+      value: { stringValue?: string };
+    }[];
+    const session = attributes.find((entry) => entry.key === 'tunedness.session_id');
+    // ADR-006's ULID for this connection: the correlation key when there is no
+    // trace to belong to.
+    expect(session?.value.stringValue).toMatch(/^[0-9A-HJKMNP-TV-Z]{26}$/);
+  });
+
+  it('exports the loop detection of a warn-mode run as not enforced', async () => {
+    const agent = startWrap();
+    try {
+      await agent.initialize();
+      // The policy's exact-repeat threshold is two, and the mode is warn: the
+      // rule fires, the call is forwarded anyway, and that is the row an
+      // operator counts before turning enforcement on.
+      await agent.call('tools/call', { name: 'echo', arguments: { n: 1 } });
+      await agent.call('tools/call', { name: 'echo', arguments: { n: 1 } });
+
+      agent.endInput();
+      await agent.exit();
+    } finally {
+      await agent.dispose();
+    }
+
+    await collector.waitFor(() =>
+      collector.logRecords.some((entry) => entry.eventName === 'tunedness.loop_detection'),
+    );
+    const loop = collector.logRecords.find(
+      (entry) => entry.eventName === 'tunedness.loop_detection',
+    );
+    const attributes = (loop?.attributes ?? []) as {
+      key: string;
+      value: { boolValue?: boolean };
+    }[];
+    expect(attributes.find((entry) => entry.key === 'tunedness.loop.enforced')?.value).toEqual({
+      boolValue: false,
+    });
+  });
+
+  it('opens no socket at all when telemetry is off', async () => {
+    policyPath = writePolicy([
+      ...WARN_POLICY,
+      'telemetry:',
+      '  enabled: false',
+      `  otlp_endpoint: ${collector.endpoint}`,
+    ]);
+    const agent = startWrap();
+    try {
+      await agent.initialize();
+      await agent.call('tools/call', { name: 'echo', arguments: {} });
+
+      agent.endInput();
+      await agent.exit();
+    } finally {
+      await agent.dispose();
+    }
+
+    // Off is the default (umbrella ADR-003), and off means nothing is sent to
+    // an endpoint that is sitting right there and would have accepted it.
+    expect(collector.received).toEqual([]);
   });
 });

@@ -6,6 +6,18 @@ import { parseArgs } from './args.js';
 import { COMMANDS } from './cli.js';
 import { MODE_VALUES } from './commands/shared.js';
 import { RELAYABLE, WRAP_FLAGS } from './commands/wrap.js';
+import {
+  attributes,
+  int,
+  logsRequest,
+  SEVERITY_INFO,
+  SPAN_KIND_CLIENT,
+  str,
+  strings,
+  traceRequest,
+  unixNano,
+} from './telemetry/otlp.js';
+import { EVENT_NAMES } from './telemetry/sink.js';
 
 /**
  * The shipped example configuration, checked against the parser that will read
@@ -189,5 +201,106 @@ describe('examples/approval-webhook.mjs', () => {
     const source = readFileSync(RECEIVER, 'utf8');
 
     expect(source).toContain('There is no response shape that fails open');
+  });
+});
+
+const OTLP_RECEIVER = fileURLToPath(
+  new URL('../../../examples/otlp-receiver.mjs', import.meta.url),
+);
+
+/** The readers the OTLP example exports, so a test can run them for real. */
+interface OtlpExample {
+  flatten(body: unknown): { resource: unknown; records: Record<string, unknown>[] };
+  readAttributes(attributes: unknown): Record<string, unknown>;
+  describe(path: string, body: unknown): string[];
+}
+
+async function otlpExample(): Promise<OtlpExample> {
+  return (await import(pathToFileURL(OTLP_RECEIVER).href)) as unknown as OtlpExample;
+}
+
+/**
+ * The OTLP example, run against the encoder that will feed it.
+ *
+ * Same reasoning as the webhook receiver above: an example of a protocol is
+ * worse than no example when it is wrong, and "it reads the payload correctly"
+ * is not a thing you can see by reading it. So the payload comes from the real
+ * encoder rather than from a hand-written fixture.
+ */
+describe('examples/otlp-receiver.mjs', () => {
+  const RESOURCE = { attributes: attributes({ 'service.name': str('agentfuse') }) };
+  const SCOPE = { name: 'agentfuse', version: '0.0.0' };
+
+  const RECORD = {
+    timeUnixNano: unixNano(1_700_000_000_000),
+    observedTimeUnixNano: unixNano(1_700_000_000_000),
+    severityNumber: SEVERITY_INFO,
+    severityText: 'INFO',
+    eventName: 'tunedness.tool_call',
+    attributes: attributes({
+      'event.name': str('tunedness.tool_call'),
+      'tunedness.session_id': str('01ARZ3NDEKTSV4RRFFQ69G5FAV'),
+      'tunedness.tool.name': str('read_file'),
+      'tunedness.call.duration_ms': int(50),
+      'tunedness.decision.codes': strings(['LOOP_EXACT_REPEAT']),
+    }),
+  };
+
+  it('reads what the exporter actually sends', async () => {
+    const { flatten } = await otlpExample();
+
+    const { records } = flatten(logsRequest(RESOURCE, SCOPE, [RECORD]));
+
+    expect(records).toHaveLength(1);
+    expect(records[0]?.eventName).toBe('tunedness.tool_call');
+  });
+
+  it('understands every attribute shape the encoder produces', async () => {
+    const { readAttributes } = await otlpExample();
+
+    expect(readAttributes(RECORD.attributes)).toEqual({
+      'event.name': 'tunedness.tool_call',
+      'tunedness.session_id': '01ARZ3NDEKTSV4RRFFQ69G5FAV',
+      'tunedness.tool.name': 'read_file',
+      // int64 arrives as a string, which is proto3's JSON mapping and not a bug.
+      'tunedness.call.duration_ms': '50',
+      'tunedness.decision.codes': ['LOOP_EXACT_REPEAT'],
+    });
+  });
+
+  it('summarises a span by its name and its session', async () => {
+    const { describe: summarise } = await otlpExample();
+
+    const [line] = summarise(
+      '/v1/traces',
+      traceRequest(RESOURCE, SCOPE, [
+        {
+          traceId: 'a'.repeat(32),
+          spanId: 'b'.repeat(16),
+          name: 'mcp.tools/call',
+          kind: SPAN_KIND_CLIENT,
+          startTimeUnixNano: unixNano(1_700_000_000_000),
+          endTimeUnixNano: unixNano(1_700_000_000_050),
+          attributes: attributes({ 'tunedness.session_id': str('S1') }),
+        },
+      ]),
+    );
+
+    expect(line).toBe('mcp.tools/call session=S1');
+  });
+
+  it('names the four event types and nothing else', () => {
+    const source = readFileSync(OTLP_RECEIVER, 'utf8');
+
+    for (const name of Object.values(EVENT_NAMES)) expect(source).toContain(name);
+    // `security_event` is McpGuard's, and an example that mentioned it would
+    // teach a reader to expect something AgentFuse must never send.
+    expect(source).not.toContain('tunedness.security_event');
+  });
+
+  it('says that a slow or silent collector costs a tool call nothing', () => {
+    const source = readFileSync(OTLP_RECEIVER, 'utf8');
+
+    expect(source).toContain('never allowed to cost a tool call');
   });
 });
