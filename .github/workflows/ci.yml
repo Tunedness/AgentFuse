@@ -9,6 +9,20 @@ concurrency:
   group: ci-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
+env:
+  # `@agentfuse/embeddings-local` depends on `onnxruntime-node`, and its
+  # postinstall script reads a per-platform manifest: on `linux/x64` — which is
+  # exactly what `ubuntu-latest` is — the default requirement is `cuda12`, and
+  # those binaries are *not* bundled in the npm tarball. So every `npm ci` here
+  # would fetch `Microsoft.ML.OnnxRuntime.Gpu.Linux` from nuget.org: 236 MB,
+  # per job, on every run, and outside the npm cache `setup-node` restores.
+  #
+  # We never use it. `session.ts` pins `executionProviders: ['cpu']`, because
+  # this is a background embedding queue on a developer's machine, not a
+  # training rig. Skipping the download costs nothing and saves close to a
+  # gigabyte per CI run across the matrix.
+  ONNXRUNTIME_NODE_INSTALL: skip
+
 jobs:
   verify:
     name: verify (node ${{ matrix.node }})
