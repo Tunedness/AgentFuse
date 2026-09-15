@@ -2,6 +2,7 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { renderTripReport, type TripReport } from '@agentfuse/core';
+import { DIAGNOSTIC_PREFIX } from '@agentfuse/proxy';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import type { CliError } from '../errors.js';
 import { type CliContext, StringWriter } from '../io.js';
@@ -107,14 +108,41 @@ describe('runReport last', () => {
 
     runReport(context(), []);
 
-    // `Diagnostics.block()` writes one marker line and then the text as it is.
-    // Prefixing each line — which is what a per-line write would do — destroys
-    // the layout somebody is reading during an incident.
-    const rendered = renderTripReport(one).split('\n');
-    for (const line of rendered) {
-      expect(stdout.text).toContain(`\n${line}\n`);
+    // Verbatim, line for line: prefixing each one — which is what writing the
+    // report through `Diagnostics.emit` would do — destroys the layout somebody
+    // is reading during an incident.
+    for (const line of renderTripReport(one).split('\n')) {
+      expect(stdout.text).toContain(line);
     }
-    expect(stdout.text).toContain('"event":"trip_report"');
+  });
+
+  it('puts nothing but the report on stdout — no diagnostic marker line', () => {
+    write('fusepolicy.yaml', POLICY);
+    const one = report({ tripId: 'ONE', at: '2026-09-15T12:00:00.000Z' });
+    seed(join(root, 'trips'), [one]);
+
+    runReport(context(), []);
+
+    // Phase 6a routed this through `Diagnostics.block()`, which writes a
+    // `[agentfuse] {"event":"trip_report",…}` marker before the text. That
+    // marker belongs in the proxy, where the block sits in a stream of prefixed
+    // lines; here it lands inside `agentfuse report last > incident.txt`. This
+    // command is not in the proxy path, so its stdout is the human's.
+    expect(stdout.text).not.toContain(DIAGNOSTIC_PREFIX);
+    expect(stdout.text).not.toContain('"event"');
+    expect(stdout.text.startsWith(renderTripReport(one))).toBe(true);
+  });
+
+  it('is clean on the --json path too, which a script parses whole', () => {
+    write('fusepolicy.yaml', POLICY);
+    const one = report({ tripId: 'ONE', at: '2026-09-15T12:00:00.000Z' });
+    seed(join(root, 'trips'), [one]);
+
+    runReport(context(), ['--json']);
+
+    // Not merely free of a prefix: the whole stream has to parse as the one
+    // document core wrote, with nothing wrapped round it.
+    expect(JSON.parse(stdout.text)).toEqual(one);
   });
 
   it('says where the report is stored', () => {

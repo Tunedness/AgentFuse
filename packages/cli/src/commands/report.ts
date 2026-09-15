@@ -14,7 +14,6 @@
  */
 
 import { renderTripReport } from '@agentfuse/core';
-import { Diagnostics } from '@agentfuse/proxy';
 import { parseArgs } from '../args.js';
 import { loadPolicy, resolveFromPolicy } from '../config.js';
 import { CliError, EXIT } from '../errors.js';
@@ -97,14 +96,21 @@ export function runReport(context: CliContext, argv: readonly string[]): number 
     return EXIT.ok;
   }
 
-  // `block()` rather than a line-by-line write. The proxy's `Diagnostics`
-  // exists for exactly this: the rendered report is a box-drawn table, and
-  // prefixing every line of it — which is what `emit()` does — destroys the
-  // layout somebody is reading during an incident. It writes one marker line
-  // and then the text verbatim, so a live trip and a report read back
-  // afterwards look the same.
-  new Diagnostics({ sink: context.stdout }).block(renderTripReport(report));
-  writeLines(context.stdout, ['', `  stored at ${entry.path}`]);
+  // Written straight to stdout, not through the proxy's `Diagnostics`.
+  //
+  // Phase 6a routed it through `Diagnostics.block()` because `block()` exists
+  // for precisely this shape — a box-drawn table that `emit()`'s per-line
+  // prefix would destroy — and recorded the cost: `block()` also writes a
+  // `[agentfuse] {"event":"trip_report",…}` marker line, which on this command
+  // lands on stdout and ends up inside `agentfuse report last > incident.txt`.
+  //
+  // That marker earns its place in the proxy. There, the report is one block in
+  // a stream of prefixed diagnostic lines and the marker is what lets a reader
+  // — or a log shipper — tell where the block starts. Here it is noise in front
+  // of the only thing the command produces: `report` is not in the proxy path,
+  // so this stdout belongs to the human who asked, and `Diagnostics` keeps
+  // every guarantee it makes for the paths that are.
+  writeLines(context.stdout, [renderTripReport(report), '', `  stored at ${entry.path}`]);
   return EXIT.ok;
 }
 
