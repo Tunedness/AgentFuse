@@ -106,25 +106,16 @@ describe('run', () => {
   });
 });
 
-describe('the commands phase 6b owns', () => {
-  it.each(PHASE_6B_COMMANDS)('%s says it is not implemented, and why', async (command) => {
-    // Named and refused rather than missing from the table: `agentfuse wrap`
-    // must not look like a misspelling.
-    const code = await run(context([command]));
-
-    expect(code).toBe(2);
-    expect(stderr.text).toContain(`\`agentfuse ${command}\` is not implemented yet`);
-    expect(stderr.text).toContain('serving entry points are the next piece of work');
-    expect(stderr.text).toContain('agentfuse validate');
+describe('the commands the table names', () => {
+  it('leaves none of them unimplemented', () => {
+    // Phase 6a kept `wrap` and `serve` in the table and refused them with an
+    // exit code, so that `agentfuse wrap` did not look like a misspelling.
+    // Phase 6b wired both up and this list emptied, which is the state the
+    // check below then has to find.
+    expect([...PHASE_6B_COMMANDS]).toEqual([]);
   });
 
-  it('does not mistake them for unknown commands', async () => {
-    await run(context(['wrap', '--', 'node', 'server.mjs']));
-
-    expect(stderr.text).not.toContain('unknown command');
-  });
-
-  it('is the only part of the table that is not wired up', async () => {
+  it('is the check that would notice if one were added back', async () => {
     const refused: string[] = [];
     for (const command of COMMANDS) {
       stderr.clear();
@@ -133,6 +124,24 @@ describe('the commands phase 6b owns', () => {
     }
 
     expect(refused).toEqual([...PHASE_6B_COMMANDS]);
+  });
+
+  it('routes wrap far enough to fail on the missing policy, not on the name', async () => {
+    // No policy anywhere above a fresh temp directory, so the command reaches
+    // `loadPolicy` and stops there. What matters is that it got that far: a
+    // command that is not in the table never runs at all.
+    const code = await run(context(['wrap', '--', 'node', 'server.mjs']));
+
+    expect(code).toBe(2);
+    expect(stderr.text).not.toContain('unknown command');
+    expect(stderr.text).toContain('fusepolicy.yaml');
+  });
+
+  it('routes serve the same way', async () => {
+    const code = await run(context(['serve', '--', 'node', 'server.mjs']));
+
+    expect(code).toBe(2);
+    expect(stderr.text).toContain('fusepolicy.yaml');
   });
 });
 

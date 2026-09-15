@@ -16,6 +16,7 @@
 import { runInit } from './commands/init.js';
 import { runModels } from './commands/models.js';
 import { runReport } from './commands/report.js';
+import { runServe } from './commands/serve.js';
 import { runValidate } from './commands/validate.js';
 import { runWrap } from './commands/wrap.js';
 import { CliError, EXIT, formatCliError } from './errors.js';
@@ -31,11 +32,17 @@ export type Command = (typeof COMMANDS)[number];
 /**
  * The commands this build names but does not carry.
  *
- * A command in {@link COMMANDS} is either implemented or listed here and
- * refused with an exit code — never silently missing, because `agentfuse wrap`
- * must not look like a misspelling.
+ * Empty since phase 6b wired up `wrap` and `serve`. The constant stays because
+ * the shape it enforces is worth keeping: a command in {@link COMMANDS} is
+ * either implemented or listed here and refused with an exit code — never
+ * silently missing, because `agentfuse wrap` must not look like a misspelling.
+ *
+ * Note that "implemented" is not "does everything its name suggests". `serve`
+ * is here no longer because it binds an endpoint and resolves session identity
+ * for real; what it does *not* do — forward tool calls — is stated in its own
+ * `--help` rather than by refusing the whole command.
  */
-export const PHASE_6B_COMMANDS: readonly Command[] = ['serve'];
+export const PHASE_6B_COMMANDS: readonly Command[] = [];
 
 /** `agentfuse --help`. */
 export function usage(): string[] {
@@ -45,7 +52,7 @@ export function usage(): string[] {
     'Usage: agentfuse <command> [options]',
     '',
     '  wrap -- <cmd>    Run an MCP server behind the breaker.',
-    '  serve            Serve the breaker over HTTP. (not in this build)',
+    '  serve            Bind an HTTP endpoint and resolve session identity.',
     '  init             Write a starter fusepolicy.yaml.',
     '  validate         Check a policy file and print what it resolves to.',
     '  report           Read the trip reports written when a circuit broke.',
@@ -128,19 +135,8 @@ async function dispatch(context: CliContext): Promise<number> {
     case 'wrap':
       return await runWrap(context, rest);
     case 'serve':
-      throw notImplemented(first);
+      return await runServe(context, rest);
   }
   // No `default`: the switch is exhaustive over `Command`, so adding an entry
   // to `COMMANDS` fails the build until it is wired up here.
-}
-
-/** The refusal for a command this build names but does not carry. */
-function notImplemented(command: Command): CliError {
-  return new CliError(`\`agentfuse ${command}\` is not implemented yet`, {
-    exitCode: EXIT.usage,
-    hints: [
-      'The policy, budget and loop-detection machinery is complete and tested; the serving entry points are the next piece of work.',
-      'In the meantime `agentfuse validate` checks a policy and `agentfuse report` reads the reports back.',
-    ],
-  });
 }
