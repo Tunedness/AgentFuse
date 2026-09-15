@@ -445,7 +445,7 @@ describe.runIf(built)('a real wrap with telemetry switched on', () => {
       // the upstream call stays a sibling rather than being re-parented onto a
       // context AgentFuse invented.
       const echoed = JSON.parse(textOf(called)) as { _meta: Record<string, string> };
-      expect(echoed._meta['traceparent']).toBe(TRACEPARENT);
+      expect(echoed._meta.traceparent).toBe(TRACEPARENT);
 
       agent.endInput();
       expect((await agent.exit()).code).toBe(0);

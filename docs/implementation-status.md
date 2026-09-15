@@ -1,8 +1,8 @@
 # AgentFuse — uygulama durumu ve devir notu
 
-**Son güncelleme:** 2026-09-16 · **`main`'deki son kod commit'i:** `a7a8ddc`
-(`main` HEAD bunu izleyen bu doküman commit'i) · **Durum:** Faz 7 bitti;
-kritik yolda sırada Faz 9, paralelde Faz 4/8
+**Son güncelleme:** 2026-09-16 · **`main`'deki son kod commit'i:** `3e791d4`
+(`main` HEAD bunu izleyen bu doküman commit'i) · **Durum:** Faz 8 bitti;
+kritik yolda sırada Faz 9, paralelde Faz 4
 
 Bu dosya, işi başka bir oturumda kaldığı yerden sürdürebilmek için tutulur.
 Ürün tanımı burada değil — tek doğruluk kaynağı `../.ssot/PRD.md` ve
@@ -24,7 +24,7 @@ dosyasındadır.
 | 5 | `@agentfuse/proxy` (MCP adaptörü) | **Bitti** — `ebce8f0` |
 | 6 | CLI (`agentfuse`) | **Bitti** — 6a: `373c240` `f503322` `58741ba` `c80c4db` · 6b: `54d858e` `19c96f8` `7447c48` |
 | 7 | Onay akışı + rapor UX | **Bitti** — `84b903e` `935146d` `a7a8ddc` |
-| 8 | Telemetri (OTLP) | Başlanmadı |
+| 8 | Telemetri (OTLP) | **Bitti** — `0172deb` `3d36b9f` `3177f90` `3e791d4` |
 | 9 | Benchmark'lar (tespit + gecikme) | Başlanmadı |
 | 10 | Dokümanlar + v0.1.0 | Başlanmadı |
 
@@ -38,43 +38,41 @@ kritik yol: 0-1-2-5-6-9-10
 ### `main` yeşil — 2026-09-16'da bizzat koşuldu
 
 ```
-npm run lint          → Checked 171 files. No fixes applied. (exit 0)
+npm run lint          → Checked 185 files. No fixes applied. (exit 0)
 npm run typecheck     → temiz (tsc -b && tsc -p tsconfig.test.json)
 npm run build         → temiz
-npm test              → Test Files 58 passed · Tests 1355 passed (~5.2 s)
+npm test              → Test Files 64 passed · Tests 1472 passed (~5.2 s)
 npm run schema:check  → schema up to date
 ```
 
-Faz 7 öncesindeki sayılar 50 dosya / 1143 test idi; eklenen 8 dosya ve 212 test
-tümüyle `packages/cli`'ye ait. Mevcut testlerden ikisi yeniden yazıldı ve
-gerekçeleri aşağıda: `runtime.test.ts`'in "approvals fail closed until phase 7"
-testi (artık gerçek bir gateway var) ve `report.test.ts`'in işaret satırını
-iddia eden testi (artık işaret satırı yok). `http.test.ts`'te bir `let`
-`const`'a çevrildi; deponun tek lint uyarısıydı ve Faz 7'nin kodundan değil.
+Faz 8 öncesindeki sayılar 58 dosya / 1355 test idi; eklenen 6 dosya ve 117 test
+tümüyle `packages/cli`'ye ait. Tek yeniden yazılan test `runtime.test.ts`'in
+"says telemetry is not exported yet" testiydi — o uyarı Faz 8'de silindi ve
+yerine telemetri portunun altı testi geldi. `lint` çıktısındaki 42 `info`
+(`useLiteralKeys`) Faz 7'den beri aynı ve exit 0'ı etkilemiyor.
 
 Coverage kapısı `vitest.config.ts` içinde `packages/core/src/**` için %90'da ve
 **gerçekten zorluyor** (Faz 2'de 100'e çekilip kasten kırılarak doğrulandı).
-Faz 7 sonundaki ölçümler (`coverage/lcov.info` üzerinden, glob bazında):
+Faz 8 sonundaki ölçümler (`coverage/lcov.info` üzerinden, glob bazında):
 
 | Paket | lines | functions | branches |
 | --- | --- | --- | --- |
 | `packages/core/src/**` (kapılı) | %99.89 | %100 | %95.45 |
 | `packages/proxy/src/**` (kapısız) | %98.88 | %100 | %91.18 |
-| `packages/cli/src/**` (kapısız) | %99.92 | %100 | %99.41 |
+| `packages/cli/src/**` (kapısız) | %99.93 | %100 | %99.51 |
 
-Core ve proxy rakamları Faz 6a'dakinin aynısı — iki pakete de dokunulmadı.
-CLI üç metrikte de yükseldi (%99.87 → %99.92 lines, %99.09 → %99.41 branches,
-functions %100'de kaldı). Yeni `approvals/` dizini dört metrikte de **%100**;
-ölçülemez kalan dallar tek tek ya silindi (iki "once-only" bayrağı gereksizdi —
-`resolve` zaten bir kez çalışır, `destroy` idempotent) ya da paylaşılan bir
-fonksiyona indirildi (`errorReporter`, `probeSocket`'teki `occupied`).
+Core ve proxy rakamları Faz 6a'dakinin aynısı — iki pakete de hâlâ
+dokunulmadı. CLI iki metrikte yükseldi (%99.92 → %99.93 lines, %99.41 → %99.51
+branches, functions %100'de kaldı). Yeni `telemetry/` dizini dört metrikte de
+**%100**; kapatılamayan iki dal koddan silindi (`#context`'teki gereksiz
+yeniden okuma ve tahliyedeki erişilemez `done` koruması).
 
 Metin reporter'ının satırları: `core/src` %98.31 / %96.46 / %100 / %99.36,
-`proxy/src` %98.46 / %91.17 / %100 / %98.87, `cli/src` %99.46 / %98.82 / %100 /
-%99.80, `cli/src/commands` %100 / %99.58 / %100 / %100. `cli/src/approvals`
-tabloda **hiç görünmüyor**, çünkü v8'in metin reporter'ı her dosyası %100 olan
-dizini listelemiyor. "All files" %99.43 / %96.62 / %100 / %99.76 (Faz 6b
-sonunda %99.30 / %95.93 / %100 / %99.71).
+`proxy/src` %98.46 / %91.17 / %100 / %98.87, `cli/src` %99.47 / %98.84 / %100 /
+%99.80, `cli/src/commands` %100 / %99.58 / %100 / %100. `cli/src/approvals` ve
+`cli/src/telemetry` tabloda **hiç görünmüyor**, çünkü v8'in metin reporter'ı
+her dosyası %100 olan dizini listelemiyor. "All files" %99.48 / %96.95 / %100 /
+%99.78 (Faz 7 sonunda %99.43 / %96.62 / %100 / %99.76).
 
 **`main.ts` metin reporter'ında %0 görünür ve bu beklenen.** Dosya tek bir
 top-level `await run(...)` ifadesidir ve gerçek stream'leri bağlar; yalnızca
@@ -1739,6 +1737,268 @@ fırsat bulamamış bir process'in bıraktığı şey.
 
 ---
 
+## Faz 8 — telemetri (OTLP) (bitti)
+
+Dört commit: `0172deb` tel formatı + alıcı fixture'ı, `3d36b9f` olay eşlemesi +
+runtime bağlantısı, `3177f90` uçtan uca iz bağlamı + örnek alıcı, `3e791d4`
+karar tablosunun ve kötü gün yollarının testleri. `packages/cli/src` ağacına
+eklenenler:
+
+```
+telemetry/otlp.ts          ← OTLP/HTTP JSON kodlaması (saf: I/O yok, saat yok)
+telemetry/trace.ts         ← W3C traceparent ayrıştırma + span kimliği
+telemetry/exporter.ts      ← sınırlı kuyruk, batch, fetch, backoff
+telemetry/sink.ts          ← FuseEvent → span + log record
+telemetry/index.ts         ← karar tablosu (embeddings.ts'in kardeşi)
+telemetry/diagnostics.ts   ← tek Diagnostics'in ikinci okuyucusu
+testing/otlp-receiver.ts   ← süreç içi alıcı (build ve coverage dışı)
+examples/otlp-receiver.mjs ← bağımlılıksız alıcı örneği
+```
+
+### ADR-010 uygulandı: OTel SDK'sı kurulmadı
+
+Resmi yığın ölçülmüştü (`semantic-conventions` tek başına 12 MB) ve çatı
+ADR-003 öznitelikleri `tunedness.*` altında sabitlediği için o paketin satacağı
+bir şey yok. Sonuç: **sıfır yeni bağımlılık**, taşıma Node 20'nin global
+`fetch`'i. "Kapalıyken sıfır OTel modülü" iddiası artık dinamik import
+disiplinine değil, paketin ağaçta hiç bulunmamasına dayanıyor ve
+`discipline.test.ts` bunu dört ayrı testle zorluyor: hiçbir manifest
+`@opentelemetry/*` beyan etmiyor, lockfile'da `node_modules/@opentelemetry`
+anahtarı yok, dizin kurulu değil, hiçbir kaynak dosya adını anmıyor. (Lockfile
+metninde ad **geçiyor**: vitest `@opentelemetry/api`'yi *opsiyonel peer* olarak
+sayıyor, ki bu tam olarak kurulmamış bir bağımlılıktır. Test bu yüzden yüklü
+paket anahtarına bakıyor.)
+
+### JSON kodlamasından neyin yazıldığı, neyin yazılmadığı
+
+**Yazılan:** `ExportTraceServiceRequest` ve `ExportLogsServiceRequest`
+gövdeleri, `resource` + `scope` sarmalayıcıları, `status`'lu span, `eventName`
+taşıyan log record, ve `AnyValue`/`KeyValue` öznitelik kodlaması.
+
+**Bilinçle yazılmayan:** metrikler, span event'leri ve link'ler, profil
+sinyali, `droppedAttributesCount` (hiçbir öznitelik düşürülmüyor), scope
+öznitelikleri, ve yanıtın `partialSuccess` yarısı — collector'ın cevabından
+yalnız durum kodu okunuyor.
+
+Kolay yanlış yapılan iki şey ve neden öyle:
+
+1. **64-bit tam sayılar JSON'da string.** Bu proto3'ün JSON eşlemesi, biçim
+   tercihi değil — ve burada asıl önemi zaman damgasında: ms × 1e6 ≈ 1.7e18,
+   `Number.MAX_SAFE_INTEGER`'ın çok ötesinde. `unixNano` bu yüzden `BigInt`'ten
+   geçiyor; testi `Number.isSafeInteger`'ın `false` döndüğünü de iddia ediyor.
+2. **Trace ve span id'leri hex, base64 değil.** OTLP JSON spesifikasyonu
+   proto3'ün `bytes` varsayılanını tam bu alanlar için eziyor.
+
+Öznitelik tipi **çağrı yerinde** seçiliyor (`str`/`int`/`double`/`bool`/
+`strings`), çalışma zamanı değerinden çıkarılmıyor: tam olarak 1 olan bir
+`budget.ratio` yine `double`, yoksa backend bir alan için iki kolon görürdü.
+
+### İki sinyal, dört olay tipi
+
+| ne zaman | ne gidiyor |
+| --- | --- |
+| iletilen her `tools/call` | `/v1/traces`'e `mcp.tools/call` span'i **ve** `/v1/logs`'a `tunedness.tool_call` |
+| `allow` olmayan her karar | `tunedness.policy_decision` |
+| %50 / %80 / %100 bütçe geçişleri | `tunedness.budget_event` |
+| kural ya da semantik tetiklenmesi (`warn`'daki `wouldTrip` dahil) | `tunedness.loop_detection` |
+
+Olaylar **log record** olarak gidiyor, span event'i olarak değil: bütçe ve
+döngü olayları iletilmiş bir çağrı olmadan da oluşabiliyor, yani asılacakları
+bir span her zaman yok. `eventName` alanı **ve** `event.name` özniteliği
+birlikte yazılıyor — ilki güncel log veri modelinin yeri, ikincisi o alandan
+önce yazılmış her collector'ın baktığı yer.
+
+Öznitelik adları çatı ADR-003 uyarınca `tunedness.*`. Kaynak seviyesinde iki
+iyi bilinen anahtar ad alanı dışında tutuldu (`service.name`,
+`service.version`), çünkü collector'lar yönlendirmeyi onlarla yapıyor.
+ADR-007 bağlayıcı: `call.tokens_estimated`, ve bütçe boyutu adları `tokens` →
+`tokens_estimated`, `usd` → `usd_estimated` diye çevriliyor.
+
+**Beşinci tip mümkün değil ve bu bir test:** `event-types.test.ts`
+`EVENT_NAMES`'i ADR-003'ün elle yazılmış listesiyle karşılaştırıyor, sink'te
+log record üreten **tek** bir yer olduğunu ve adının o tablodan geldiğini
+kontrol ediyor, ve `security_event`'in hiçbir kaynak dosyada (yorum dışında)
+geçmemesini zorluyor. Faz 3'ün kuralı da duruyor: embedding kuyruğu hataları
+`SemanticLoopStats`'ta kalıyor, `semantic_stats` teşhisi olarak yazılıyor.
+
+### İz bağlamı nereden geliyor, nereye gitmiyor
+
+Proxy `traceparent`'ı isteğin `_meta`'sından (SEP-414) okuyup `beforeCall`'a
+veriyor, motor da onu uçuştaki `ToolCallRecord`'da tutuyor. CLI onu **oturum
+store'u üzerinden** okuyor: `runtime.ts` sink'e geç bağlanan bir arama
+fonksiyonu veriyor (`sessions.get(sessionId)?.inFlight.get(callId)?.traceparent`),
+approval host'unun `bindHost`'uyla aynı desen.
+
+Zamanlama taşıyıcı: **span kimliği `policy_decision` anında basılıyor**, çünkü
+kaydın `inFlight`'ta olduğu pencere tam olarak orası (`deny` yolunda silme
+`emit`'ten *sonra* geliyor). `tool_call` olayı aynı `callId`'nin kimliğini
+yeniden kullanıp haritadan düşürüyor. Böylece bir kararın olayı ile ettiği
+çağrının span'i **aynı span id**'yi taşıyor ve bloke edilmiş bir çağrının olayı
+da ajanın izinin içinde kalıyor.
+
+- **Gelen bağlam varsa** span onun çocuğu: aynı `traceId`, yeni span id,
+  `parentSpanId` = gelenin span id'si, flag'ler olduğu gibi taşınıyor.
+- **Gelen bağlam yoksa** span burada başlayan bir izin kökü: yeni `traceId`,
+  `parentSpanId` **yok**, ve tele hiçbir şey yazılmıyor. Korelasyon anahtarı o
+  zaman `tunedness.session_id` — ki her span ve her olay onu zaten taşıyor.
+- **Sampling bayrağı taşınıyor ama uygulanmıyor:** bu telemetri bir devre
+  kesicinin neye izin verip neyi reddettiğinin kaydı, ve başkasının head
+  sampler'ının bloke edilmiş bir çağrıyı kayıttan düşürmesine izin vermek
+  denetim izine delik açardı.
+- **`budget_event` ve `loop_detection` iz id'si taşımıyor.** Bütçe geçişi bir
+  çağrının değil oturumun olayı; döngü tespiti kendisini üreten geçmiş
+  çağrıları adıyla taşıyor (`loop.call_ids`). O sırada açık olan span'e
+  bağlamak, tahmini bağlantı gibi göstermek olurdu.
+- **`tracestate` ve `baggage` CLI'ya hiç ulaşmıyor.** Motorun kaydı yalnız
+  `traceparent` taşıyor; proxy üçünü de upstream'e iletiyor. `trace.ts`
+  `tracestate`'i okuyabiliyor (test edildi), ama üretimde besleyen yok.
+
+### Upstream'e yeniden enjeksiyon yapılmadı — kayda geçiyor
+
+Faz brifingi "upstream `_meta`'ya yeniden enjekte et" diyordu. Proxy donmuş ve
+bunun dikişi yok: `GuardedToolCall.forward()` parametre almıyor, giden
+`_meta`'yı `bridge.ts` `upstreamParams`/`forwardedMeta` ile kendisi kuruyor ve
+ajanın `traceparent`'ını **olduğu gibi** iletiyor. Yani bugünkü davranış:
+sarılan sunucunun işi AgentFuse'un span'inin **kardeşi**, çocuğu değil; ikisi de
+ajanın span'inin altında. Uçtan uca test bunu iki taraftan birden pinliyor
+(çocuk ajanın `traceparent`'ını görüyor, export edilen span onun çocuğu).
+
+CLI tarafından kapatmanın tek yolu downstream transport'u sarıp gelen
+`_meta`'yı yeniden yazmak olurdu — yani proxy'nin okuduğu isteği değiştirmek.
+Bu, "en küçük dürüst geçici çözüm" değil, ajanın gönderdiği mesajı arkadan
+değiştirmek olurdu ve `bridge.ts`'in tek sahiplik kuralını bozardı.
+**Kapatacak dikiş küçük:** `ToolCallGuardOptions`'a opsiyonel bir
+`traceparentFor(call) => string | undefined` (ya da `forward(paramsOverride)`),
+`tools-call.ts` içinde `upstreamParams`'a geçirilecek şekilde. Faz 6b'nin
+bıraktığı `onChildExit` ve `onConnect` kancalarıyla birlikte alınacak üçüncü
+kanca budur.
+
+### Onaylar dört tipin içinde nasıl görünüyor
+
+Kendi olay tipleri **yok**; olan şey `policy_decision`'ın içinde:
+
+- İnsanın sorulduğu karar zaten `POLICY_APPROVAL`, kötü biten hali
+  `APPROVAL_DENIED` / `APPROVAL_TIMEOUT` kodlarıyla geliyor (`decision.codes`).
+- Eksik olan tek ölçüm Faz 7'nin işaret ettiği şeydi: insan ne kadar bekletti.
+  Sink teşhis akışını izliyor (`approval_pending` ve webhook'un
+  `approval_posted`'ı → `approval_resolved`, `approvalId` ile eşleşerek) ve
+  `approval.verdict`, `approval.source`, `approval.wait_ms` özniteliklerini o
+  oturumun **bir sonraki** kararına iliştiriyor.
+- **Bilinçli genişletme:** onaylanan bir çağrının kararı `allow`'dur ve tablo
+  onu dışa vermezdi. Yine de veriliyor, çünkü ADR-009 onay kaydını bir denetim
+  artefaktı sayıyor ve denetimin sorduğu soru tam olarak "bu çağrıya neden izin
+  verildi"dir. **Başka hiçbir `allow` tele çıkmıyor.**
+- **Secret hiçbir yere gitmiyor:** teşhis satırından **adıyla üç alan**
+  kopyalanıyor (`verdict`, `source`, ve zaman damgaları). `reason` bile
+  kopyalanmıyor — insanın yazdığı serbest metnin collector'a gitmesi için bir
+  sebep yok. Bir test uydurma bir `secret` alanı, bir socket yolu ve secret
+  içeren bir `reason` ile besleyip export'ta hiçbirinin görünmediğini ölçüyor.
+
+### Export kuyruğu: sınırlar ve backoff
+
+`exporter.ts` bilinçle `core/src/loop/queue.ts` ile aynı şekilde — üründe iki
+değil tek bir "sınırlı arka plan işi" biçimi olsun diye:
+
+| davranış | değer |
+| --- | --- |
+| sinyal başına kuyruk | 1024 kayıt, taşmada **en eski** düşer |
+| batch | en çok 128 kayıt |
+| flush aralığı | 1000 ms (unref'li timer), batch dolunca hemen |
+| POST timeout'u | 5000 ms (`AbortSignal.timeout`, bağlantı dahil) |
+| backoff | 1000 ms'den başlayıp ikiye katlanarak 30 s'ye kadar |
+| başarısız batch | **yeniden denenmez**, düşürülür ve sayılır |
+
+Gerekçeler: yeniden deneme zaten zorlanan bir collector'ın üstüne yük bindirir
+ve veri gözlemseldir (kararlar stderr'de ve kesinti raporlarında duruyor);
+timer `unref`'li, çünkü wrap'i ajanın pipe'ı ayakta tutar, bekleyen bir export
+değil; **bir kesinti bir satır** yazar (bir streak'in yalnız ilk hatası),
+toparlanma da bir satır (`telemetry_export_recovered`); kapanışta
+`telemetry_stats` sayaçları yazıyor. Başarılı yanıtın gövdesi **hiç
+okunmuyor** — bu yüzden 200 dönüp saçma gövde veren bir collector bedava.
+
+Bir tek yerde kuyruktan ayrılıyor: core kendi timer'ını kuramadığı için orada
+worker'ı bir sonraki `enqueue` uyandırıyordu; burada CLI'nin böyle bir kısıtı
+yok ve bir sonraki araç çağrısına kadar bekleyen bir kayıt, anlattığı olaydan
+sonra varırdı.
+
+### Karar tablosu ve embeddings'ten ayrıldığı satır
+
+| yapılandırma | sonuç |
+| --- | --- |
+| `telemetry.enabled: false` | **sessizce hiçbir şey kurulmaz.** Kuyruk yok, timer yok, socket yok, stderr'de satır yok. |
+| açık, endpoint ayrıştırılıyor | exporter + sink, ve endpoint'i anan bir `telemetry_enabled` teşhisi. |
+| açık, endpoint ayrıştırılamıyor | **uyarı, koşum devam eder.** |
+
+Son satır embeddings tablosundan bilinçle ayrılıyor. Orada `provider: local` +
+`mode: enforce` + eksik paket sert çıkıştı, çünkü operatör adı geçen bir
+dedektörle devre kesilmesini istemişti. Telemetri hiçbir şeye karar vermiyor:
+`otlp_endpoint`'teki bir yazım hatası yüzünden wrap'i düşürmek, kullanıcının
+MCP sunucusunu da götürür ve ajanı **önünde fuse olmadan** bırakır — Faz 7'nin
+açılamayan onay kanalı için verdiği kararın aynısı.
+
+`telemetry.enabled: false` satırının sessiz olması da karar: kimsenin açmadığı
+bir özellik hakkında her koşumda bir satır yazmak, operatörün kendi sunucusunun
+çıktısını okuduğu akışta gürültüdür.
+
+### Tek `Diagnostics`, ikinci okuyucu
+
+Faz 6b'nin kuralı duruyor: bir wrap'te **tek** `Diagnostics` var, yoksa
+rate-limit pencereleri ayrışır. Faz 8'in ihtiyacı ikinci bir *tüketici*ydi, o
+yüzden `ObservedDiagnostics` sınıfı `Diagnostics`'i **genişletiyor**:
+`emit` önce gözlemciye gösteriyor, sonra `super.emit`'e devrediyor. Prefix,
+rate limiter, `block()` ve `--quiet` proxy'nin, değişmedi.
+
+**Gözlem `--quiet` kontrolünün önünde ve bu bilinçli.** `--quiet` AgentFuse'un
+terminaldeki gevezeliğini susturmak içindir; devre kesicinin ne yaptığını
+kaydetmeyi durdurma talimatı değildir. Sessiz bir terminal istediği için
+denetim izini kaybeden bir koşum, tam olarak collector'ın var olma sebebini
+kaybederdi. Bir test `--quiet` altında stderr'in tamamen boş olduğunu ve
+export'un yine aktığını birlikte ölçüyor.
+
+Gözlemci `try` içinde: kapalı olması gereken bir özellik uğruna proxy'yi
+düşüren bir telemetri tüketicisi olmaz.
+
+### Testler — alıcı gerçek bir socket'te
+
+- `testing/otlp-receiver.ts` süreç içi ama **gerçek** bir `node:http` sunucusu:
+  gelen URL'yi, header'ları ve ayrıştırılmış gövdeyi olduğu gibi tutuyor, ve
+  istendiğinde kötü davranıyor (yavaş cevap, HTTP hatası, bozuk gövde, socket'i
+  kapatma). Payload alan alan onun tarafından doğrulanıyor.
+- `wrap-process.test.ts`'e dört uçtan uca test eklendi: **inşa edilmiş
+  `dist/main.js`**, gerçek fixture sunucusu ve gerçek alıcı ile. Gelen
+  `traceparent` span'i çocuk yapıyor; sarılan sunucu ajanın bağlamını
+  değişmeden görüyor (fixture `FIXTURE_ECHO_META=1` ile `_meta`'yı geri
+  yazıyor); bağlam yokken span kök oluyor ve `session_id` ADR-006'nın ULID'i
+  oluyor; `warn` modunda `loop.enforced: false` gidiyor; ve **telemetri
+  kapalıyken dinleyen bir collector'a hiçbir şey ulaşmıyor.**
+- `examples/otlp-receiver.mjs` bağımlılıksız bir alıcı, ve `examples.test.ts`
+  onun okuyucularını **gerçek kodlayıcıya karşı** koşturuyor — bir tel
+  formatının yanlış örneği, hiç olmamasından kötüdür.
+
+### Faz 8'in çelişki kaydı
+
+1. **Upstream'e yeniden enjeksiyon yok** (yukarıda). Proxy donmuş; dikiş
+   yazıldı, uygulanmadı.
+2. **Gelen bağlam yokken span yine üretiliyor** (kök olarak). "Uydurma
+   `traceparent` yok" kuralı *tel üzerine yazılan dizeye* uygulandı: hiçbir
+   yere `traceparent` yazılmıyor ve hiçbir span uydurma bir ebeveyn
+   bildirmiyor. Alternatif okuma — bağlam yokken hiç span üretmemek — wrap
+   modunun tamamında span'i sıfırlardı, çünkü bugün ajanların çoğu
+   `traceparent` göndermiyor.
+3. **Onaylanan bir `allow` kararı dışa veriliyor** (yukarıda, ADR-009).
+   Tablonun "yalnız `allow` olmayanlar" kuralının tek istisnası, ve dar:
+   insanın sorulduğu karar.
+4. **`http.ts`'in `RequestContext`'i genişletilmedi.** Faz 6b oraya "OTLP
+   bağlamı gerekirse buraya" notu bırakmıştı; P0'da `serve` araç çağrısı
+   iletmiyor (ADR-008), yani okuyacak span yok. Okunmayan bir alan eklemek ölü
+   kod olurdu. ADR-006 merdiveni HTTP header'larını okumamaya devam ediyor.
+5. **`core` ve `proxy` değiştirilmedi.** Tek satır bile. `TelemetrySink` portu,
+   `FuseEvent` birliği ve `ToolCallRecord.traceparent` olduğu gibi yetti;
+   ihtiyaç duyulan tek şey `engine.ports.sessions` üzerinden uçuştaki kaydı
+   okumaktı, ki o zaten public yüzey.
+
+---
+
 ## Sırada ne var
 
 ### Önce `.ssot`: üç nokta kendi kararını bekliyor
@@ -1780,25 +2040,45 @@ Not: Faz 1'de `embeddings-local` `@agentfuse/core`'a bağlanmadı, bu yüzden
 dondurulmuş `EmbeddingProvider`'ıyla değiştirmeli ve tsconfig `references`'ını
 düzeltmeli.
 
-### Faz 8–10
+### Faz 9–10
 
-Plan dosyasındaki brifingler geçerli. Kısaca: Faz 8 OTLP telemetri (kapalıyken
-**sıfır** OTel modülü yüklenmeli); Faz 9 benchmark'lar ve eşik kalibrasyonu;
-Faz 10 dokümanlar ve v0.1.0.
+Plan dosyasındaki brifingler geçerli. Kısaca: Faz 9 benchmark'lar ve eşik
+kalibrasyonu; Faz 10 dokümanlar ve v0.1.0.
 
-**Faz 8'in bağlanacağı dikişler iki yerde yazılı:** Faz 6b → "Faz 7 ve Faz 8
-için bırakılan dikişler" ve Faz 7 → "Faz 8 ve Faz 10 için bırakılanlar".
-Taşıyıcı maddeler: `createRuntime`'ın yazdığı "OTLP export yok" uyarısı
-**silinmek zorunda** (onay gateway'i uyarısı Faz 7'de silindi), ikinci bir
-`Diagnostics` kurulmamalı (rate-limit pencereleri ayrışır), ve onay akışının
-olay adları sabit — özellikle `approval_pending` → `approval_resolved` çifti,
-ki bir onayın ne kadar beklediğini ölçmenin tek yolu o.
+**Faz 9'un Faz 8'den alacakları:**
 
-Faz 8 ya da 9 proxy'ye dokunuyorsa birlikte alınacak iki kanca var, ikisi de
-Faz 6b'nin belgelenmiş ödünçleri: `StdioWrapOptions.onChildExit` (çocuğun exit
-code'u aynalanabilsin diye) ve `StdioWrapHandle.onConnect` (bağlantının
-açıldığı anı yakalamak için kurulan 25 ms'lik zamanlayıcı silinsin diye).
-Faz 7 proxy'ye dokunmadı, yani ikisi de hâlâ açık.
+- Ölçüm noktası hazır: `telemetry.enabled: true` + `otlp_endpoint`'i süreç içi
+  bir alıcıya çevirmek, ROC taramasının her kararı, her döngü tespitini ve her
+  `loop.window_score`'u yapılandırılmış olarak okumasını sağlıyor —
+  `lastScore()` ile birlikte ikinci okuma noktası bu.
+  `testing/otlp-receiver.ts` zaten o alıcıdır ve build dışıdır.
+- **Gecikme ölçümünde telemetri açıkken de sıcak yol değişmiyor:** `emit`
+  birkaç nesne kurup bir diziye `push` ediyor, socket işi timer'da. Faz 9 p95'i
+  ölçerken telemetriyi hem açık hem kapalı koşup farkın ölçüm gürültüsünün
+  altında kaldığını göstermeli; aksi hâlde batch ve kuyruk sabitleri
+  (`exporter.ts`) kalibrasyona açık.
+- Faz 3'ün notu duruyor: fingerprint'e duyarlı örnekleme ROC taramasında
+  ölçülecek bir iyileştirme adayı.
+
+**Faz 10'un Faz 8'den alacakları:**
+
+- Telemetri bölümünün anlatması gerekenler: **varsayılan kapalı** (çatı
+  ADR-003), `telemetry.enabled` + `otlp_endpoint` + `service_name`, sinyal
+  yollarının (`/v1/traces`, `/v1/logs`) eklendiği, dört olay tipi ve
+  `tunedness.*` öznitelik adları, `--quiet`'in telemetriyi **susturmadığı**, ve
+  collector'ın düşmesinin bir teşhis satırından başka bir şeye mal olmadığı.
+- `examples/otlp-receiver.mjs` bağımlılıksız bir alıcı ve dokümanın "çıktıyı
+  gör" adımı olmaya hazır; başındaki blok ne geldiğini anlatıyor.
+- ADR-010 kurulum boyutuna dokunmadığımızı söylüyor: doküman "telemetri açmak
+  ek paket kurdurmaz" diyebilir, çünkü öyle.
+
+Faz 9 ya da 10 proxy'ye dokunuyorsa birlikte alınacak **üç** kanca var, üçü de
+belgelenmiş ödünç: `StdioWrapOptions.onChildExit` (çocuğun exit code'u
+aynalanabilsin diye), `StdioWrapHandle.onConnect` (bağlantının açıldığı anı
+yakalamak için kurulan 25 ms'lik zamanlayıcı silinsin diye) ve Faz 8'in
+eklediği `ToolCallGuardOptions.traceparentFor` (span'imiz upstream'e ebeveyn
+olarak enjekte edilebilsin diye). Faz 7 ve Faz 8 proxy'ye dokunmadı, yani üçü
+de açık.
 
 **Faz 9 yalnız test değil, ürünün sayısal iddiasıdır.** PRD §6 eşikleri —
 recall ≥ 0.90, FP < 0.05, p95 eklenen < 50 ms — CI'da kapı olur. Corpus'un
