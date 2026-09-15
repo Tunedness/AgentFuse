@@ -36,8 +36,14 @@ function sourceFiles(dir: string): string[] {
   const out: string[] = [];
   for (const entry of readdirSync(dir, { withFileTypes: true })) {
     const full = join(dir, entry.name);
-    if (entry.isDirectory()) out.push(...sourceFiles(full));
-    else if (entry.name.endsWith('.ts') && !entry.name.endsWith('.test.ts')) out.push(full);
+    if (entry.isDirectory()) {
+      // `src/testing/` is scaffolding that happens not to end in `.test.ts`.
+      // The package build and the coverage report both exclude it, so it never
+      // ships and these rules — which are about what ships — do not apply.
+      if (entry.name !== 'testing') out.push(...sourceFiles(full));
+    } else if (entry.name.endsWith('.ts') && !entry.name.endsWith('.test.ts')) {
+      out.push(full);
+    }
   }
   return out;
 }

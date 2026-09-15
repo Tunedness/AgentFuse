@@ -284,7 +284,7 @@ export async function loadInstaller(
     throw new CliError(`${EMBEDDINGS_PACKAGE} is not installed`, {
       exitCode: EXIT.missingDependency,
       hints: [
-        `\`agentfuse models install\` delegates to ${EMBEDDINGS_PACKAGE}, which AgentFuse deliberately does not depend on: it carries onnxruntime-node, about 301 MB of platform binaries, and bundling that into every install is what ADR-003 rejected.`,
+        `\`agentfuse models install\` delegates to ${EMBEDDINGS_PACKAGE}, which AgentFuse deliberately does not depend on: it carries onnxruntime-node, about 301 MB of platform binaries, and every plain install would pay for it.`,
         `Install it first: npm install ${EMBEDDINGS_PACKAGE}`,
         messageOf(error),
       ],
