@@ -4,12 +4,18 @@ import { fileURLToPath } from 'node:url';
 import { CounterIdGenerator, FuseEngine, parsePolicy } from '@agentfuse/core';
 import { Client } from '@modelcontextprotocol/client';
 import { InMemoryTransport } from '@modelcontextprotocol/server';
-import { afterEach, beforeAll, describe, expect, it } from 'vitest';
+import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
 import {
   RELAYABLE_CLIENT_CAPABILITIES,
   type StdioWrapOptions,
   wrapStdioServer,
 } from './stdio-wrap.js';
+
+// These tests spawn real processes over real pipes, so their wall clock is the
+// machine's, not the code's. Vitest's 5 s default is enough in isolation and
+// too tight under a loaded full-suite run — which shows up as a random red
+// build rather than as a bug. The assertions are about behaviour, never speed.
+vi.setConfig({ testTimeout: 20_000 });
 
 const FIXTURES = fileURLToPath(new URL('./testing/fixtures/', import.meta.url));
 const WRAP_HOST = `${FIXTURES}wrap-host.mjs`;

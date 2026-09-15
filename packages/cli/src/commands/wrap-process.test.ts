@@ -2,9 +2,15 @@ import { existsSync, mkdtempSync, readdirSync, rmSync, writeFileSync } from 'nod
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { OtlpReceiver } from '../testing/otlp-receiver.js';
 import { nonProtocolLines, WireClient } from '../testing/wire.js';
+
+// These tests spawn real processes over real pipes, so their wall clock is the
+// machine's, not the code's. Vitest's 5 s default is enough in isolation and
+// too tight under a loaded full-suite run — which shows up as a random red
+// build rather than as a bug. The assertions are about behaviour, never speed.
+vi.setConfig({ testTimeout: 20_000 });
 
 /**
  * `agentfuse wrap` as a real process, driven over a real pipe.

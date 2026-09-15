@@ -4,11 +4,17 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { promisify } from 'node:util';
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { COMMANDS, PHASE_6B_COMMANDS, run, usage } from './cli.js';
 import { CliError } from './errors.js';
 import { CLI_VERSION, versionBanner } from './index.js';
 import { type CliContext, StringWriter } from './io.js';
+
+// These tests spawn real processes over real pipes, so their wall clock is the
+// machine's, not the code's. Vitest's 5 s default is enough in isolation and
+// too tight under a loaded full-suite run — which shows up as a random red
+// build rather than as a bug. The assertions are about behaviour, never speed.
+vi.setConfig({ testTimeout: 20_000 });
 
 let root: string;
 let stdout: StringWriter;
