@@ -353,6 +353,46 @@ describe('a collector that is down, slow or nonsense', () => {
 });
 
 describe('the bounds', () => {
+  it('leaves the rest of a backlog queued when a batch fails', async () => {
+    const log = diagnostics();
+    const subject = exporter('http://127.0.0.1:1', {
+      onDiagnostic: log.emit,
+      batchSize: 1,
+      timeoutMs: 100,
+      retryDelayMs: 60_000,
+    });
+
+    subject.enqueueSpan(span());
+    subject.enqueueSpan(span());
+    subject.enqueueSpan(span());
+    await subject.flush();
+
+    // One batch tried, one batch lost, and the backoff stopped the rest from
+    // being thrown at a collector that has just proved it is not there.
+    expect(subject.stats.failures).toBe(1);
+    expect(subject.depth).toBe(2);
+  });
+
+  it('counts a record it cannot even serialise, instead of wedging the queue', async () => {
+    const collector = await receiver();
+    const log = diagnostics();
+    const subject = exporter(collector.endpoint, { onDiagnostic: log.emit });
+
+    // A BigInt is the everyday way to make `JSON.stringify` throw. Nothing we
+    // build can contain one; the path exists so that a future attribute type
+    // that does is a counter and a line rather than a stuck exporter.
+    subject.enqueueSpan(
+      span({
+        attributes: [{ key: 'x', value: { intValue: 1n } }] as unknown as OtlpSpan['attributes'],
+      }),
+    );
+    subject.enqueueSpan(span());
+    await subject.flush();
+
+    expect(log.lines[0]?.event).toBe('telemetry_export_failed');
+    expect(subject.stats.failures).toBe(1);
+  });
+
   it('drops the oldest record when a queue is full', async () => {
     const collector = await receiver();
     const subject = exporter(collector.endpoint, { capacity: 2, batchSize: 10 });

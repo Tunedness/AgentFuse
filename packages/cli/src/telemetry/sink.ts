@@ -377,10 +377,14 @@ export class OtlpTelemetrySink implements TelemetrySink {
     this.#exporter.enqueueLog(record);
   }
 
-  /** The span identity for a call, minted once and remembered until it ends. */
+  /**
+   * Mints the span identity for a call and remembers it until the call ends.
+   *
+   * Called once per call, from the decision — the one moment at which the
+   * inbound `traceparent` is still readable. The completion reuses what is
+   * remembered and only comes back here when there is nothing to reuse.
+   */
   #context(sessionId: string, callId: string): SpanContext {
-    const existing = this.#contexts.get(callId);
-    if (existing !== undefined) return existing;
     const parent = parseTraceparent(this.#lookup?.(sessionId, callId));
     const context = spanContextFor(parent, this.#random);
     this.#remember(this.#contexts, callId, context);
@@ -397,10 +401,10 @@ export class OtlpTelemetrySink implements TelemetrySink {
    */
   #remember<T>(map: Map<string, T>, key: string, value: T): void {
     map.set(key, value);
-    while (map.size > this.#capacity) {
-      const oldest = map.keys().next();
-      if (oldest.done === true) return;
-      map.delete(oldest.value);
-    }
+    if (map.size <= this.#capacity) return;
+    // One in, so at most one out. The cast is safe by construction: the map is
+    // over a capacity of at least one, so it has a first key.
+    const [oldest] = map.keys();
+    map.delete(oldest as string);
   }
 }
