@@ -17,6 +17,7 @@ import { runInit } from './commands/init.js';
 import { runModels } from './commands/models.js';
 import { runReport } from './commands/report.js';
 import { runValidate } from './commands/validate.js';
+import { runWrap } from './commands/wrap.js';
 import { CliError, EXIT, formatCliError } from './errors.js';
 import { versionBanner } from './index.js';
 import { type CliContext, writeLines } from './io.js';
@@ -28,15 +29,13 @@ export const COMMANDS = ['wrap', 'serve', 'init', 'validate', 'report', 'models'
 export type Command = (typeof COMMANDS)[number];
 
 /**
- * The commands phase 6b owns.
+ * The commands this build names but does not carry.
  *
- * `wrap` is almost entirely a `wrapStdioServer()` call and `serve` is the HTTP
- * gateway; both sit on top of `createRuntime`, which is finished and tested.
- * They are named here and refused with an exit code rather than omitted from
- * the table, so `agentfuse wrap` says what is going on instead of suggesting
- * that the user misspelled something.
+ * A command in {@link COMMANDS} is either implemented or listed here and
+ * refused with an exit code — never silently missing, because `agentfuse wrap`
+ * must not look like a misspelling.
  */
-export const PHASE_6B_COMMANDS: readonly Command[] = ['wrap', 'serve'];
+export const PHASE_6B_COMMANDS: readonly Command[] = ['serve'];
 
 /** `agentfuse --help`. */
 export function usage(): string[] {
@@ -45,7 +44,7 @@ export function usage(): string[] {
     '',
     'Usage: agentfuse <command> [options]',
     '',
-    '  wrap -- <cmd>    Run an MCP server behind the breaker. (not in this build)',
+    '  wrap -- <cmd>    Run an MCP server behind the breaker.',
     '  serve            Serve the breaker over HTTP. (not in this build)',
     '  init             Write a starter fusepolicy.yaml.',
     '  validate         Check a policy file and print what it resolves to.',
@@ -126,11 +125,8 @@ async function dispatch(context: CliContext): Promise<number> {
       return runReport(context, rest);
     case 'models':
       return await runModels(context, rest);
-    // TODO(phase-6b): `wrap` and `serve` land here. `createRuntime` in
-    // `runtime.ts` already returns what `wrapStdioServer` needs — engine,
-    // diagnostics, `writeReport`, `onSessionEnd` — so what is missing is the
-    // transport and the child process, not the decision machinery.
     case 'wrap':
+      return await runWrap(context, rest);
     case 'serve':
       throw notImplemented(first);
   }
