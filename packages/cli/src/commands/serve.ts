@@ -69,6 +69,7 @@ import {
 import { type CliContext, writeNotice } from '../io.js';
 import { createRuntime, DEFAULT_CLOSE_TIMEOUT_MS } from '../runtime.js';
 import { asMode } from './shared.js';
+import { defaultServerName } from './wrap.js';
 
 /** Flags `serve` accepts. The upstream target comes after a bare `--`. */
 export const SERVE_FLAGS = {
@@ -410,7 +411,9 @@ export async function runServe(
   const port = asPort(args.value('port')) ?? DEFAULT_PORT;
   const bindHost = args.value('host') ?? DEFAULT_HOST;
   const path = args.value('path') ?? DEFAULT_PATH;
-  const serverName = args.value('name') ?? command;
+  // The same guess `wrap` makes, for the same reason: the alias is part of
+  // every fingerprint, and `npx` is not a server.
+  const serverName = args.value('name') ?? defaultServerName(command, targetArgs);
   const policyFlag = args.value('policy');
   const hookFlag = args.value('hook');
   const quiet = args.bool('quiet');

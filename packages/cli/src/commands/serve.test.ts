@@ -569,6 +569,31 @@ describe('the command, over a real socket', () => {
     expect(stderr.text).toContain('"event":"http_closing"');
   });
 
+  it('guesses the same alias wrap would, when --name is absent', async () => {
+    const host = new FakeHost();
+    let base = '';
+    const finished = runServe(
+      context(),
+      ['--port', '0', '--', 'npx', '-y', '@modelcontextprotocol/server-filesystem', '/srv'],
+      {
+        host,
+        closeTimeoutMs: 50,
+        onListening: (endpoint) => {
+          base = `http://127.0.0.1:${endpoint.port}`;
+        },
+      },
+    );
+    await new Promise((resolve) => setTimeout(resolve, 20));
+
+    // Not `npx`: the alias is part of every fingerprint, so a runner defers to
+    // what it is running — the same guess, from the same function, as wrap.
+    const health = (await (await fetch(`${base}/healthz`)).json()) as { serverName: string };
+    expect(health.serverName).toBe('server-filesystem');
+
+    host.signals.emit('SIGINT');
+    expect(await finished).toBe(0);
+  });
+
   it('says nothing at all under --quiet', async () => {
     const host = new FakeHost();
     const finished = runServe(context(), ['--quiet', '--port', '0', '--', 'npx', 'srv'], {

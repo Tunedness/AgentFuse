@@ -1,0 +1,63 @@
+{
+  "mcpServers": {
+    "filesystem": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "agentfuse",
+        "wrap",
+        "--name",
+        "filesystem",
+        "--policy",
+        "/absolute/path/to/fusepolicy.yaml",
+        "--",
+        "npx",
+        "-y",
+        "@modelcontextprotocol/server-filesystem",
+        "/absolute/path/to/your/projects"
+      ]
+    },
+    "github": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "agentfuse",
+        "wrap",
+        "--name",
+        "github",
+        "--mode",
+        "enforce",
+        "--",
+        "npx",
+        "-y",
+        "@modelcontextprotocol/server-github"
+      ],
+      "env": {
+        "AGENTFUSE_POLICY": "/absolute/path/to/fusepolicy.yaml",
+        "GITHUB_PERSONAL_ACCESS_TOKEN": "replace-me"
+      }
+    },
+    "slow-local-server": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "agentfuse",
+        "wrap",
+        "--name",
+        "reports",
+        "--request-timeout",
+        "600000",
+        "--relay",
+        "sampling,elicitation,roots",
+        "--quiet",
+        "--",
+        "node",
+        "/absolute/path/to/your/server.js",
+        "--verbose"
+      ],
+      "env": {
+        "AGENTFUSE_POLICY": "/absolute/path/to/fusepolicy.yaml"
+      }
+    }
+  }
+}
