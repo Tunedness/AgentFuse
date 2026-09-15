@@ -119,4 +119,38 @@ describe('purity invariant', () => {
     }
     expect(offenders).toEqual([]);
   });
+
+  /**
+   * No timers, anywhere.
+   *
+   * Phase 2 recorded this decision for the approval gateway: the engine passes
+   * `timeoutMs` and waits for `'timeout'` back rather than arming a timer,
+   * because a package whose only source of time is an injected {@link Clock}
+   * cannot also hold a private one. Phase 3's embedding queue is the first piece
+   * of core that genuinely wants to wait — it backs off after a failed batch —
+   * and it does that by comparing `clock.now()` against a deadline and letting
+   * the next `enqueue` wake it up.
+   *
+   * That keeps the whole package deterministic under a fake clock, and it also
+   * means no background work can hold a process open. Written down as a test
+   * because the tempting fix for a flaky async test is a `setTimeout`.
+   */
+  it('arms no timers of its own', () => {
+    const banned = [
+      /\bsetTimeout\s*\(/,
+      /\bsetInterval\s*\(/,
+      /\bsetImmediate\s*\(/,
+      /\bqueueMicrotask\s*\(/,
+      /\bprocess\.hrtime\b/,
+      /\bperformance\.now\s*\(/,
+    ];
+    const offenders: string[] = [];
+    for (const file of files) {
+      const source = stripComments(readFileSync(file, 'utf8'));
+      for (const pattern of banned) {
+        if (pattern.test(source)) offenders.push(`${file.slice(SRC.length)}: ${pattern.source}`);
+      }
+    }
+    expect(offenders).toEqual([]);
+  });
 });

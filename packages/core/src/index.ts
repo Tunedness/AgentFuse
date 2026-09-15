@@ -84,6 +84,13 @@ export {
   normalizeArgs,
   truncateValue,
 } from './loop/normalize.js';
+export type {
+  DropCause,
+  EmbeddingJob,
+  EmbeddingQueueOptions,
+  EmbeddingQueueStats,
+} from './loop/queue.js';
+export { EmbeddingQueue } from './loop/queue.js';
 export type { EmbeddingWindowOptions } from './loop/window.js';
 export { EmbeddingWindow } from './loop/window.js';
 export type {
