@@ -1,0 +1,14 @@
+{
+  "comment": "The exact bytes the noisy fixture server writes to stderr. Read by both the fixture (plain node, no transform) and the test (TypeScript), so there is one definition and no chance of the expectation drifting from what is written. JSON rather than a module because a shared module would either need a build step or would run the fixture server on import. The payload carries UTF-8 beyond the BMP, a bare CR with no LF, an ANSI escape, a NUL byte, a line long enough to cross a pipe buffer boundary, and a final chunk with no trailing newline: a line-oriented forwarder mangles at least four of those.",
+  "startup": [
+    "noisy-server: starting up\n",
+    "utf-8: über · 日本語 · 🜛 · ﷽\n",
+    "bare carriage return follows:\rand the line continues\n",
+    "\u001b[31mANSI red\u001b[0m\n",
+    "NUL inside a line: [\u0000] and after it\n"
+  ],
+  "longLinePrefix": "long: ",
+  "longLineLength": 9000,
+  "tail": "no trailing newline on this last chunk",
+  "call": "noisy-server: handling a call\n"
+}

@@ -366,6 +366,37 @@ describe('teardown', () => {
   });
 });
 
+describe('out-of-band errors', () => {
+  it('are reported rather than thrown out of close()', async () => {
+    const reported: Error[] = [];
+    const stub = {
+      request: async () => ({}),
+      notification: async () => {},
+      close: async () => {
+        throw new Error('the upstream transport refused to close');
+      },
+      fallbackRequestHandler: undefined,
+      fallbackNotificationHandler: undefined,
+    } as unknown as Client;
+
+    const bridge = createBridge({
+      client: stub,
+      serverInfo: SCENARIO_INFO,
+      capabilities: { tools: {} },
+      onToolCall: (call) => call.forward(),
+      onError: (error) => reported.push(error),
+    });
+
+    // Teardown is best effort on both halves: a client that will not close must
+    // not stop the server half from closing, and the failure has to surface
+    // somewhere other than an unhandled rejection.
+    await expect(bridge.close()).resolves.toBeUndefined();
+    expect(reported.map((error) => error.message)).toEqual([
+      'the upstream transport refused to close',
+    ]);
+  });
+});
+
 describe('an upstream that answers tools/call with nonsense', () => {
   it('is reported rather than passed on as a CallToolResult', async () => {
     // Unreachable through an SDK `Server`, which normalises every `tools/call`

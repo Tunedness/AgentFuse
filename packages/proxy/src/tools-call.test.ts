@@ -149,6 +149,26 @@ describe('a call the engine allows', () => {
     expect(blocked.isError).toBe(true);
   });
 
+  it('summarises a structured-only result, so the semantic layer has something to see', async () => {
+    const { engine } = engineFor({
+      version: 1,
+      mode: 'enforce',
+      loop_detection: { exact_repeat: { count: 2 } },
+    });
+    const guard = createToolCallGuard({ engine, serverName: 'scenario', sessionId: SESSION });
+    harness = await createHarness({ onToolCall: guard.gate });
+
+    const first = await harness.client.callTool({ name: 'structured' });
+    const summary = guard.endSession();
+
+    // A tool with no text block would otherwise be summarised as the empty
+    // string, and every one of its calls would look identical to the semantic
+    // layer.
+    expect(first.structuredContent).toEqual({ rows: 3, cursor: 'next' });
+    expect(summary.calls).toBe(1);
+    expect(summary.tokensEstimated.results).toBeGreaterThan(0);
+  });
+
   it('consults the annotations catalogue when the host supplies one', async () => {
     const asked: string[] = [];
     const { engine } = engineFor({

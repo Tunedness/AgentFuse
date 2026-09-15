@@ -52,6 +52,11 @@ const ECHO_TOOLS = [
     description: 'Throws a JSON-RPC error.',
     inputSchema: { type: 'object' as const },
   },
+  {
+    name: 'structured',
+    description: 'Answers with structuredContent and no text block.',
+    inputSchema: { type: 'object' as const },
+  },
 ] as const;
 
 /** What a scenario server recorded about the traffic it received. */
@@ -123,6 +128,11 @@ export function createScenarioServer(): { server: Server; log: ScenarioLog } {
         return { isError: true, content: [{ type: 'text', text: 'ENOENT: no such file /tmp/a' }] };
       case 'throw':
         throw new Error('scenario server refuses');
+      case 'structured':
+        // No text block at all. A proxy that summarised the result from text
+        // alone would hand the engine the empty string for every one of these
+        // calls, and the semantic layer would see them all as identical.
+        return { content: [], structuredContent: { rows: 3, cursor: 'next' } };
       default:
         return {
           content: [{ type: 'text', text: JSON.stringify(request.params.arguments ?? {}) }],
