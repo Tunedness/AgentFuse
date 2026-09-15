@@ -31,6 +31,18 @@ describe('@agentfuse/core public surface', () => {
     }
   });
 
+  it('exposes the asynchronous semantic layer', () => {
+    for (const name of [
+      'EmbeddingWindow',
+      'EmbeddingQueue',
+      'SemanticLoopDetector',
+      'attachSemanticLoopDetector',
+      'semanticEmbeddingText',
+    ]) {
+      expect(core, `missing export: ${name}`).toHaveProperty(name);
+    }
+  });
+
   it('re-exports the policy surface on its own subpath', () => {
     expect(policy.parsePolicy).toBe(core.parsePolicy);
     expect(policy.FusePolicySchemaV1).toBe(core.FusePolicySchemaV1);

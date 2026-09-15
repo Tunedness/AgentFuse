@@ -23,6 +23,13 @@ export interface SessionCounters {
   resultTokens: number;
 }
 
+/**
+ * Why the semantic layer did not score every call of a session.
+ *
+ * See {@link SessionState.degraded}.
+ */
+export type DegradedCause = 'sampled' | 'unavailable';
+
 /** Everything the engine remembers about one agent session. */
 export interface SessionState {
   sessionId: string;
@@ -49,8 +56,20 @@ export interface SessionState {
    * scorer never blocks a decision, it just leaves a note for the next one.
    */
   pendingTrip?: Reason;
-  /** Set when the embedding queue shed load and stopped scoring every call. */
-  degraded?: 'sampled';
+  /**
+   * Set when the semantic layer stopped scoring every call in this session.
+   *
+   * `'sampled'` is load shedding — the embedding queue overflowed or started
+   * admitting every second call, so the window is sparser than the policy asked
+   * for. `'unavailable'` is worse: the provider failed and nothing was scored
+   * at all, leaving only the deterministic rules.
+   *
+   * The distinction exists because a report that says "sampled" when the
+   * embedding backend was dead is a lie, and ADR-007's rule — an estimate
+   * carries its caveat where a reader will see it — applies just as much to
+   * detection fidelity as to token counts.
+   */
+  degraded?: DegradedCause;
   /** Calls that have started but not yet reported an outcome, keyed by call id. */
   inFlight: Map<string, ToolCallRecord>;
   /** Number of completed calls that reported an error. */

@@ -41,6 +41,7 @@ export type {
   CallOutcome,
   Decision,
   DecisionAction,
+  DegradedCause,
   FuseEvent,
   FuseEventBase,
   LoopDetectionEvent,
@@ -71,9 +72,21 @@ export type {
   BreakerTransition,
   Guard,
   GuardContext,
+  SemanticHost,
+  SemanticLoopDetectorOptions,
+  SemanticLoopStats,
   TripOutcome,
 } from './guards/index.js';
-export { applyBreakerEvent, applyTrip, GUARDS, GuardState, runGuards } from './guards/index.js';
+export {
+  applyBreakerEvent,
+  applyTrip,
+  attachSemanticLoopDetector,
+  GUARDS,
+  GuardState,
+  runGuards,
+  SemanticLoopDetector,
+} from './guards/index.js';
+export { MAX_ARGS_CHARS, MAX_SUMMARY_CHARS, semanticEmbeddingText } from './loop/embed-text.js';
 export type { ErrorInput } from './loop/fingerprint.js';
 export { errorSignature, fingerprint, shortFingerprint } from './loop/fingerprint.js';
 export {

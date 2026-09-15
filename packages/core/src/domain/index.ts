@@ -17,4 +17,9 @@ export type {
   ToolAnnotations,
   ToolCallRecord,
 } from './records.js';
-export type { SessionCounters, SessionState, SessionSummary } from './session.js';
+export type {
+  DegradedCause,
+  SessionCounters,
+  SessionState,
+  SessionSummary,
+} from './session.js';

@@ -7,7 +7,7 @@ import { UlidGenerator } from './adapters/ulid.js';
 import type { BreakerPhase } from './domain/breaker.js';
 import type { Decision, DecisionAction, Reason, TripCode } from './domain/decision.js';
 import type { CallOutcome, ToolAnnotations, ToolCallRecord } from './domain/records.js';
-import type { SessionState, SessionSummary } from './domain/session.js';
+import type { DegradedCause, SessionState, SessionSummary } from './domain/session.js';
 import { applyBreakerEvent } from './guards/breaker.js';
 import { runGuards } from './guards/pipeline.js';
 import type { GuardContext } from './guards/types.js';
@@ -184,10 +184,18 @@ export class FuseEngine {
     session.pendingTrip ??= reason;
   }
 
-  /** Records that the semantic layer is sampling rather than scoring every call. */
-  markDegraded(sessionId: string): void {
+  /**
+   * Records that the semantic layer did not score every call in a session.
+   *
+   * `'unavailable'` outranks `'sampled'`: a session that sampled for a while
+   * and then lost its provider entirely is described by the worse of the two,
+   * and a later load-shedding notice must not downgrade that.
+   */
+  markDegraded(sessionId: string, cause: DegradedCause = 'sampled'): void {
     const session = this.#ports.sessions.get(sessionId);
-    if (session) session.degraded = 'sampled';
+    if (!session) return;
+    if (session.degraded === 'unavailable') return;
+    session.degraded = cause;
   }
 
   /**
