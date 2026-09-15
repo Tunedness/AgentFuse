@@ -3,7 +3,12 @@ import { DenyAllApprovalGateway, ScriptedApprovalGateway } from './adapters/appr
 import { FakeClock } from './adapters/clock.js';
 import { RecordingTelemetrySink } from './adapters/telemetry.js';
 import { CounterIdGenerator } from './adapters/ulid.js';
-import type { CallOutcome, Decision, TripCode } from './domain/index.js';
+import {
+  APPROVAL_REASON_LIMIT,
+  type CallOutcome,
+  type Decision,
+  type TripCode,
+} from './domain/index.js';
 import { FuseEngine } from './engine.js';
 import { parsePolicy } from './policy/compile.js';
 import type { ApprovalGateway } from './ports/index.js';
@@ -393,6 +398,141 @@ describe('approvals', () => {
     expect(decision.action).toBe('warn');
     expect(decision.wouldTrip).toBe(true);
     expect(gateway.requests).toHaveLength(0);
+    // No gateway ran, so there is nothing to record and nothing is invented.
+    expect(decision.approval).toBeUndefined();
+  });
+});
+
+/**
+ * ADR-009: `approve`/`deny` have always insisted on a `--reason`, and it used to
+ * stop at a diagnostic line. The report is an audit artifact and "why was this
+ * call allowed" is exactly what an audit asks, so the answer now travels as an
+ * object and lands on the decision.
+ */
+describe('the human’s reason', () => {
+  const approvalPolicy = { mode: 'enforce', tools: [{ match: '*', action: 'require_approval' }] };
+
+  /** A gateway that answers with the object form of the port. */
+  function answering(
+    verdict: 'approved' | 'denied' | 'timeout',
+    reason?: unknown,
+  ): ApprovalGateway {
+    return { requestApproval: async () => ({ verdict, reason: reason as string | undefined }) };
+  }
+
+  it('reaches the decision of an approved call', async () => {
+    const h = harness(approvalPolicy, answering('approved', 'checked the path by hand'));
+
+    const decision = await call(h, { path: '/a' });
+
+    expect(decision.action).toBe('allow');
+    expect(decision.approval).toEqual({
+      verdict: 'approved',
+      reason: 'checked the path by hand',
+    });
+  });
+
+  it('reaches the decision of a denied call', async () => {
+    const h = harness(approvalPolicy, answering('denied', 'that is production'));
+
+    const decision = await call(h, { path: '/a' });
+
+    expect(decision.action).toBe('deny');
+    expect(decision.approval).toEqual({ verdict: 'denied', reason: 'that is production' });
+  });
+
+  it('is absent when nobody wrote one, and the timeout behaves as it always did', async () => {
+    const h = harness(approvalPolicy, new ScriptedApprovalGateway('timeout'));
+
+    const decision = await call(h, { path: '/a' });
+
+    // Unchanged from before the field existed: the verdict is recorded, the
+    // reason is not invented, and `on_timeout` still decides the action.
+    expect(decision.action).toBe('deny');
+    expect(codes(decision)).toEqual(['POLICY_APPROVAL', 'APPROVAL_TIMEOUT']);
+    expect(decision.approval).toEqual({ verdict: 'timeout' });
+  });
+
+  it('accepts a gateway that still answers with a bare verdict string', async () => {
+    // Widening the port rather than replacing it: a three-line gateway with
+    // nothing to say beyond yes or no stays correct without being rewritten.
+    const h = harness(approvalPolicy, new ScriptedApprovalGateway('approved'));
+
+    expect((await call(h, { path: '/a' })).approval).toEqual({ verdict: 'approved' });
+  });
+
+  it('records no reason when a gateway throws, because nobody gave one', async () => {
+    const h = harness(approvalPolicy, {
+      requestApproval: () => Promise.reject(new Error('socket is gone')),
+    });
+
+    const decision = await call(h, { path: '/a' });
+
+    // The failure belongs in the host's diagnostics, not in a field that says
+    // a person wrote it.
+    expect(decision.action).toBe('deny');
+    expect(decision.approval).toEqual({ verdict: 'denied' });
+  });
+
+  it('denies an answer it cannot read rather than guessing', async () => {
+    const h = harness(approvalPolicy, {
+      requestApproval: async () => ({ verdict: 'yes-go-on' }) as never,
+    });
+
+    expect((await call(h, { path: '/a' })).approval).toEqual({ verdict: 'denied' });
+  });
+
+  it('sanitises and caps whatever the gateway hands over', async () => {
+    const hostile = `\u001B[31m${'why '.repeat(400)}\nnewline`;
+    const h = harness(approvalPolicy, answering('approved', hostile));
+
+    const reason = (await call(h, { path: '/a' })).approval?.reason ?? '';
+
+    expect(reason.length).toBe(APPROVAL_REASON_LIMIT);
+    expect(reason).not.toContain('\u001B');
+    expect(reason).not.toContain('\n');
+  });
+
+  it('drops a reason that is not a string', async () => {
+    const h = harness(approvalPolicy, answering('approved', { toString: () => 'nice try' }));
+
+    expect((await call(h, { path: '/a' })).approval).toEqual({ verdict: 'approved' });
+  });
+
+  it('puts the answer in the trip report, whichever way it went', async () => {
+    // The breaker's own `require_approval` disposition is the path that builds
+    // a report, and the report is built *after* the gateway answers — so the
+    // words are in it rather than bolted on afterwards.
+    const approved = harness(
+      {
+        mode: 'enforce',
+        loop_detection: {
+          exact_repeat: { count: 2 },
+          on_trip: 'require_approval',
+          semantic: { enabled: false },
+        },
+      },
+      answering('approved', 'the retry is intentional'),
+    );
+
+    await call(approved, { path: '/a' });
+    const decision = await call(approved, { path: '/a' });
+
+    expect(decision.action).toBe('allow');
+    expect(decision.report?.approval).toEqual({
+      verdict: 'approved',
+      reason: 'the retry is intentional',
+    });
+  });
+
+  it('leaves the report’s approval absent when no human was asked', async () => {
+    const h = harness({ mode: 'enforce', loop_detection: { exact_repeat: { count: 2 } } });
+
+    await call(h, { path: '/a' });
+    const decision = await call(h, { path: '/a' });
+
+    expect(decision.report).toBeDefined();
+    expect(decision.report?.approval).toBeUndefined();
   });
 });
 

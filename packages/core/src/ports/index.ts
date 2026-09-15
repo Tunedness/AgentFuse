@@ -69,6 +69,25 @@ export interface ApprovalRequest {
 }
 
 /**
+ * A verdict with the words a human wrote beside it.
+ *
+ * ADR-009: `approve`/`deny` have always required a `--reason`, but the port
+ * returned a bare verdict string, so the reason reached a diagnostic line and
+ * stopped there. The report is an audit artifact and "why was this call
+ * allowed" is exactly what an audit asks, so the answer travels as an object
+ * and the engine puts it on the decision and in the trip report.
+ */
+export interface ApprovalAnswer {
+  verdict: 'approved' | 'denied' | 'timeout';
+  /**
+   * Free text, and treated as untrusted: the engine sanitises and caps it
+   * before it is recorded anywhere. A gateway passes on what it was told and
+   * invents nothing — a reason nobody wrote is worse than no reason.
+   */
+  reason?: string | undefined;
+}
+
+/**
  * Asks a human.
  *
  * The **gateway owns the timeout**, not the engine: the engine has no clock of
@@ -76,12 +95,18 @@ export interface ApprovalRequest {
  * so it passes `timeoutMs` and expects `'timeout'` back. The `AbortSignal` is
  * fired when the session ends or the breaker is reset, and an implementation
  * must abandon the prompt when it trips.
+ *
+ * A bare verdict string is still a complete answer. Widening the return type
+ * rather than replacing it is deliberate: a gateway with nothing to say beyond
+ * yes or no — the deny-all default, a test double, an embedder's three-line
+ * adapter — stays correct without being rewritten, and the engine normalises
+ * the two forms in one place.
  */
 export interface ApprovalGateway {
   requestApproval(
     req: ApprovalRequest,
     signal: AbortSignal,
-  ): Promise<'approved' | 'denied' | 'timeout'>;
+  ): Promise<'approved' | 'denied' | 'timeout' | ApprovalAnswer>;
 }
 
 /**

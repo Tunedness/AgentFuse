@@ -34,6 +34,7 @@ export {
   UlidGenerator,
 } from './adapters/index.js';
 export type {
+  ApprovalRecord,
   BreakerPhase,
   BreakerState,
   BudgetDimension,
@@ -56,7 +57,12 @@ export type {
   ToolCallRecord,
   TripCode,
 } from './domain/index.js';
-export { BUDGET_CODES, initialBreakerState, LOOP_CODES } from './domain/index.js';
+export {
+  APPROVAL_REASON_LIMIT,
+  BUDGET_CODES,
+  initialBreakerState,
+  LOOP_CODES,
+} from './domain/index.js';
 export type {
   BeforeCallInput,
   DecisionHook,
@@ -134,6 +140,7 @@ export {
   toolKey,
 } from './policy/index.js';
 export type {
+  ApprovalAnswer,
   ApprovalGateway,
   ApprovalRequest,
   Clock,
@@ -150,4 +157,5 @@ export { buildTripReport, renderTripReport, TOKEN_ESTIMATE_NOTE } from './report
 export { sha256 } from './util/hash.js';
 export type { JsonValue } from './util/json.js';
 export { stableStringify, toJsonValue } from './util/json.js';
+export { sanitizeFreeText } from './util/text.js';
 export { CORE_VERSION } from './version.js';

@@ -1,5 +1,5 @@
 import type { BreakerPhase } from '../domain/breaker.js';
-import type { Reason, TripCode } from '../domain/decision.js';
+import type { ApprovalRecord, Reason, TripCode } from '../domain/decision.js';
 import type { ToolCallRecord } from '../domain/records.js';
 import type { SessionState } from '../domain/session.js';
 import { argsPreview } from '../loop/normalize.js';
@@ -57,6 +57,14 @@ export interface TripReport {
   };
   recentCalls: ReportedCall[];
   policy: { sha256: string; version: 1 };
+  /**
+   * The human's answer, when this trip was put to one (ADR-009).
+   *
+   * Present on an approval that was granted as well as on one that was
+   * refused: "why was this call allowed" is precisely the question an audit
+   * asks, and a report that only records the refusals answers half of it.
+   */
+  approval?: ApprovalRecord;
   traceparent?: string;
   agentfuse: { version: string };
 }
@@ -72,6 +80,8 @@ export interface BuildTripReportInput {
   /** Loop settings in force for the current call, rule override merged. */
   loop: LoopDetectionSettings;
   now: number;
+  /** The gateway's answer, when a human was asked before this was built. */
+  approval?: ApprovalRecord;
 }
 
 function reportCall(
@@ -151,6 +161,8 @@ export function buildTripReport(input: BuildTripReportInput): TripReport {
     },
     recentCalls,
     policy: { sha256: policy.sha256, version: 1 },
+    // Recorded, never inferred: absent unless a gateway actually answered.
+    ...(input.approval !== undefined ? { approval: input.approval } : undefined),
     // Copied, never invented: a fabricated traceparent would silently corrupt
     // the operator's distributed traces.
     ...(current.traceparent !== undefined ? { traceparent: current.traceparent } : undefined),

@@ -58,6 +58,13 @@ describe('@agentfuse/core public surface', () => {
     ]);
   });
 
+  it('exposes the approval record’s vocabulary, so a host can read one', () => {
+    // ADR-009: the answer a human gave travels on the decision and into the
+    // report, so the cap and the sanitiser are part of the contract.
+    expect(core.APPROVAL_REASON_LIMIT).toBe(500);
+    expect(typeof core.sanitizeFreeText).toBe('function');
+  });
+
   it('names the loop and budget code groups', () => {
     expect(core.LOOP_CODES).toContain('LOOP_SEMANTIC');
     expect(core.BUDGET_CODES).toContain('BUDGET_USD');

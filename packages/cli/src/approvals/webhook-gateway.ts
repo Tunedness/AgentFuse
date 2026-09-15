@@ -49,7 +49,12 @@
  */
 
 import { createHmac, timingSafeEqual } from 'node:crypto';
-import type { ApprovalGateway, ApprovalRequest, ApprovalVerdict } from '@agentfuse/core';
+import type {
+  ApprovalAnswer,
+  ApprovalGateway,
+  ApprovalRequest,
+  ApprovalVerdict,
+} from '@agentfuse/core';
 import type { Diagnostics } from '@agentfuse/proxy';
 import { messageOf } from '../errors.js';
 
@@ -226,7 +231,7 @@ export class WebhookApprovalGateway implements ApprovalGateway {
     this.#userAgent = options.userAgent ?? 'agentfuse';
   }
 
-  async requestApproval(request: ApprovalRequest, signal: AbortSignal): Promise<ApprovalVerdict> {
+  async requestApproval(request: ApprovalRequest, signal: AbortSignal): Promise<ApprovalAnswer> {
     const body = JSON.stringify(webhookPayload(request, this.#now()));
     const controller = new AbortController();
     let expired = false;
@@ -247,29 +252,26 @@ export class WebhookApprovalGateway implements ApprovalGateway {
     });
 
     try {
-      const verdict = await this.#ask(request, body, controller.signal);
-      return verdict;
+      return await this.#ask(request, body, controller.signal);
     } catch (error) {
       if (expired) {
-        this.#resolved(request, 'timeout', 'the endpoint did not answer in time');
-        return 'timeout';
+        return this.#resolved(request, 'timeout', 'the endpoint did not answer in time');
       }
       // An abort from the engine means the session is gone; a denial is the one
       // answer that cannot be re-routed by `on_timeout`. Everything else here
       // is a transport failure, which fails closed for the same reason.
-      this.#resolved(request, 'denied', signal.aborted ? 'the session ended' : messageOf(error));
-      return 'denied';
+      return this.#resolved(
+        request,
+        'denied',
+        signal.aborted ? 'the session ended' : messageOf(error),
+      );
     } finally {
       clearTimeout(timer);
       signal.removeEventListener('abort', onAbort);
     }
   }
 
-  async #ask(
-    request: ApprovalRequest,
-    body: string,
-    signal: AbortSignal,
-  ): Promise<ApprovalVerdict> {
+  async #ask(request: ApprovalRequest, body: string, signal: AbortSignal): Promise<ApprovalAnswer> {
     const response = await this.#fetch(this.#url, {
       method: 'POST',
       headers: {
@@ -286,26 +288,29 @@ export class WebhookApprovalGateway implements ApprovalGateway {
     });
 
     if (!response.ok) {
-      this.#resolved(request, 'denied', `the endpoint answered HTTP ${response.status}`);
-      return 'denied';
+      return this.#resolved(request, 'denied', `the endpoint answered HTTP ${response.status}`);
     }
 
     const text = await readCapped(response, this.#limit);
     if (text === undefined) {
-      this.#resolved(request, 'denied', `the response body exceeded ${this.#limit} bytes`);
-      return 'denied';
+      return this.#resolved(request, 'denied', `the response body exceeded ${this.#limit} bytes`);
     }
 
     const answer = readAnswer(text);
-    if (!answer.ok) {
-      this.#resolved(request, 'denied', answer.error);
-      return 'denied';
-    }
-    this.#resolved(request, answer.verdict, answer.reason);
-    return answer.verdict;
+    if (!answer.ok) return this.#resolved(request, 'denied', answer.error);
+    return this.#resolved(request, answer.verdict, answer.reason);
   }
 
-  #resolved(request: ApprovalRequest, verdict: ApprovalVerdict, reason: string): void {
+  /**
+   * Logs how this ended and hands the same words back to the engine.
+   *
+   * One place, so the diagnostic line and the audit record cannot disagree.
+   * The reason is whatever the endpoint sent or whatever went wrong with it —
+   * untrusted either way, and sanitised by the engine before it is recorded.
+   * The secret is not in it and cannot be: nothing here reads the secret except
+   * the HMAC.
+   */
+  #resolved(request: ApprovalRequest, verdict: ApprovalVerdict, reason: string): ApprovalAnswer {
     this.#diagnostics.emit('approval_resolved', {
       approvalId: request.approvalId,
       sessionId: request.sessionId,
@@ -313,5 +318,6 @@ export class WebhookApprovalGateway implements ApprovalGateway {
       source: 'webhook',
       ...(reason === '' ? undefined : { reason }),
     });
+    return { verdict, ...(reason === '' ? undefined : { reason }) };
   }
 }

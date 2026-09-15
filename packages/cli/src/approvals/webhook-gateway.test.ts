@@ -217,7 +217,7 @@ describe('the signature scheme', () => {
     );
 
     expect(endpoint.seen[0]?.verified).toBe(false);
-    expect(verdict).toBe('denied');
+    expect(verdict.verdict).toBe('denied');
     expect(event(sink, 'approval_resolved')['reason']).toContain('HTTP 401');
   });
 });
@@ -234,7 +234,7 @@ describe('a webhook that answers', () => {
       new AbortController().signal,
     );
 
-    expect(verdict).toBe('approved');
+    expect(verdict.verdict).toBe('approved');
     expect(endpoint.seen[0]?.verified).toBe(true);
     expect(endpoint.seen[0]?.body).toBe(FIXTURE_BODY);
     expect(event(sink, 'approval_resolved')).toMatchObject({
@@ -250,7 +250,7 @@ describe('a webhook that answers', () => {
 
     await expect(
       gatewayFor(endpoint.url, sink).requestApproval(request(), new AbortController().signal),
-    ).resolves.toBe('denied');
+    ).resolves.toMatchObject({ verdict: 'denied' });
   });
 
   it('identifies itself and asks for JSON', async () => {
@@ -306,7 +306,7 @@ describe('a response that cannot be trusted', () => {
       new AbortController().signal,
     );
 
-    expect(verdict).toBe('denied');
+    expect(verdict.verdict).toBe('denied');
     expect(event(sink, 'approval_resolved')['reason']).toContain(expected);
   });
 
@@ -319,7 +319,7 @@ describe('a response that cannot be trusted', () => {
       new AbortController().signal,
     );
 
-    expect(verdict).toBe('denied');
+    expect(verdict.verdict).toBe('denied');
     expect(event(sink, 'approval_resolved')['reason']).toContain('not JSON');
   });
 
@@ -329,7 +329,7 @@ describe('a response that cannot be trusted', () => {
 
     await expect(
       gatewayFor(endpoint.url, sink).requestApproval(request(), new AbortController().signal),
-    ).resolves.toBe('denied');
+    ).resolves.toMatchObject({ verdict: 'denied' });
   });
 
   it('denies a body bigger than the cap, while it is arriving', async () => {
@@ -343,7 +343,7 @@ describe('a response that cannot be trusted', () => {
       new AbortController().signal,
     );
 
-    expect(verdict).toBe('denied');
+    expect(verdict.verdict).toBe('denied');
     expect(event(sink, 'approval_resolved')['reason']).toContain('exceeded 64 bytes');
   });
 
@@ -363,7 +363,7 @@ describe('a response that cannot be trusted', () => {
 
     await expect(
       gatewayFor(endpoint.url, sink).requestApproval(request(), new AbortController().signal),
-    ).resolves.toBe('denied');
+    ).resolves.toMatchObject({ verdict: 'denied' });
   });
 
   it('denies when there is nothing listening at all', async () => {
@@ -376,7 +376,7 @@ describe('a response that cannot be trusted', () => {
 
     // A transport failure is a denial and not a timeout: `on_timeout: allow`
     // must not be convertible into blanket consent by breaking the network.
-    expect(verdict).toBe('denied');
+    expect(verdict.verdict).toBe('denied');
     expect(event(sink, 'approval_resolved')['verdict']).toBe('denied');
   });
 });
@@ -391,7 +391,7 @@ describe('a response that never comes', () => {
       new AbortController().signal,
     );
 
-    expect(verdict).toBe('timeout');
+    expect(verdict.verdict).toBe('timeout');
     expect(event(sink, 'approval_resolved')).toMatchObject({
       verdict: 'timeout',
       source: 'webhook',
@@ -406,7 +406,7 @@ describe('a response that never comes', () => {
     const pending = gatewayFor(endpoint.url, sink).requestApproval(request(), controller.signal);
     controller.abort();
 
-    await expect(pending).resolves.toBe('denied');
+    await expect(pending).resolves.toMatchObject({ verdict: 'denied' });
     expect(event(sink, 'approval_resolved')['reason']).toContain('the session ended');
   });
 

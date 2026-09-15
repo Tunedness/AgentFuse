@@ -36,7 +36,12 @@
  * and it was refused" must be answerable from the log.
  */
 
-import type { ApprovalGateway, ApprovalRequest, ApprovalVerdict } from '@agentfuse/core';
+import type {
+  ApprovalAnswer,
+  ApprovalGateway,
+  ApprovalRequest,
+  ApprovalVerdict,
+} from '@agentfuse/core';
 import type { Diagnostics } from '@agentfuse/proxy';
 import { messageOf } from '../errors.js';
 
@@ -44,6 +49,18 @@ import { messageOf } from '../errors.js';
 export interface NamedGateway {
   readonly name: string;
   readonly gateway: ApprovalGateway;
+}
+
+/**
+ * Normalises a member's answer.
+ *
+ * The port accepts a bare verdict as well as `{ verdict, reason }`, so that an
+ * embedder's three-line gateway keeps working; a composite over a mixture of
+ * both has to read them the same way. The reason travels on untouched — the
+ * engine is where it is sanitised, once.
+ */
+function answerOf(result: ApprovalVerdict | ApprovalAnswer): ApprovalAnswer {
+  return typeof result === 'string' ? { verdict: result } : result;
 }
 
 /** Asks several gateways and applies the rule in the module doc. */
@@ -61,7 +78,7 @@ export class CompositeApprovalGateway implements ApprovalGateway {
     return this.#members.map((member) => member.name);
   }
 
-  async requestApproval(request: ApprovalRequest, signal: AbortSignal): Promise<ApprovalVerdict> {
+  async requestApproval(request: ApprovalRequest, signal: AbortSignal): Promise<ApprovalAnswer> {
     // Stands the losers down. Chained to the engine's signal so an ended
     // session still aborts every channel.
     const controller = new AbortController();
@@ -70,8 +87,8 @@ export class CompositeApprovalGateway implements ApprovalGateway {
     else signal.addEventListener('abort', onAbort, { once: true });
 
     let decided = false;
-    let settle!: (verdict: ApprovalVerdict) => void;
-    const answer = new Promise<ApprovalVerdict>((resolve) => {
+    let settle!: (answer: ApprovalAnswer) => void;
+    const answer = new Promise<ApprovalAnswer>((resolve) => {
       settle = resolve;
     });
 
@@ -82,7 +99,9 @@ export class CompositeApprovalGateway implements ApprovalGateway {
       void member.gateway
         .requestApproval(request, controller.signal)
         .then(
-          (verdict) => {
+          (result) => {
+            const answered = answerOf(result);
+            const verdict = answered.verdict;
             if (verdict === 'approved' || verdict === 'denied') {
               if (decided) {
                 this.#diagnostics.emit('approval_discarded', {
@@ -97,7 +116,10 @@ export class CompositeApprovalGateway implements ApprovalGateway {
                   source: member.name,
                   verdict,
                 });
-                settle(verdict);
+                // The winning channel's words travel with its verdict: every
+                // `approved` this returns is traceable to one channel, and so
+                // is the reason recorded beside it.
+                settle(answered);
               }
             }
           },
@@ -114,7 +136,12 @@ export class CompositeApprovalGateway implements ApprovalGateway {
           outstanding -= 1;
           // Every channel has spoken and none was decisive: a failure anywhere
           // fails closed, otherwise this really was nobody answering in time.
-          if (outstanding === 0 && !decided) settle(anyFailed ? 'denied' : 'timeout');
+          // No reason on either: nobody wrote one. A channel's failure is its
+          // own `approval_gateway_failed` line, not a sentence in an audit
+          // record claiming a person said it.
+          if (outstanding === 0 && !decided) {
+            settle({ verdict: anyFailed ? 'denied' : 'timeout' });
+          }
         });
     }
 

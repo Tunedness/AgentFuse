@@ -1,6 +1,7 @@
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import type { ApprovalAnswer } from '@agentfuse/core';
 import { Diagnostics } from '@agentfuse/proxy';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { CliApprovalGateway } from '../approvals/cli-gateway.js';
@@ -43,7 +44,7 @@ function context(env: Readonly<Record<string, string>> = {}): CliContext {
 /** A waiting wrap: one pending approval, one bound host. */
 async function waitingWrap(): Promise<{
   readonly gateway: CliApprovalGateway;
-  readonly verdict: Promise<string>;
+  readonly verdict: Promise<ApprovalAnswer>;
   readonly resets: string[];
 }> {
   const gateway = await CliApprovalGateway.open({
@@ -156,7 +157,9 @@ describe('a verdict delivered over the socket', () => {
 
     expect(code).toBe(EXIT.ok);
     expect(stdout.text).toContain('Approved write_file on fs');
-    await expect(wrap.verdict).resolves.toBe('approved');
+    // ADR-009: the words go back to the engine with the verdict, so the trip
+    // report can say why the call was allowed.
+    await expect(wrap.verdict).resolves.toEqual({ verdict: 'approved', reason: 'checked it' });
   });
 
   it('denies the same way', async () => {
@@ -172,7 +175,7 @@ describe('a verdict delivered over the socket', () => {
 
     expect(code).toBe(EXIT.ok);
     expect(stdout.text).toContain('Denied write_file on fs');
-    await expect(wrap.verdict).resolves.toBe('denied');
+    await expect(wrap.verdict).resolves.toEqual({ verdict: 'denied', reason: 'wrong path' });
   });
 
   it('finds the socket through the environment, which is how it usually works', async () => {
@@ -185,7 +188,7 @@ describe('a verdict delivered over the socket', () => {
     ]);
 
     expect(code).toBe(EXIT.ok);
-    await expect(wrap.verdict).resolves.toBe('approved');
+    await expect(wrap.verdict).resolves.toMatchObject({ verdict: 'approved' });
   });
 
   it('exits 2 and says so when the wrap does not know that id', async () => {

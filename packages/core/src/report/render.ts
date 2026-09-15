@@ -109,6 +109,17 @@ export function renderTripReport(report: TripReport): string {
   lines.push(
     `  breaker: ${breaker.phase}  ·  cooldown: ${breaker.cooldown.calls} approvals or ${formatDuration(breaker.cooldown.durationMs)}`,
   );
+
+  // ADR-009: the report is an audit artifact, and the first thing an audit asks
+  // of a human-gated call is why the person answered as they did. Next to the
+  // breaker line, because that is what their answer moved. The text arrives
+  // sanitised and capped from the engine, so it cannot break the ruling below
+  // or run past the width — see `util/text.ts`.
+  const approval = report.approval;
+  if (approval !== undefined) {
+    lines.push(`  human: ${approval.verdict}`);
+    if (approval.reason !== undefined) lines.push(...wrap(approval.reason, WIDTH - 4, '    '));
+  }
   lines.push('');
 
   const tokens = budgets.tokensEstimated.args + budgets.tokensEstimated.results;

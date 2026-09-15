@@ -57,6 +57,37 @@ export interface Reason {
   evidence?: Record<string, unknown>;
 }
 
+/**
+ * How many characters of a human's approval reason are kept.
+ *
+ * Bounded because the text is free-form, written by a person under time
+ * pressure or by a remote webhook endpoint, and it ends up inside a rendered
+ * table and a JSON file somebody greps. Long enough for a sentence explaining a
+ * decision, short enough that no single record can dominate a report.
+ */
+export const APPROVAL_REASON_LIMIT = 500;
+
+/**
+ * What a human answered, when the policy asked one.
+ *
+ * ADR-009: the report is an audit artifact, and "why was this call allowed" is
+ * exactly what an audit asks. The verdict alone cannot answer it, so the
+ * gateway's answer is carried on the decision and from there into the trip
+ * report.
+ */
+export interface ApprovalRecord {
+  /** The verdict as the gateway reported it. */
+  verdict: 'approved' | 'denied' | 'timeout';
+  /**
+   * The words that came with it, sanitised and capped at
+   * {@link APPROVAL_REASON_LIMIT}.
+   *
+   * Absent when nobody wrote any — a plain timeout, or a gateway that answers
+   * with a bare verdict. Never a fabricated explanation.
+   */
+  reason?: string;
+}
+
 /** The engine's verdict on a single call. */
 export interface Decision {
   /** What the caller should do. */
@@ -73,6 +104,14 @@ export interface Decision {
   wouldTrip: boolean;
   /** Present only on the call that actually tripped the breaker. */
   report?: TripReport;
+  /**
+   * The human's answer, when one was asked for.
+   *
+   * Only ever set in `enforce` mode, because that is the only mode in which the
+   * engine resolves an approval at all. Its presence is what tells a host that
+   * this decision is part of an audit trail, whichever way it went.
+   */
+  approval?: ApprovalRecord;
   /** Id of the call this decision is about. */
   callId: string;
 }

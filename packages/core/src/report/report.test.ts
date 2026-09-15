@@ -171,6 +171,54 @@ describe('renderTripReport', () => {
     expect(renderTripReport(zeroed)).toContain('  0%');
   });
 
+  it('says what the human answered and why', async () => {
+    // ADR-009: the report is an audit artifact, and the first thing an audit
+    // asks of a human-gated call is why the person answered as they did.
+    const { report } = await tripped();
+    const answered: TripReport = {
+      ...report,
+      approval: { verdict: 'approved', reason: 'the retry is intentional, I asked for it' },
+    };
+
+    const text = renderTripReport(answered);
+
+    expect(text).toContain('human: approved');
+    expect(text).toContain('the retry is intentional, I asked for it');
+  });
+
+  it('says nothing about approval when nobody was asked', async () => {
+    const { report } = await tripped();
+
+    expect(renderTripReport(report)).not.toContain('human:');
+  });
+
+  it('renders a verdict that came with no words', async () => {
+    const { report } = await tripped();
+    const answered: TripReport = { ...report, approval: { verdict: 'timeout' } };
+
+    expect(renderTripReport(answered)).toContain('human: timeout');
+  });
+
+  it('cannot be broken apart by the reason, however it was written', async () => {
+    // The text arrives sanitised from the engine, so the worst a report can be
+    // handed is a long run of ordinary words. It wraps; it does not overflow
+    // the ruled table or introduce a line that is not ours.
+    const { report } = await tripped();
+    const answered: TripReport = {
+      ...report,
+      approval: { verdict: 'denied', reason: 'no '.repeat(200).trim() },
+    };
+
+    const lines = renderTripReport(answered).split('\n');
+    const reasonLines = lines.filter((line) => line.startsWith('    no'));
+
+    expect(reasonLines.length).toBeGreaterThan(2);
+    expect(reasonLines.every((line) => line.length <= 78)).toBe(true);
+    // The sections after it are still where they were.
+    expect(lines.some((line) => line.startsWith('  recent calls'))).toBe(true);
+    expect(lines.at(-1)).toContain('agentfuse ');
+  });
+
   it('wraps a long trigger message', async () => {
     const { report } = await tripped();
     const wordy: TripReport = {

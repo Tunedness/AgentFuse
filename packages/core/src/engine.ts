@@ -5,7 +5,14 @@ import { NoopTelemetrySink } from './adapters/telemetry.js';
 import { HeuristicTokenizer, TableCostModel } from './adapters/tokenizer.js';
 import { UlidGenerator } from './adapters/ulid.js';
 import type { BreakerPhase } from './domain/breaker.js';
-import type { Decision, DecisionAction, Reason, TripCode } from './domain/decision.js';
+import {
+  APPROVAL_REASON_LIMIT,
+  type ApprovalRecord,
+  type Decision,
+  type DecisionAction,
+  type Reason,
+  type TripCode,
+} from './domain/decision.js';
 import type { CallOutcome, ToolAnnotations, ToolCallRecord } from './domain/records.js';
 import type { DegradedCause, SessionState, SessionSummary } from './domain/session.js';
 import { applyBreakerEvent } from './guards/breaker.js';
@@ -16,8 +23,9 @@ import { argsPreview, normalizeArgs } from './loop/normalize.js';
 import { type CompiledPolicy, compilePolicy } from './policy/compile.js';
 import { evaluateRules } from './policy/evaluate.js';
 import type { FusePolicy } from './policy/schema.js';
-import type { Ports } from './ports/index.js';
+import type { ApprovalAnswer, Ports } from './ports/index.js';
 import { buildTripReport, TOKEN_ESTIMATE_NOTE, type TripReport } from './report/trip-report.js';
+import { sanitizeFreeText } from './util/text.js';
 
 /** What the proxy hands the engine before forwarding a call. */
 export interface BeforeCallInput {
@@ -101,6 +109,24 @@ function deepFreeze<T>(value: T): T {
   Object.freeze(value);
   for (const child of Object.values(value)) deepFreeze(child);
   return value;
+}
+
+/**
+ * Normalises whatever a gateway answered into one shape.
+ *
+ * The port accepts both a bare verdict and `{ verdict, reason }` — see
+ * {@link ApprovalGateway} — and this is the single place the two forms meet, so
+ * the sanitising happens exactly once. A verdict that is not one of the three
+ * is `'denied'`: an answer the engine cannot read is not consent.
+ */
+function approvalRecordOf(answer: ApprovalAnswer | string): ApprovalRecord {
+  const verdict = typeof answer === 'string' ? answer : answer.verdict;
+  const reason =
+    typeof answer === 'string' ? undefined : sanitizeFreeText(answer.reason, APPROVAL_REASON_LIMIT);
+  if (verdict !== 'approved' && verdict !== 'denied' && verdict !== 'timeout') {
+    return { verdict: 'denied' };
+  }
+  return { verdict, ...(reason !== undefined ? { reason } : undefined) };
 }
 
 /** A frozen deep copy, falling back to the original when cloning is impossible. */
@@ -243,9 +269,12 @@ export class FuseEngine {
 
     const state = runGuards(ctx);
     let enforceAction = state.action;
+    let approval: ApprovalRecord | undefined;
 
     if (enforceAction === 'require_approval' && mode === 'enforce') {
-      enforceAction = await this.#resolveApproval(ctx, state.reasons);
+      const resolved = await this.#resolveApproval(ctx, state.reasons);
+      enforceAction = resolved.action;
+      approval = resolved.approval;
     } else if (mode === 'warn' && session.breaker.phase === 'half_open' && !state.trip) {
       // Warn mode never asks a human, but the breaker still has to be able to
       // recover: a call that was forwarded without re-tripping is the warn-mode
@@ -267,6 +296,10 @@ export class FuseEngine {
         trigger: state.trip,
         loop: evaluation.loop,
         now,
+        // Built after the gateway answered — the approval is resolved above,
+        // before this — so the audit artifact carries the human's words rather
+        // than having them bolted on afterwards.
+        ...(approval !== undefined ? { approval } : undefined),
       });
     }
 
@@ -277,6 +310,7 @@ export class FuseEngine {
       callId,
       ...(state.matchedRule !== undefined ? { matchedRule: state.matchedRule } : undefined),
       ...(report !== undefined ? { report } : undefined),
+      ...(approval !== undefined ? { approval } : undefined),
     };
 
     const final = this.#applyHooks(decision, record, session);
@@ -440,49 +474,56 @@ export class FuseEngine {
 
   // -------------------------------------------------------------------------
 
-  async #resolveApproval(ctx: GuardContext, reasons: Reason[]): Promise<DecisionAction> {
+  async #resolveApproval(
+    ctx: GuardContext,
+    reasons: Reason[],
+  ): Promise<{ action: DecisionAction; approval: ApprovalRecord }> {
     const { approvals, ids } = this.#ports;
     const { session, evaluation, record } = ctx;
     const config = this.#policy.policy.approvals;
 
     const controller = new AbortController();
     session.pendingApprovals.add(controller);
-    let verdict: 'approved' | 'denied' | 'timeout';
+    let answer: ApprovalRecord;
     try {
-      verdict = await approvals.requestApproval(
-        {
-          approvalId: ids.next(),
-          sessionId: session.sessionId,
-          toolName: record.toolName,
-          serverName: record.serverName,
-          argsPreview: this.#policy.policy.report.redact_args
-            ? record.fingerprint
-            : argsPreview(record.args),
-          reasons: [...reasons],
-          timeoutMs: config.timeout,
-        },
-        controller.signal,
+      answer = approvalRecordOf(
+        await approvals.requestApproval(
+          {
+            approvalId: ids.next(),
+            sessionId: session.sessionId,
+            toolName: record.toolName,
+            serverName: record.serverName,
+            argsPreview: this.#policy.policy.report.redact_args
+              ? record.fingerprint
+              : argsPreview(record.args),
+            reasons: [...reasons],
+            timeoutMs: config.timeout,
+          },
+          controller.signal,
+        ),
       );
     } catch {
-      // A gateway that throws is a gateway that could not obtain consent.
-      verdict = 'denied';
+      // A gateway that throws is a gateway that could not obtain consent. No
+      // reason, because nobody gave one: the failure belongs in the host's
+      // diagnostics, not in a field that says a person wrote it.
+      answer = { verdict: 'denied' };
     } finally {
       session.pendingApprovals.delete(controller);
     }
 
-    if (verdict === 'approved') {
+    if (answer.verdict === 'approved') {
       this.#recordProbe(session, evaluation.loop.cooldown.calls);
-      return 'allow';
+      return { action: 'allow', approval: answer };
     }
 
-    if (verdict === 'denied') {
+    if (answer.verdict === 'denied') {
       applyBreakerEvent(session.breaker, { kind: 'denied', now: ctx.now });
       reasons.push({
         code: 'APPROVAL_DENIED',
         message: 'A human denied this call. Do not retry it; ask the user what to do instead.',
         evidence: { toolName: record.toolName, serverName: record.serverName },
       });
-      return 'deny';
+      return { action: 'deny', approval: answer };
     }
 
     const allowed = config.on_timeout === 'allow';
@@ -496,7 +537,7 @@ export class FuseEngine {
     });
     // A timeout is nobody's approval, so it never counts towards closing the
     // breaker even when the policy forwards the call.
-    return allowed ? 'allow' : 'deny';
+    return { action: allowed ? 'allow' : 'deny', approval: answer };
   }
 
   #recordProbe(session: SessionState, cooldownCalls: number): void {

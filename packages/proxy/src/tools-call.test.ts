@@ -427,6 +427,109 @@ describe('the session lifecycle', () => {
   });
 });
 
+describe('a call a human was asked about', () => {
+  /** Enforce mode where the second identical call goes to a human. */
+  function askingPolicy(): unknown {
+    return {
+      version: 1,
+      mode: 'enforce',
+      loop_detection: {
+        exact_repeat: { count: 2 },
+        on_trip: 'require_approval',
+        semantic: { enabled: false },
+      },
+    };
+  }
+
+  /** An engine whose approvals are answered by a script. */
+  function askedEngine(verdict: 'approved' | 'denied', reason: string): FuseEngine {
+    return new FuseEngine(parsePolicy(askingPolicy()), {
+      clock: new FakeClock(1_700_000_000_000),
+      ids: new CounterIdGenerator('id'),
+      sessions: new InMemorySessionStore(),
+      approvals: { requestApproval: async () => ({ verdict, reason }) },
+    });
+  }
+
+  it('has its report written even when the answer was yes', async () => {
+    // ADR-009: "why was this call allowed" is exactly what an audit asks, so
+    // the artifact that answers it is persisted for an approval too — until
+    // now only a refusal produced a file.
+    const written: Decision[] = [];
+    const guard = createToolCallGuard({
+      engine: askedEngine('approved', 'the retry is intentional'),
+      serverName: 'scenario',
+      sessionId: SESSION,
+      writeReport: (decision) => {
+        written.push(decision);
+        return '/reports/one.json';
+      },
+    });
+    harness = await createHarness({ onToolCall: guard.gate });
+
+    await harness.client.callTool({ name: 'echo', arguments: {} });
+    const allowed = await harness.client.callTool({ name: 'echo', arguments: {} });
+
+    // Forwarded, because the human said yes — and recorded, because they were
+    // asked at all.
+    expect(allowed.isError).toBeUndefined();
+    expect(written).toHaveLength(1);
+    expect(written[0]?.approval).toEqual({
+      verdict: 'approved',
+      reason: 'the retry is intentional',
+    });
+    expect(written[0]?.report?.approval?.reason).toBe('the retry is intentional');
+  });
+
+  it('carries the reason into the report of a refusal as well', async () => {
+    const written: Decision[] = [];
+    const guard = createToolCallGuard({
+      engine: askedEngine('denied', 'that is production'),
+      serverName: 'scenario',
+      sessionId: SESSION,
+      writeReport: (decision) => {
+        written.push(decision);
+        return '/reports/one.json';
+      },
+    });
+    harness = await createHarness({ onToolCall: guard.gate });
+
+    await harness.client.callTool({ name: 'echo', arguments: {} });
+    const blocked = await harness.client.callTool({ name: 'echo', arguments: {} });
+
+    expect(blocked.isError).toBe(true);
+    expect(written).toHaveLength(1);
+    expect(written[0]?.report?.approval).toEqual({
+      verdict: 'denied',
+      reason: 'that is production',
+    });
+  });
+
+  it('writes nothing for a trip nobody was asked about', async () => {
+    // The widening is narrow: a plain refusal still writes exactly one report,
+    // and a forwarded call with no approval writes none.
+    const written: Decision[] = [];
+    const { engine } = engineFor(repeatTrippingPolicy());
+    const guard = createToolCallGuard({
+      engine,
+      serverName: 'scenario',
+      sessionId: SESSION,
+      writeReport: (decision) => {
+        written.push(decision);
+        return '/reports/one.json';
+      },
+    });
+    harness = await createHarness({ onToolCall: guard.gate });
+
+    await harness.client.callTool({ name: 'echo', arguments: {} });
+    expect(written).toHaveLength(0);
+
+    await harness.client.callTool({ name: 'echo', arguments: {} });
+    expect(written).toHaveLength(1);
+    expect(written[0]?.approval).toBeUndefined();
+  });
+});
+
 describe('the traceparent the guarded server is forwarded', () => {
   /** The host's span: same trace as the agent's, a span id of its own. */
   const OURS = '00-4bf92f3577b34da6a3ce929d0e0e4736-0123456789abcdef-01';

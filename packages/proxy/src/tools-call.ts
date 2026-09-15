@@ -228,8 +228,18 @@ export function createToolCallGuard(options: ToolCallGuardOptions): ToolCallGuar
       diagnostics?.block(renderTripDiagnostic(decision.report));
     }
 
+    // ADR-009: a trip a human was asked about is an audit record whichever way
+    // they answered, and "why was this call allowed" is exactly the question an
+    // audit asks — so the report is persisted for an approval as well as for a
+    // refusal. Nothing else widens: a decision with no report (a rule-level
+    // `require_approval` never tripped the breaker) still writes nothing, and a
+    // warn-mode run never resolves an approval at all.
+    const reportPath =
+      blocks(decision) || decision.approval !== undefined
+        ? options.writeReport?.(decision)
+        : undefined;
+
     if (blocks(decision)) {
-      const reportPath = options.writeReport?.(decision);
       diagnostics?.emit('blocked', {
         sessionId,
         tool: toolName,

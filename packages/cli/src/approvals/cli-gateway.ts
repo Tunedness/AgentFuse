@@ -39,16 +39,20 @@
  *
  * ## What happens to `--reason`
  *
- * It is recorded in the `approval_resolved` diagnostic and echoed to the person
- * who typed it. It does **not** reach the agent-facing refusal text or the JSON
- * trip report, and it cannot: `ApprovalGateway.requestApproval` returns a bare
- * verdict string, the report is built inside the engine before any of this is
- * known, and both of those live in frozen packages. The seam that would close
- * it is a verdict object (`{ verdict, reason }`) on the port — a core change,
- * recorded in `docs/implementation-status.md` rather than made here.
+ * It is recorded in the `approval_resolved` diagnostic, echoed to the person
+ * who typed it, and — since ADR-009 — returned to the engine as part of the
+ * answer, which puts it on the decision and in the trip report. The report is
+ * an audit artifact, and "why was this call allowed" is exactly what an audit
+ * asks. The engine sanitises and caps it before recording it; nothing here
+ * assumes the text is safe, because on the webhook channel it is written by a
+ * remote endpoint rather than by the operator.
+ *
+ * It still does **not** reach the agent-facing refusal text. Putting an
+ * operator's words into the model's context is a product decision of its own
+ * and is not one this seam makes.
  */
 
-import type { ApprovalGateway, ApprovalRequest, ApprovalVerdict } from '@agentfuse/core';
+import type { ApprovalAnswer, ApprovalGateway, ApprovalRequest } from '@agentfuse/core';
 import type { Diagnostics } from '@agentfuse/proxy';
 import { type Writer, writeNotice } from '../io.js';
 import type { CommandFrame, ReplyFrame } from './protocol.js';
@@ -130,7 +134,7 @@ export function approvalPrompt(
 
 /** How one pending approval was resolved, and by which route. */
 interface Answer {
-  readonly verdict: ApprovalVerdict;
+  readonly verdict: ApprovalAnswer['verdict'];
   /** The human's words, where there are any. Empty for a timeout. */
   readonly reason: string;
   /** `cli`, `timeout` or `abort`, for the log. */
@@ -217,7 +221,7 @@ export class CliApprovalGateway implements ApprovalGateway {
     this.#host = host;
   }
 
-  async requestApproval(request: ApprovalRequest, signal: AbortSignal): Promise<ApprovalVerdict> {
+  async requestApproval(request: ApprovalRequest, signal: AbortSignal): Promise<ApprovalAnswer> {
     writeNotice(
       this.#stderr,
       'note',
@@ -273,7 +277,13 @@ export class CliApprovalGateway implements ApprovalGateway {
       source: answer.source,
       ...(answer.reason === '' ? undefined : { reason: answer.reason }),
     });
-    return answer.verdict;
+    // The words go back to the engine as well as to the log: ADR-009 puts them
+    // on the decision and in the trip report. An empty string is omitted rather
+    // than recorded, because "" says less than no field at all.
+    return {
+      verdict: answer.verdict,
+      ...(answer.reason === '' ? undefined : { reason: answer.reason }),
+    };
   }
 
   /** Stops listening. Pending prompts are the engine's to abort. */

@@ -1,7 +1,7 @@
 export type { BreakerPhase, BreakerState } from './breaker.js';
 export { initialBreakerState } from './breaker.js';
-export type { Decision, DecisionAction, Reason, TripCode } from './decision.js';
-export { BUDGET_CODES, LOOP_CODES } from './decision.js';
+export type { ApprovalRecord, Decision, DecisionAction, Reason, TripCode } from './decision.js';
+export { APPROVAL_REASON_LIMIT, BUDGET_CODES, LOOP_CODES } from './decision.js';
 export type {
   BudgetDimension,
   BudgetEvent,

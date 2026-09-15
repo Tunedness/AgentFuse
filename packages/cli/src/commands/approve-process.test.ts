@@ -602,3 +602,166 @@ describe.runIf(built)('the webhook channel, against a real endpoint', () => {
     }
   });
 });
+
+/**
+ * ADR-009's second half: the words a person typed reach the audit artifact.
+ *
+ * The rule-level `require_approval` used by the tests above never trips the
+ * breaker, so it builds no report. The breaker's own `on_trip:
+ * require_approval` does, and that is the path a trip report — and therefore
+ * `agentfuse report` — is written from.
+ */
+describe.runIf(built)('the reason in the report', () => {
+  /** `ESC`, spelled out so the source stays readable. */
+  const ESC = '\u001B';
+
+  /** Enforce mode where the second identical call goes to a human. */
+  function trippingPolicy(): string[] {
+    return [
+      'version: 1',
+      'mode: enforce',
+      'report:',
+      '  dir: reports',
+      'loop_detection:',
+      '  exact_repeat:',
+      '    count: 2',
+      '  on_trip: require_approval',
+      '  semantic:',
+      '    enabled: false',
+      'approvals:',
+      '  timeout: 30s',
+      '  gateways: [cli]',
+    ];
+  }
+
+  /** Drives one wrap to a human-gated repeat and answers it. */
+  async function answered(
+    verdict: 'approve' | 'deny',
+    reason: string,
+  ): Promise<{ stderr: string }> {
+    writePolicy(trippingPolicy());
+    const agent = startWrap();
+    try {
+      await agent.initialize();
+      await agent.request('tools/call', { name: 'echo', arguments: { a: 1 } });
+      const call = agent.request('tools/call', { name: 'echo', arguments: { a: 1 } });
+      const prompt = await waitForStderr(agent, '"event":"approval_pending"', 'the prompt');
+
+      const reply = await agentfuse([verdict, pendingId(prompt), '--reason', reason]);
+      expect(reply.code).toBe(0);
+      await call;
+
+      agent.endInput();
+      await agent.exit();
+      return { stderr: agent.stderr.toString('utf8') };
+    } finally {
+      await agent.dispose();
+    }
+  }
+
+  /** `agentfuse report` run against this root's report directory. */
+  async function report(...flags: readonly string[]) {
+    return await agentfuse(['report', 'last', '--dir', join(root, 'reports'), ...flags]);
+  }
+
+  it('renders an approval’s reason in `agentfuse report`', async () => {
+    await answered('approve', 'the retry is intentional, I asked for it');
+
+    const rendered = await report();
+    expect(rendered.code).toBe(0);
+    expect(rendered.stdout).toContain('human: approved');
+    expect(rendered.stdout).toContain('the retry is intentional, I asked for it');
+
+    const json = JSON.parse((await report('--json')).stdout) as {
+      approval?: { verdict?: string; reason?: string };
+    };
+    expect(json.approval).toEqual({
+      verdict: 'approved',
+      reason: 'the retry is intentional, I asked for it',
+    });
+  });
+
+  it('renders a denial’s reason the same way', async () => {
+    await answered('deny', 'that path is production');
+
+    const rendered = await report();
+    expect(rendered.stdout).toContain('human: denied');
+    expect(rendered.stdout).toContain('that path is production');
+  });
+
+  it('cannot be broken by a hostile reason', async () => {
+    // Free text typed by a person, and the report is a file somebody else
+    // reads on their terminal. Escapes, controls, newlines and length all have
+    // to be neutralised before it is stored — see `core/src/util/text.ts`.
+    // Under the socket protocol's own 1 KiB cap on `--reason`, so what is
+    // being tested here is the engine's sanitising rather than that refusal.
+    const hostile = `${ESC}[31mred${ESC}[0m\nSECOND LINE\r\n${'very '.repeat(150)}`;
+
+    await answered('approve', hostile);
+
+    const rendered = await report();
+    const json = JSON.parse((await report('--json')).stdout) as {
+      approval?: { reason?: string };
+    };
+    const reason = json.approval?.reason ?? '';
+
+    expect(rendered.code).toBe(0);
+    // Stored: no escapes, no controls, no newlines, and bounded.
+    // biome-ignore lint/suspicious/noControlCharactersInRegex: matching control characters is the point.
+    expect(/[\u0000-\u001F\u007F-\u009F]/.test(reason)).toBe(false);
+    expect(reason.length).toBeLessThanOrEqual(500);
+    expect(reason).toContain('red');
+    // Rendered: the ruled report is still one block of our own lines, and
+    // "SECOND LINE" is inside a wrapped paragraph rather than starting one.
+    expect(rendered.stdout).not.toContain(ESC);
+    expect(rendered.stdout.split('\n').some((line) => line.startsWith('SECOND LINE'))).toBe(false);
+    expect(rendered.stdout).toContain('recent calls');
+  });
+
+  it('keeps the webhook secret out of the reason it records', async () => {
+    // The webhook's `reason` is written by a remote endpoint, so it is the one
+    // field an attacker could aim at the audit record. It still cannot carry
+    // the secret: nothing but the HMAC ever reads it.
+    const secret = 'the-shared-secret';
+    const server = createServer((req, res) => {
+      const chunks: Buffer[] = [];
+      req.on('data', (chunk: Buffer) => chunks.push(chunk));
+      req.on('end', () => {
+        const body = Buffer.concat(chunks).toString('utf8');
+        const expected = `v1=${createHmac('sha256', secret).update(body, 'utf8').digest('hex')}`;
+        const ok = req.headers['x-agentfuse-signature'] === expected;
+        res.writeHead(ok ? 200 : 401, { 'content-type': 'application/json' });
+        res.end(ok ? '{"verdict":"approved","reason":"on-call approved it"}' : '{}');
+      });
+    });
+    servers.push(server);
+    await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', () => resolve()));
+    const { port } = server.address() as AddressInfo;
+
+    writePolicy([
+      ...trippingPolicy().filter((line) => line !== '  gateways: [cli]'),
+      '  gateways: [webhook]',
+      '  webhook:',
+      `    url: http://127.0.0.1:${port}/approvals`,
+      '    secret_env: AF_WEBHOOK_SECRET',
+    ]);
+
+    const agent = startWrap({ env: { AF_WEBHOOK_SECRET: secret } });
+    try {
+      await agent.initialize();
+      await agent.request('tools/call', { name: 'echo', arguments: { a: 1 } });
+      await agent.request('tools/call', { name: 'echo', arguments: { a: 1 } });
+      agent.endInput();
+      await agent.exit();
+    } finally {
+      await agent.dispose();
+    }
+
+    const stored = (await report('--json')).stdout;
+    expect(JSON.parse(stored).approval).toEqual({
+      verdict: 'approved',
+      reason: 'on-call approved it',
+    });
+    expect(stored).not.toContain(secret);
+  });
+});

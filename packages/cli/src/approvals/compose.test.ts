@@ -98,9 +98,11 @@ describe('the composition rule', () => {
       ['webhook', slow.gateway],
     ]);
 
-    await expect(gateway.requestApproval(REQUEST, new AbortController().signal)).resolves.toBe(
-      'approved',
-    );
+    // A member that answers with a bare verdict string is still a complete
+    // answer; the composite normalises it into the object the port now returns.
+    await expect(gateway.requestApproval(REQUEST, new AbortController().signal)).resolves.toEqual({
+      verdict: 'approved',
+    });
     expect(slow.aborted()).toBe(true);
     expect(events(sink)).toContainEqual(
       expect.objectContaining({ event: 'approval_decided_by', source: 'cli', verdict: 'approved' }),
@@ -113,9 +115,9 @@ describe('the composition rule', () => {
       ['webhook', channel({ verdict: 'denied' }).gateway],
     ]);
 
-    await expect(gateway.requestApproval(REQUEST, new AbortController().signal)).resolves.toBe(
-      'denied',
-    );
+    await expect(gateway.requestApproval(REQUEST, new AbortController().signal)).resolves.toEqual({
+      verdict: 'denied',
+    });
   });
 
   it('does not let one channel giving up end the request', async () => {
@@ -128,9 +130,9 @@ describe('the composition rule', () => {
       ['webhook', human.gateway],
     ]);
 
-    await expect(gateway.requestApproval(REQUEST, new AbortController().signal)).resolves.toBe(
-      'approved',
-    );
+    await expect(gateway.requestApproval(REQUEST, new AbortController().signal)).resolves.toEqual({
+      verdict: 'approved',
+    });
   });
 
   it('reports a timeout only when every channel has timed out', async () => {
@@ -139,9 +141,9 @@ describe('the composition rule', () => {
       ['webhook', channel({ verdict: 'timeout', afterMs: 20 }).gateway],
     ]);
 
-    await expect(gateway.requestApproval(REQUEST, new AbortController().signal)).resolves.toBe(
-      'timeout',
-    );
+    await expect(gateway.requestApproval(REQUEST, new AbortController().signal)).resolves.toEqual({
+      verdict: 'timeout',
+    });
   });
 
   it('fails closed when a channel breaks and nobody else answers', async () => {
@@ -152,9 +154,9 @@ describe('the composition rule', () => {
       ['webhook', channel({ verdict: 'timeout', afterMs: 20 }).gateway],
     ]);
 
-    await expect(gateway.requestApproval(REQUEST, new AbortController().signal)).resolves.toBe(
-      'denied',
-    );
+    await expect(gateway.requestApproval(REQUEST, new AbortController().signal)).resolves.toEqual({
+      verdict: 'denied',
+    });
     expect(events(sink)).toContainEqual(
       expect.objectContaining({ event: 'approval_gateway_failed', source: 'cli' }),
     );
@@ -166,9 +168,28 @@ describe('the composition rule', () => {
       ['webhook', channel({ verdict: 'approved', afterMs: 20 }).gateway],
     ]);
 
-    await expect(gateway.requestApproval(REQUEST, new AbortController().signal)).resolves.toBe(
-      'approved',
-    );
+    await expect(gateway.requestApproval(REQUEST, new AbortController().signal)).resolves.toEqual({
+      verdict: 'approved',
+    });
+  });
+
+  it('carries the winning channel’s words back with its verdict', async () => {
+    // ADR-009: every `approved` the composite returns is traceable to one
+    // channel, and so is the reason recorded beside it in the trip report.
+    const { gateway } = composite([
+      ['cli', channel({ verdict: 'timeout', afterMs: 500 }).gateway],
+      [
+        'webhook',
+        {
+          requestApproval: async () => ({ verdict: 'approved' as const, reason: 'on call rota' }),
+        },
+      ],
+    ]);
+
+    await expect(gateway.requestApproval(REQUEST, new AbortController().signal)).resolves.toEqual({
+      verdict: 'approved',
+      reason: 'on call rota',
+    });
   });
 
   it('records a verdict that arrives after the decision instead of dropping it', async () => {
@@ -198,7 +219,7 @@ describe('the composition rule', () => {
     const pending = gateway.requestApproval(REQUEST, controller.signal);
     controller.abort();
 
-    await expect(pending).resolves.toBe('denied');
+    await expect(pending).resolves.toEqual({ verdict: 'denied' });
     expect(one.aborted()).toBe(true);
     expect(two.aborted()).toBe(true);
   });
@@ -209,7 +230,9 @@ describe('the composition rule', () => {
     const controller = new AbortController();
     controller.abort();
 
-    await expect(gateway.requestApproval(REQUEST, controller.signal)).resolves.toBe('denied');
+    await expect(gateway.requestApproval(REQUEST, controller.signal)).resolves.toEqual({
+      verdict: 'denied',
+    });
     expect(one.aborted()).toBe(true);
   });
 });
