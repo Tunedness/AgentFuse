@@ -39,6 +39,24 @@ export class CliError extends Error {
   }
 }
 
+/**
+ * The message of a thrown value, whether or not it is an `Error`.
+ *
+ * One helper rather than a ternary at each of the dozen places that quote an
+ * underlying failure in a hint. A module whose top-level `throw 'x'` rejected a
+ * dynamic import is not an `Error`, and `String(error)` on an object prints
+ * `[object Object]`, so the single-place version is the one worth testing.
+ */
+export function messageOf(error: unknown): string {
+  if (error instanceof Error) return error.message;
+  if (typeof error === 'string') return error;
+  try {
+    return JSON.stringify(error) ?? String(error);
+  } catch {
+    return String(error);
+  }
+}
+
 /** Renders a {@link CliError} the way the CLI prints it. */
 export function formatCliError(error: CliError): string {
   const lines = [`agentfuse: ${error.message}`];

@@ -28,7 +28,7 @@ import { dirname, isAbsolute, parse as parsePath, resolve } from 'node:path';
 import { type FusePolicy, FusePolicySchemaV1 } from '@agentfuse/core';
 import { isMap, isSeq, LineCounter, type Node, parseDocument } from 'yaml';
 import type { z } from 'zod';
-import { CliError, EXIT } from './errors.js';
+import { CliError, EXIT, messageOf } from './errors.js';
 
 /**
  * Filenames looked for in each directory of the search, in this order.
@@ -255,7 +255,7 @@ export function readPolicyFile(location: PolicyLocation): LoadedPolicy {
   } catch (error) {
     throw new PolicyFileError(
       `cannot read the policy file ${path}`,
-      [error instanceof Error ? error.message : String(error)],
+      [messageOf(error)],
       ['Check the path and the file permissions.'],
     );
   }
@@ -289,7 +289,7 @@ export function readPolicyFile(location: PolicyLocation): LoadedPolicy {
   } catch (error) {
     throw new PolicyFileError(
       `${path} is not valid YAML`,
-      [`${path}  ${error instanceof Error ? error.message : String(error)}`],
+      [`${path}  ${messageOf(error)}`],
       ['Check the `&anchor` and `*alias` references.'],
     );
   }

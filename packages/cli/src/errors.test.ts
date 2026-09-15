@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { CliError, EXIT, formatCliError } from './errors.js';
+import { CliError, EXIT, formatCliError, messageOf } from './errors.js';
 
 describe('CliError', () => {
   it('defaults to the usage exit code and no hints', () => {
@@ -36,6 +36,37 @@ describe('CliError', () => {
 
     expect(new Set(codes).size).toBe(codes.length);
     expect(EXIT.ok).toBe(0);
+  });
+});
+
+describe('messageOf', () => {
+  it('takes the message of an Error', () => {
+    expect(messageOf(new Error('disk full'))).toBe('disk full');
+  });
+
+  it('takes a thrown string as it is', () => {
+    // A module whose top-level `throw 'x'` rejected a dynamic import.
+    expect(messageOf('top-level throw')).toBe('top-level throw');
+  });
+
+  it('describes a thrown object instead of printing [object Object]', () => {
+    expect(messageOf({ code: 'EACCES' })).toBe('{"code":"EACCES"}');
+  });
+
+  it('falls back to String for a value JSON cannot describe', () => {
+    const cyclic: Record<string, unknown> = {};
+    cyclic.self = cyclic;
+
+    expect(messageOf(cyclic)).toBe('[object Object]');
+  });
+
+  it('handles the values JSON.stringify returns undefined for', () => {
+    expect(messageOf(undefined)).toBe('undefined');
+    expect(messageOf(() => 1)).toContain('=>');
+  });
+
+  it('keeps a subclass`s message', () => {
+    expect(messageOf(new CliError('nope'))).toBe('nope');
   });
 });
 
