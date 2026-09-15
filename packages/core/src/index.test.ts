@@ -40,6 +40,7 @@ describe('@agentfuse/core public surface', () => {
     expect(Object.keys(testing).sort()).toEqual([
       'CounterIdGenerator',
       'FakeClock',
+      'HashingProvider',
       'RecordingTelemetrySink',
       'ScriptedApprovalGateway',
     ]);

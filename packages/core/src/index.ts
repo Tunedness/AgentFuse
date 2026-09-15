@@ -84,6 +84,8 @@ export {
   normalizeArgs,
   truncateValue,
 } from './loop/normalize.js';
+export type { EmbeddingWindowOptions } from './loop/window.js';
+export { EmbeddingWindow } from './loop/window.js';
 export type {
   CompiledPolicy,
   CompiledRule,
