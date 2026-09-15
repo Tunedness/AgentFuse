@@ -1,8 +1,9 @@
 # AgentFuse — uygulama durumu ve devir notu
 
-**Son güncelleme:** 2026-09-16 · **`main`'deki son kod commit'i:** `3e791d4`
-(`main` HEAD bunu izleyen bu doküman commit'i) · **Durum:** Faz 8 bitti;
-kritik yolda sırada Faz 9, paralelde Faz 4
+**Son güncelleme:** 2026-09-16 · **`main`'deki son kod commit'i:** `a92f06d`
+(`main` HEAD bunu izleyen bu doküman commit'i) · **Durum:** Faz 8 bitti ve
+Faz 7/8'den kalan iki boşluk kapatıldı; kritik yolda sırada Faz 9, paralelde
+Faz 4
 
 Bu dosya, işi başka bir oturumda kaldığı yerden sürdürebilmek için tutulur.
 Ürün tanımı burada değil — tek doğruluk kaynağı `../.ssot/PRD.md` ve
@@ -27,6 +28,7 @@ dosyasındadır.
 | 8 | Telemetri (OTLP) | **Bitti** — `0172deb` `3d36b9f` `3177f90` `3e791d4` |
 | 9 | Benchmark'lar (tespit + gecikme) | Başlanmadı |
 | 10 | Dokümanlar + v0.1.0 | Başlanmadı |
+| — | Faz 7/8'den kalan iki boşluk | **Bitti** — `a3e7752` `a92f06d` |
 
 Bağımlılık grafiği ve kritik yol:
 
@@ -38,34 +40,37 @@ kritik yol: 0-1-2-5-6-9-10
 ### `main` yeşil — 2026-09-16'da bizzat koşuldu
 
 ```
-npm run lint          → Checked 185 files. No fixes applied. (exit 0)
+npm run lint          → Checked 187 files. No fixes applied. (exit 0)
 npm run typecheck     → temiz (tsc -b && tsc -p tsconfig.test.json)
 npm run build         → temiz
-npm test              → Test Files 64 passed · Tests 1472 passed (~5.2 s)
+npm test              → Test Files 65 passed · Tests 1527 passed (~6 s)
 npm run schema:check  → schema up to date
 ```
 
-Faz 8 öncesindeki sayılar 58 dosya / 1355 test idi; eklenen 6 dosya ve 117 test
-tümüyle `packages/cli`'ye ait. Tek yeniden yazılan test `runtime.test.ts`'in
-"says telemetry is not exported yet" testiydi — o uyarı Faz 8'de silindi ve
-yerine telemetri portunun altı testi geldi. `lint` çıktısındaki 42 `info`
-(`useLiteralKeys`) Faz 7'den beri aynı ve exit 0'ı etkilemiyor.
+Faz 8 sonundaki sayılar 64 dosya / 1472 test idi; iki boşluğu kapatan çalışma
+bir dosya (`core/src/util/text.test.ts`) ve 55 test ekledi. Yeniden yazılan
+testler onay kapılarının dönüş tipini izliyor: `requestApproval` artık bir
+nesne döndürdüğü için `resolves.toBe('approved')` diyen her iddia
+`toEqual({ verdict: … })` oldu, ve `wrap-process.test.ts`'in "sarılan sunucu
+ajanın bağlamını değişmeden görüyor" testi artık tersini — bizim span'imizi
+gördüğünü — pinliyor. `lint` çıktısındaki 42 `info` (`useLiteralKeys`) Faz
+7'den beri aynı ve exit 0'ı etkilemiyor. Yeni üç `biome-ignore` var, üçü de
+`noControlCharactersInRegex` için ve gerekçesi aynı: kontrol karakterlerini
+eşlemek o regex'in tek işi.
 
 Coverage kapısı `vitest.config.ts` içinde `packages/core/src/**` için %90'da ve
 **gerçekten zorluyor** (Faz 2'de 100'e çekilip kasten kırılarak doğrulandı).
-Faz 8 sonundaki ölçümler (`coverage/lcov.info` üzerinden, glob bazında):
+Bu çalışmanın sonundaki ölçümler (`coverage/lcov.info` üzerinden, glob bazında):
 
 | Paket | lines | functions | branches |
 | --- | --- | --- | --- |
-| `packages/core/src/**` (kapılı) | %99.89 | %100 | %95.45 |
-| `packages/proxy/src/**` (kapısız) | %98.88 | %100 | %91.18 |
-| `packages/cli/src/**` (kapısız) | %99.93 | %100 | %99.51 |
+| `packages/core/src/**` (kapılı) | %99.89 | %100 | %95.65 |
+| `packages/proxy/src/**` (kapısız) | %98.90 | %100 | %91.51 |
+| `packages/cli/src/**` (kapısız) | %99.93 | %100 | %99.52 |
 
-Core ve proxy rakamları Faz 6a'dakinin aynısı — iki pakete de hâlâ
-dokunulmadı. CLI iki metrikte yükseldi (%99.92 → %99.93 lines, %99.41 → %99.51
-branches, functions %100'de kaldı). Yeni `telemetry/` dizini dört metrikte de
-**%100**; kapatılamayan iki dal koddan silindi (`#context`'teki gereksiz
-yeniden okuma ve tahliyedeki erişilemez `done` koruması).
+Üç paket de Faz 8 sonundaki rakamının (99.89/100/95.45, 98.88/100/91.18,
+99.93/100/99.51) üstünde ya da eşit; core ve proxy ilk kez Faz 6a'dan beri
+değişti. `telemetry/` dizini dört metrikte de **%100** kaldı.
 
 Metin reporter'ının satırları: `core/src` %98.31 / %96.46 / %100 / %99.36,
 `proxy/src` %98.46 / %91.17 / %100 / %98.87, `cli/src` %99.47 / %98.84 / %100 /
@@ -1473,15 +1478,14 @@ Argümanlar bu katmanda redakte edilmiyor ve edilemez: `report.redact_args`
 açıkken motor `argsPreview` yerine fingerprint'i veriyor, çünkü ham argümanları
 gören tek yer motor. Prompt ne geldiyse onu yazıyor — testi de bunu ölçüyor.
 
-### İnsanın `--reason`'ı nereye gidiyor (ve nereye gitmiyor)
+### İnsanın `--reason`'ı nereye gidiyor
 
-`approval_resolved` teşhis satırına ve komutu yazan kişiye geri. **Ajana giden
-ret metnine ve JSON rapora gitmiyor, gidemiyor:**
-`ApprovalGateway.requestApproval` çıplak bir verdict string'i döndürüyor, ve
-rapor motor içinde, gateway cevap vermeden önce inşa ediliyor. İkisi de donmuş
-paketlerde. **Bunu kapatacak dikiş tek bir tip değişikliği:** portun
-`'approved' | 'denied' | 'timeout'` yerine `{ verdict, reason? }` döndürmesi —
-core değişikliği, yani kendi ADR satırını hak ediyor.
+Faz 7'de yalnız `approval_resolved` teşhis satırına ve komutu yazan kişiye
+gidiyordu; ADR-009 bunu boşluk saydı ve **kapatıldı** (`a92f06d`, aşağıdaki
+"Kapanan iki boşluk" bölümü). Bugün gerekçe karara (`Decision.approval`) ve
+kesinti raporuna da gidiyor. **Ajana giden ret metnine hâlâ gitmiyor** ve bu
+bilinçli: operatörün sözlerini modelin bağlamına koymak kendi ürün kararını
+hak ediyor.
 
 ### Timeout'un sahibi gateway (Faz 2 kararı, uygulandı)
 
@@ -1683,8 +1687,8 @@ fırsat bulamamış bir process'in bıraktığı şey.
    uygulanmış ve belgelenmiş durumda; birincisi motora yeni bir giriş noktası
    ister (`resetBreaker(sessionId, { to: 'half_open' })` ya da
    `cooldownElapsed(sessionId)`).
-2. **İnsanın `--reason`'ı rapora ve ajana ulaşmıyor** (yukarıda). Port çıplak
-   string döndürüyor. Dikiş: `{ verdict, reason? }`.
+2. **İnsanın `--reason`'ı rapora ulaşmıyordu** (yukarıda). ADR-009 bunu karara
+   bağladı, `a92f06d` kapattı. Ajana giden metne hâlâ ulaşmıyor.
 3. **Açılamayan kanal sert hata değil** (yukarıda). Brifing bunu belirtmiyordu;
    embeddings tablosunun precedent'inden bilinçli olarak ayrıldı ve gerekçesi
    yazıldı.
@@ -1853,25 +1857,18 @@ da ajanın izinin içinde kalıyor.
   `traceparent` taşıyor; proxy üçünü de upstream'e iletiyor. `trace.ts`
   `tracestate`'i okuyabiliyor (test edildi), ama üretimde besleyen yok.
 
-### Upstream'e yeniden enjeksiyon yapılmadı — kayda geçiyor
+### Upstream'e yeniden enjeksiyon — Faz 8'de yapılmadı, sonra yapıldı
 
-Faz brifingi "upstream `_meta`'ya yeniden enjekte et" diyordu. Proxy donmuş ve
-bunun dikişi yok: `GuardedToolCall.forward()` parametre almıyor, giden
-`_meta`'yı `bridge.ts` `upstreamParams`/`forwardedMeta` ile kendisi kuruyor ve
-ajanın `traceparent`'ını **olduğu gibi** iletiyor. Yani bugünkü davranış:
-sarılan sunucunun işi AgentFuse'un span'inin **kardeşi**, çocuğu değil; ikisi de
-ajanın span'inin altında. Uçtan uca test bunu iki taraftan birden pinliyor
-(çocuk ajanın `traceparent`'ını görüyor, export edilen span onun çocuğu).
+Faz brifingi "upstream `_meta`'ya yeniden enjekte et" diyordu; Faz 8 proxy'ye
+dokunamadığı için yapamadı ve bugünkü davranışı (sarılan sunucunun işi
+AgentFuse'un span'inin **kardeşi**) kayda geçirdi. Boşluk `a3e7752` ile
+kapatıldı — aşağıdaki "Kapanan iki boşluk" bölümü dikişin son halini anlatıyor.
 
-CLI tarafından kapatmanın tek yolu downstream transport'u sarıp gelen
-`_meta`'yı yeniden yazmak olurdu — yani proxy'nin okuduğu isteği değiştirmek.
-Bu, "en küçük dürüst geçici çözüm" değil, ajanın gönderdiği mesajı arkadan
-değiştirmek olurdu ve `bridge.ts`'in tek sahiplik kuralını bozardı.
-**Kapatacak dikiş küçük:** `ToolCallGuardOptions`'a opsiyonel bir
-`traceparentFor(call) => string | undefined` (ya da `forward(paramsOverride)`),
-`tools-call.ts` içinde `upstreamParams`'a geçirilecek şekilde. Faz 6b'nin
-bıraktığı `onChildExit` ve `onConnect` kancalarıyla birlikte alınacak üçüncü
-kanca budur.
+Kayda değer olan, o zaman **reddedilen** çözüm: CLI tarafından kapatmanın tek
+yolu downstream transport'u sarıp gelen `_meta`'yı yeniden yazmak olurdu, yani
+proxy'nin okuduğu isteği değiştirmek. Bu "en küçük dürüst geçici çözüm" değil,
+ajanın gönderdiği mesajı arkadan değiştirmek olurdu ve `bridge.ts`'in tek
+sahiplik kuralını bozardı. Doğru cevap proxy'de bir kanca açmaktı.
 
 ### Onaylar dört tipin içinde nasıl görünüyor
 
@@ -1977,8 +1974,8 @@ düşüren bir telemetri tüketicisi olmaz.
 
 ### Faz 8'in çelişki kaydı
 
-1. **Upstream'e yeniden enjeksiyon yok** (yukarıda). Proxy donmuş; dikiş
-   yazıldı, uygulanmadı.
+1. **Upstream'e yeniden enjeksiyon yoktu** (yukarıda). Proxy o fazda donmuştu;
+   dikiş yazıldı, sonradan `a3e7752` ile uygulandı.
 2. **Gelen bağlam yokken span yine üretiliyor** (kök olarak). "Uydurma
    `traceparent` yok" kuralı *tel üzerine yazılan dizeye* uygulandı: hiçbir
    yere `traceparent` yazılmıyor ve hiçbir span uydurma bir ebeveyn
@@ -1999,9 +1996,124 @@ düşüren bir telemetri tüketicisi olmaz.
 
 ---
 
+## Kapanan iki boşluk — Faz 7 ve Faz 8'in bıraktıkları (bitti)
+
+İki commit: `a3e7752` upstream `_meta`'ya span enjeksiyonu, `a92f06d` onay
+gerekçesinin denetim kaydına taşınması. İkisi de yeni özellik değil; `.ssot`'un
+zaten verdiği sözlerdi ve ilgili fazlar `core`/`proxy`'ye dokunamadığı için
+açık kalmışlardı. Bu çalışma iki pakete de **dar** dokundu: başka hiçbir
+değişiklik yok.
+
+### Boşluk 1 — span'imiz artık upstream `_meta`'da
+
+Dikişin son hali üç parçadan oluşuyor ve hiçbiri sınır kuralını bozmuyor:
+
+```
+bridge.ts   GuardedToolCall.forward(overrides?: OutboundMetaOverrides)
+remap.ts    forwardedMeta/upstreamParams(..., overrides?)   ← _meta'nın tek sahibi
+tools-call.ts  ToolCallGuardOptions.traceparentFor(call, decision)
+```
+
+- **`forward()` bir override çantası alıyor, params değil.** Kapı ajanın
+  isteğini yeniden yazamıyor; yalnız `remap.ts`'in bildiği bir `_meta`
+  anahtarına erişiyor. `bridge.ts` ve `remap.ts` hâlâ `@agentfuse/core`
+  görmüyor — `boundary.test.ts` yerinde ve geçiyor.
+- **Kanca `beforeCall`'dan *sonra* okunuyor ve `decision`'ı da alıyor.**
+  Sebep zamanlama: span kimliği CLI'da `policy_decision` anında basılıyor
+  (Faz 8'in kararı), yani enjekte edilecek dize karar verilmeden önce
+  *yok*. Kancanın `decision.callId`'ye ihtiyacı bu yüzden var; brifingdeki
+  `traceparentFor(call)` imzası tek başına yetmezdi.
+- **`OtlpTelemetrySink.traceparentFor(callId)`** o kimliği `00-…` olarak
+  render ediyor, `runtime.ts` kancayı ona bağlıyor, `wrap.ts` yalnız sink
+  varken geçiriyor. Telemetri kapalıyken `Runtime.traceparentFor` `undefined`;
+  proxy kancayı hiç almıyor ve giden baytlar ajanın kendi baytları.
+- **Uydurma yok.** Tele yazılan dize bu process'in gerçekten export ettiği bir
+  span'i adlandırıyor. Gelen bağlam yokken bile enjekte ediliyor — o span bir
+  izin kökü ve sarılan sunucu ona katılıyor; "uydurma `traceparent` yok" kuralı
+  *var olmayan* bir span'i adlandırmayı yasaklıyor, var olanı değil.
+
+Kanıt: `wrap-process.test.ts` içinde inşa edilmiş `dist/main.js`, gerçek
+fixture sunucusu ve gerçek OTLP alıcısıyla iki test — biri gelen bağlamla
+(`echoed._meta.traceparent === 00-<agent trace>-<export edilen span id>-01`),
+biri bağlamsız (kök span'in kendisi). Regresyon tarafı ayrı pinli: telemetri
+kapalı bir wrap'te sarılan sunucu ajanın `traceparent`/`tracestate`/`baggage`
+üçlüsünü olduğu gibi görüyor.
+
+### Boşluk 2 — onay gerekçesi denetim kaydında
+
+ADR-009'un ikinci yarısı. Dikiş:
+
+```
+ports/index.ts   ApprovalGateway → Promise<verdict | { verdict, reason? }>
+domain/decision  ApprovalRecord, APPROVAL_REASON_LIMIT (500), Decision.approval
+report/          TripReport.approval + render'da "human: <verdict>" satırı
+util/text.ts     sanitizeFreeText(value, limit)
+```
+
+- **Tip genişletildi, değiştirilmedi.** Port hâlâ çıplak bir verdict dizesini
+  kabul ediyor, çünkü söyleyecek başka şeyi olmayan bir gateway (core'un
+  `DenyAllApprovalGateway`'i, test dublörleri, bir gömücünün üç satırlık
+  adaptörü) yeniden yazılmayı hak etmiyor. İki biçim motorda tek bir yerde —
+  `approvalRecordOf` — normalize ediliyor, sanitizasyon da orada bir kez
+  koşuyor. Okunamayan bir verdict `'denied'`: motorun anlamadığı cevap rıza
+  değil.
+- **Faz 7'nin "rapor gateway cevap vermeden önce inşa ediliyor" gözlemi
+  yanlıştı.** `beforeCall` sırası şu: `runGuards` → approval → `buildTripReport`.
+  Yani gerekçe rapora sonradan iliştirilmiyor, rapor zaten onu bilerek
+  kuruluyor. Hiçbir yeniden sıralama gerekmedi.
+- **Değişen tek davranış: raporun ne zaman diske yazıldığı.** Eskiden yalnız
+  bloklanan çağrılar dosya üretiyordu; ADR-009 "rapor bir denetim artefaktıdır,
+  denetimin sorduğu soru 'bu çağrıya neden izin verildi'dir" dediği için insana
+  sorulan çağrı **onaylandığında da** yazılıyor. Genişleme dar: koşul
+  `decision.approval !== undefined`, yani kural seviyesinde bir
+  `require_approval` (devreyi tripletmeyen, dolayısıyla raporu olmayan) hâlâ
+  hiçbir şey yazmıyor ve `warn` modunda onay hiç çözülmüyor.
+- **Metin güvenilmez sayılıyor.** `sanitizeFreeText` ANSI dizilerini, C0/C1
+  kontrol karakterlerini (satır sonları dahil), tek başına kalmış surrogate'leri
+  siliyor, boşlukları tekleştiriyor ve 500 karakterde kırpıyor. Sebebi yolculuk:
+  metin bir terminalde yazılıyor, socket ya da HTTP üzerinden geliyor, bir JSON
+  dosyasına yazılıyor ve **başkasının** terminalinde render ediliyor. Webhook
+  kanalında yazarı operatör bile değil, uzak bir endpoint. CLI protokolünün
+  kendi 1 KiB `--reason` sınırı ayrıca duruyor; ikisi farklı katmanlar.
+- **Telemetri değişmedi.** Faz 8 `reason`'ı bilinçle kopyalamıyordu ve hâlâ
+  kopyalamıyor; dört olay tipi sözleşmesi (çatı ADR-003) olduğu gibi. Secret
+  testi yerinde: uydurma bir `secret` alanı ve secret içeren bir `reason` ile
+  beslenen sink export'a hiçbirini yazmıyor.
+- **Ajana giden metin de değişmedi.** `buildTripResult` yalnız kodu, devre
+  fazını ve rapor kimliğini taşıyor. ADR-009 gerekçeyi "raporun ve karar
+  kaydının" taşıması gerektiğini söylüyor; operatörün serbest metnini modelin
+  bağlamına koymak ayrı bir ürün kararı ve burada verilmedi (aşağıya bakın).
+
+Kanıt: `approve-process.test.ts` içinde iki gerçek process — onaylanan ve
+reddedilen çağrının gerekçesi `agentfuse report last` çıktısında ve
+`--json`'ında; ANSI + kontrol karakteri + satır sonu + uzun metin taşıyan bir
+gerekçe raporu bozamıyor; ve webhook kanalının `reason`'ı (uzak endpoint
+yazıyor) kayda giriyor ama secret hiçbir yere sızmıyor. Cevapsız kalan bir onay
+(timeout) bit bit eskisi gibi davranıyor.
+
+### Üç kanca artık bir desen mi?
+
+Evet, ve kayda geçiyor. Biri artık var (`ToolCallGuardOptions.traceparentFor`),
+ikisi hâlâ önerilmiş durumda (`StdioWrapOptions.onChildExit`,
+`StdioWrapHandle.onConnect`), ama üçü de aynı biçim: *proxy bir olayı biliyor,
+host ona ne yapacağını biliyor.* Üçü de opsiyonel ve yoklukta bugünkü davranışı
+bit bit koruyor — CLI'daki 25 ms'lik `watchForConnection` zamanlayıcısı ve
+`wrap.ts`'in exit-code tablosu, o iki kanca olmadığı için var olan geçici
+çözümler.
+
+**Yine de birleştirilmedi.** İkisi bağlantı yaşam döngüsüne
+(`StdioWrapOptions`), biri araç çağrısı yoluna (`ToolCallGuardOptions`) ait ve
+bunlar farklı ömürler: biri bağlantı başına bir kez, öteki her `tools/call`'da.
+Tek bir `hooks` nesnesinde toplamak, kalan iki kanca da yazıldığında ve
+McpGuard'ın paylaşılan pakete taşıma günü geldiğinde değerlendirilecek bir iş;
+o güne kadar üç ayrı opsiyonel alan okunaklı olanı. Bu faz onları kendi
+inisiyatifiyle birleştirmedi — brifing de bunu istemedi.
+
+---
+
 ## Sırada ne var
 
-### Önce `.ssot`: üç nokta kendi kararını bekliyor
+### Önce `.ssot`: iki nokta kendi kararını bekliyor
 
 Çatı ADR-002 kapsam değiştiren koddan önce doküman güncellemesi şart koşuyor.
 Açık duran noktalar:
@@ -2014,13 +2126,21 @@ Açık duran noktalar:
    `Mcp-Session-Id`'yi önce sayıyor, uygulama onu `baggage`'ın altına koyuyor,
    ve gerekçe aynı ADR'ın zincirleme sözleşmesi. Faz 6b bu sırayı `serve`'de
    uyguladı ve testle pinledi; metin hâlâ ötekini söylüyor.
-3. **`approve --reset` hangi phase'e götürmeli?** Faz 7 → çelişki kaydı #1.
-   Uygulanan davranış core'un donmuş `resetBreaker`'ı, yani `closed`; faz
-   brifingi `half_open` diyordu. Bir ADR satırı bunu bağlayıcı hale getirmeli,
-   çünkü ikisi operatöre farklı şeyler vaat ediyor. Aynı yerde kayda değer iki
-   şey daha var ve ikisi de Faz 7'de **uygulanmış ve belgelenmiş** durumda:
-   iki gateway'in kompozisyon kuralı, ve açılamayan bir onay kanalının sert hata
-   değil uyarı olması.
+**Kapanan üçüncü nokta:** `approve --reset` hangi phase'e götürmeli sorusunu
+ADR-009 karara bağladı — devre **kapanır** (`closed`), ve uygulanan davranış
+zaten oydu. Aynı ADR'ın ikinci yarısı (onay gerekçesi) da kapandı; bkz.
+"Kapanan iki boşluk". Hâlâ `.ssot`'ta yeri olmayan iki şey Faz 7'de uygulanmış
+ve belgelenmiş durumda: iki gateway'in kompozisyon kuralı, ve açılamayan bir
+onay kanalının sert hata değil uyarı olması.
+
+**Bu çalışmadan çıkan yeni bir nokta:** onay gerekçesi **ajana** da gitmeli mi?
+ADR-009 boşluğu tarif ederken "kesinti raporuna ve ajanın gördüğü metne
+ulaşmıyor" diyor, ama kararı yalnız "port `{ verdict, reason? }` döndürür ve
+karar kaydı gerekçeyi taşır" diye yazıyor. Uygulama dar okumayı seçti: rapor ve
+karar kaydı evet, ajanın gördüğü ret metni hayır. Gerekçe, insanın serbest
+metnini modelin bağlamına koymanın kendi ürün kararı olması (ve ADR-004'ün
+"AgentFuse ne olacağına karar verir, ne söyleneceğine değil" çizgisine yakın
+durması). Bir ADR satırı bunu ya onaylamalı ya da tersini söylemeli.
 
 ### Faz 4 — `@agentfuse/embeddings-local`
 
@@ -2072,13 +2192,20 @@ kalibrasyonu; Faz 10 dokümanlar ve v0.1.0.
 - ADR-010 kurulum boyutuna dokunmadığımızı söylüyor: doküman "telemetri açmak
   ek paket kurdurmaz" diyebilir, çünkü öyle.
 
-Faz 9 ya da 10 proxy'ye dokunuyorsa birlikte alınacak **üç** kanca var, üçü de
-belgelenmiş ödünç: `StdioWrapOptions.onChildExit` (çocuğun exit code'u
-aynalanabilsin diye), `StdioWrapHandle.onConnect` (bağlantının açıldığı anı
-yakalamak için kurulan 25 ms'lik zamanlayıcı silinsin diye) ve Faz 8'in
-eklediği `ToolCallGuardOptions.traceparentFor` (span'imiz upstream'e ebeveyn
-olarak enjekte edilebilsin diye). Faz 7 ve Faz 8 proxy'ye dokunmadı, yani üçü
-de açık.
+Faz 9 ya da 10 proxy'ye dokunuyorsa birlikte alınacak **iki** kanca kaldı, ikisi
+de belgelenmiş ödünç: `StdioWrapOptions.onChildExit` (çocuğun exit code'u
+aynalanabilsin diye) ve `StdioWrapHandle.onConnect` (bağlantının açıldığı anı
+yakalamak için kurulan 25 ms'lik zamanlayıcı silinsin diye). Üçüncüsü —
+`ToolCallGuardOptions.traceparentFor` — `a3e7752` ile eklendi ve üçünün aynı
+deseni paylaşması yukarıda kayda geçti.
+
+**Faz 9 ve 10 için iki not daha:** telemetri açık koşulan bir benchmark artık
+her araç çağrısında bir `_meta` anahtarı daha yazıyor (`traceparent`) ve
+sarılan sunucu ajanınki yerine bizim span'imizi görüyor — gecikme ölçümü
+telemetriyi hem açık hem kapalı koşarken bunu da kapsıyor. Faz 10'un onay
+bölümü ise `--reason`'ın artık kesinti raporunda ve `agentfuse report`
+çıktısında göründüğünü anlatmalı; Faz 7'nin "yalnız log'a gider" cümlesi
+geçersiz.
 
 **Faz 9 yalnız test değil, ürünün sayısal iddiasıdır.** PRD §6 eşikleri —
 recall ≥ 0.90, FP < 0.05, p95 eklenen < 50 ms — CI'da kapı olur. Corpus'un
