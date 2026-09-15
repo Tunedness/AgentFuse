@@ -1,8 +1,8 @@
 # AgentFuse — uygulama durumu ve devir notu
 
-**Son güncelleme:** 2026-09-15 · **`main`'deki son kod commit'i:** `ebce8f0`
-(`main` HEAD bunu izleyen bu doküman commit'i) · **Durum:** Faz 5 bitti, kritik
-yol Faz 6'ya geçti
+**Son güncelleme:** 2026-09-15 · **`main`'deki son kod commit'i:** `c80c4db`
+(`main` HEAD bunu izleyen bu doküman commit'i) · **Durum:** Faz 6 kısmen bitti
+(6a); kritik yol `wrap`/`serve` için Faz 6b'ye geçti
 
 Bu dosya, işi başka bir oturumda kaldığı yerden sürdürebilmek için tutulur.
 Ürün tanımı burada değil — tek doğruluk kaynağı `../.ssot/PRD.md` ve
@@ -22,7 +22,7 @@ dosyasındadır.
 | 3 | Asenkron semantik döngü katmanı | **Bitti** — `abd96d8` |
 | 4 | `@agentfuse/embeddings-local` | Başlanmadı |
 | 5 | `@agentfuse/proxy` (MCP adaptörü) | **Bitti** — `ebce8f0` |
-| 6 | CLI (`agentfuse`) | Başlanmadı |
+| 6 | CLI (`agentfuse`) | **Kısmen bitti (6a)** — `373c240` `f503322` `58741ba` `c80c4db`; `wrap`/`serve` = 6b |
 | 7 | Onay akışı + rapor UX | Başlanmadı |
 | 8 | Telemetri (OTLP) | Başlanmadı |
 | 9 | Benchmark'lar (tespit + gecikme) | Başlanmadı |
@@ -38,31 +38,45 @@ kritik yol: 0-1-2-5-6-9-10
 ### `main` yeşil — 2026-09-15'te bizzat koşuldu
 
 ```
-npm run lint          → Checked 109 files. No fixes applied.
+npm run lint          → Checked 140 files. No fixes applied.
 npm run typecheck     → temiz (tsc -b && tsc -p tsconfig.test.json)
 npm run build         → temiz
-npm test              → Test Files 28 passed · Tests 633 passed (2.45 s)
+npm test              → Test Files 43 passed · Tests 951 passed (2.53 s)
 npm run schema:check  → schema up to date
 ```
 
+Faz 6a öncesindeki sayılar 28 dosya / 633 test idi; eklenen 15 dosya ve 318
+test tümüyle `packages/cli`'ye ait ve mevcut 633 testin hiçbiri değişmedi.
+
 Coverage kapısı `vitest.config.ts` içinde `packages/core/src/**` için %90'da ve
 **gerçekten zorluyor** (Faz 2'de 100'e çekilip kasten kırılarak doğrulandı).
-Faz 5 sonundaki ölçümler (`coverage/lcov.info` üzerinden, glob bazında):
+Faz 6a sonundaki ölçümler (`coverage/lcov.info` üzerinden, glob bazında):
 
 | Paket | lines | functions | branches |
 | --- | --- | --- | --- |
 | `packages/core/src/**` (kapılı) | %99.89 | %100 | %95.45 |
 | `packages/proxy/src/**` (kapısız) | %98.88 | %100 | %91.18 |
+| `packages/cli/src/**` (kapısız) | %99.79 | %100 | %98.86 |
 
-Kapı yalnız core'da, ama proxy de bilinçli olarak aynı çubuğun üstünde tutuldu;
-sayıyı şişirmemek için yazılmamış tek test yok. Metin reporter'ının `proxy/src`
-satırı: statements %98.46, branches %91.17, functions %100, lines %98.87.
-Karşılaştırma için Faz 3 sonunda "All files" %99.24 / %95.47 / %100 / %99.78
-idi; artık bu satır tüm paketleri kapsıyor ve %99.03 / %93.95 / %100 / %99.53.
+Kapı yalnız core'da, ama proxy ve CLI de bilinçli olarak aynı çubuğun üstünde
+tutuldu; sayıyı şişirmemek için yazılmamış tek test yok. Metin reporter'ının
+satırları: `proxy/src` %98.46 / %91.17 / %100 / %98.87, `cli/src` %99.27 /
+%98.86 / %100 / %99.72, `cli/src/commands` %100 / %98.82 / %100 / %100.
+Karşılaştırma için Faz 5 sonunda "All files" %99.03 / %93.95 / %100 / %99.53
+idi; artık %99.19 / %95.35 / %100 / %99.66.
 
-`packages/proxy/src/testing/` coverage'dan ve paket build'inden muaf: içindeki
-harness'lar ve senaryo dublörleri `.test.ts` ile bitmediği halde test
-iskelesidir, ve yayınlanmaları her senaryoyu public kontrata çevirirdi.
+**`main.ts` metin reporter'ında %0 görünür ve bu beklenen.** Dosya tek bir
+top-level `await run(...)` ifadesidir ve gerçek stream'leri bağlar; yalnızca
+ayrı bir process olarak koşarken çalışır. `cli.test.ts` onu `dist/main.js`'i
+`execFile` ile çağırarak test ediyor (`it.runIf(existsSync(MAIN))` — kapı
+`build`'i `test`'ten önce koştuğu için CI'da her zaman koşar). v8
+instrumentasyonu child process'i görmez, ama shebang'in, top-level await'in ve
+`process.exitCode`'un gerçekten çalıştığı o testle pinli.
+
+`packages/*/src/testing/` coverage'dan ve paket build'inden muaf: içindeki
+harness'lar, senaryo dublörleri ve `json-schema.ts` doğrulayıcısı `.test.ts` ile
+bitmediği halde test iskelesidir, ve yayınlanmaları her senaryoyu public
+kontrata çevirirdi.
 
 Senkron yolun ölçülen maliyeti (`beforeCall` + `afterCall` + `observe`, 20 000
 çağrı, 50 oturum, `HashingProvider(384)` bağlı, `mode: warn`): ortalama
@@ -380,6 +394,8 @@ result: <özet, en çok 256 karakter>
   `close()`. Provider bulunamazsa hiç bağlamayın — kural katmanı tam işlevli
   kalır. Proxy `forget()` için dikişi bıraktı:
   `ToolCallGuardOptions.onSessionEnd`.
+  **Faz 6a'da yapıldı:** `runtime.ts` içinde `createRuntime`, ve
+  `Runtime.onSessionEnd` o kancaya bağlanmış halde.
 - **Faz 6:** `provider: 'none'` ya da `semantic.enabled: false`, CLI dinamik
   `import()` ile `@agentfuse/embeddings-local`'ı bulamadığında kullanacağı
   kapatma anahtarıdır; dedektör o çağrıları `skipped` sayar.
@@ -735,26 +751,321 @@ ikili: ya tek faz koşturun, ya da her ajana "ara commit at" talimatı verin. Fa
 
 ---
 
+## Faz 6a — CLI tesisatı ve proxy dışı komutlar (bitti)
+
+Dört commit: `373c240` tesisat (errors, io, args, config, tokenizer),
+`f503322` rapor dizini + `onDecision` hook'u + opsiyonel embedding backend'i,
+`58741ba` runtime, `c80c4db` komutlar + giriş noktası. `packages/cli/src`
+ağacı:
+
+```
+main.ts                    ← process'e dokunan TEK dosya
+cli.ts                     ← komut tablosu, CliError → exit code
+index.ts                   ← CLI_VERSION + versionBanner()
+errors.ts io.ts args.ts    ← tesisat: hata, stream, bayrak
+config.ts                  ← fusepolicy.yaml bulma/okuma/doğrulama
+tokenizer.ts               ← gpt-tokenizer o200k_base + CostModel
+reports.ts                 ← .agentfuse/reports (proxy'nin writeReport dikişi)
+hook.ts                    ← --hook ./hook.mjs (ADR-004)
+embeddings.ts              ← dinamik import() + zarif düşüş tablosu
+runtime.ts                 ← motoru, portları ve semantik katmanı kuran yer
+commands/{init,validate,report,models,shared}.ts
+testing/json-schema.ts     ← build ve coverage dışı
+```
+
+**`wrap` ve `serve` bilinçli olarak yazılmadı — Faz 6b.** `cli.ts` ikisini de
+tabloda tutuyor ve `CliError` ile reddediyor (`exit 2`), çünkü tabloda
+olmayan bir komut "yazım hatası yaptın" gibi görünür. `PHASE_6B_COMMANDS`
+sabiti ve `cli.test.ts` içindeki "is the only part of the table that is not
+wired up" testi, 6b bitince bu listenin boşalmasını zorunlu kılıyor.
+
+### Taslak dosyalar hakkında verilen kararlar
+
+Devralınan 14 dosya tek tek değerlendirildi. `wip/phase-6-partial` branch'ine
+dokunulmadı.
+
+| Dosya | Karar | Gerekçe |
+| --- | --- | --- |
+| `errors.ts` | **tutuldu**, testleri yazıldı + `messageOf` eklendi | `CliError` + `EXIT` tablosu + stack'siz format doğru kurulmuş. Tek ekleme: `error instanceof Error ? error.message : String(error)` ternary'si altı dosyada on kez tekrar ediyordu; tek bir `messageOf()` oldu ve test edildi (dinamik import'u reddeden `throw 'x'` bir `Error` değildir, `String({})` ise `[object Object]` yazar). |
+| `io.ts` | **tutuldu**, testleri yazıldı | Stream'leri parametre yapma kararı ve `writeNotice` (prefix'li, çok satırlı, stderr-only uyarı) tamdı. Referans verdiği `discipline.test.ts` bu fazda yazıldı. |
+| `args.ts` | **tutuldu**, `nearest`/`distance` yeniden yazıldı | `--` ayıracı, bildirilmiş bayraklar ve inline `=` doğru. Ama mesafe düz Levenshtein'dı: `--quite` → `quiet` 2 puan alıp `max(1, len/3)` = 1 bütçesini geçemiyordu, yani **en yaygın yazım hatası hiç öneri almıyordu**. Damerau'ya (transpozisyon = 1 düzenleme) ve DP tablosu yerine bütçeli özyinelemeye çevrildi; ikinci kazanç, `noUncheckedIndexedAccess` yüzünden var olan beş erişilemez `?? 0` dalının yok olması. Ayrıştırma döngüsü `argv.entries()`'e geçti, böylece `token === undefined` koruması da gerekmez oldu. |
+| `config.ts` | **tutuldu**, YAML hata yolu yeniden yazıldı | Arama sırası, `LineCounter` ile Zod issue'sunu satıra bağlama ve `LoadedPolicy.dir` gerekçesi doğru ve savunulabilir. Üç hata düzeltildi, aşağıda. |
+| `tokenizer.ts` | **tutuldu**, sayaç enjekte edilebilir yapıldı | `bytes/4` yerine gerçek BPE gerekçesi ADR-007'nin kendi gerekçesi. `allowedSpecial` kararı doğru: `count` senkron olarak `afterCall` içinde koşuyor, bir dosyanın içindeki `<|endoftext|>` yüzünden fırlatmak araç çağrısını düşürürdü. Fallback yolu test edilebilsin diye sayma fonksiyonu opsiyonel constructor parametresi oldu. |
+| `reports.ts` | **tutuldu**, iki alan düzeltildi | "Yazma asla araç çağrısını düşürmez" kuralı ve kronolojik sıralanan dosya adı doğru. `ReportEntry.trippedAt` "ISO-8601, raporun kendisinden okunur" diye belgelenmişti; ikisi de yanlıştı (`:` ve `.` değiştirilmiş, ve ad'dan okunuyor) — `stamp` oldu ve doğru belgelendi. `find()` `resolve(reference)` ile ortam cwd'sini okuyordu; artık store'un kendi dizinine göre çözüyor. |
+| `hook.ts` | **tutuldu**, testleri yazıldı | Dosya URL'siyle import, `default` sonra `onDecision`, ikisini de adıyla anan hata mesajı. Fırlatan hook'un core'da yakalandığını yeniden uygulamaması doğru karar. |
+| `embeddings.ts` | **tutuldu**, `SemanticRequest.model` eklendi | Karar tablosu ADR-001 ve ADR-003'ten doğru türetilmiş; `wanted` hesabının **her kuralın** birleşmiş ayarına bakması (global `false` altında tek bir kural `true` diyebilir) ince ve doğru bir nokta. Tek değişiklik: `request.models[0] ?? 'Xenova/…'` üç yerde şemanın varsayılanının ikinci kopyasıydı ve erişilemezdi; `model` alanı tek geçişte dolduruluyor ve `wanted` ile birlikte boş kalıyor. |
+| `runtime.ts` | **yeniden yazıldı** (iskeleti korundu) | Port enjeksiyonu, uyarılar ve semantik bağlama iyiydi ve kaldı. İki hata: `endSession(sessionId)` "oturumu bitirir ve dedektöre söyler" diye belgelenmişti ama yalnız `forget()` çağırıyordu — proxy oturumu zaten bitirip **özeti** veriyor, o yüzden alan `onSessionEnd(summary)` oldu ve bağlandığı kancayla aynı imzaya kavuştu. `withTimeout` `ms <= 0` için verilen promise'i hiç ele almadan dönüyordu: kapanışta reddeden bir provider "unhandled rejection" üretir, ki Node 20+ bunu process'i düşürerek karşılar. Ayrıca 6b'nin ihtiyaç duyduğu `writeReport`, `quiet` ve `onSessionEnd` alanları yüzeye çıkarıldı. |
+| `commands/init.ts` | **tutuldu**, testleri yazıldı | Başlangıç dosyası bir ürün yüzeyi olarak ele alınmış: `mode: warn` açık yazılmış, `$schema` satırı ilk satırda, `max_usd_estimated` kendi uyarısıyla, çapa limitler tahminlerden önce. Yayınlanmış JSON Schema'ya karşı doğrulanıyor ve geçiyor. |
+| `commands/validate.ts` | **tutuldu**, bir satır yeniden yazıldı | "Neyin yanlış olduğunu söyle" + "neyin doğru olduğunu söyle" ayrımı doğru. `found via` satırı iç içe üç ternary'ydi ve `env` durumunda `--env (AGENTFUSE_POLICY)` yazıyordu — var olmayan bir bayrak. `describeOrigin()` oldu. |
+| `commands/report.ts` | **tutuldu**, iki değişiklik | Metni yeniden render etmemesi doğru karar. `Diagnostics.block()` kullanımına geçti (aşağıda). `list`, okunamayan bir dosya yüzünden tüm listelemeyi düşürüyordu; artık o satırı `UNREADABLE` diye gösteriyor. |
+| `commands/models.ts` | **tutuldu**, bir mesaj düzeltildi | Komutun asıl ürünü başarısızlık mesajı olduğu için doğru yerde emek harcanmış. Kullanıcıya giden ipucundan `ADR-003` atıfı çıkarıldı: kullanıcı ADR'ları hiç görmedi. Bir test artık kullanıcı mesajlarında `ADR-\d` bulunmamasını zorluyor. |
+| `commands/shared.ts` | **yarısı silindi** | `asMode` kaldı. `asPort` atıldı: yalnız `serve`'in bayrağı ve `serve` 6b'nin. Kullanılmayan bir yardımcıyı test etmek, olmayan bir komutun tasarımını şimdiden dondurmak olurdu. |
+
+Taslakta hiçbir dosya tümüyle atılmadı; hiçbiri kayda geçmiş bir kararla
+çelişmiyordu. `main.ts` (Faz 1'in 6 satırlık stub'ı) değiştirildi ve dispatch
+`cli.ts`'e ayrıldı.
+
+### Taslakta bulunan hatalar — hepsi testle kapatıldı
+
+1. **`prettyErrors: false` satır numaralarını yok ediyor.** `yaml`'ın
+   `YAMLError.linePos` alanı yalnız `prettyErrors` açıkken doluyor, ama
+   `prettyErrors` `message`'ı da kendi pozisyonu ve kod çerçevesiyle yeniden
+   yazıyor. Taslak `prettyErrors: false` verip `linePos`'u okuyordu, yani
+   **bozuk YAML mesajlarının hiçbirinde satır yoktu.** Artık pozisyon,
+   Zod issue'larının kullandığı `LineCounter` üzerinden `error.pos[0]`'dan
+   hesaplanıyor; dosyadaki her problem satırı tek bir biçimde.
+2. **Fırlatan adım `toJS()`, `parseDocument()` değil.** `parseDocument`
+   sorunları `document.errors`'da topluyor, hiç fırlatmıyor — taslağın
+   try/catch'i ölü koddu. Fırlatan yer, anchor/alias'ları çözen
+   `document.toJS()`: çözülmemiş bir `*alias` ve `maxAliasCount`'un
+   durdurduğu genişleme bombası. Korumasızdı, yani bir YAML bombası
+   kullanıcıya AgentFuse'un iç stack'ini gösterirdi.
+3. **Transpozisyon öneri alamıyordu** (yukarıda, `args.ts`).
+4. **`withTimeout(…, 0)` promise'i sahipsiz bırakıyordu** (yukarıda,
+   `runtime.ts`).
+5. **`onSessionEnd` imzası kancayla uyuşmuyordu** (yukarıda, `runtime.ts`).
+
+### Politika dosyası arama sırası ve gerekçesi
+
+`findPolicyFile` sırayla dener; **her basamak testli**:
+
+1. **`--policy <path>`** — açık talimat. Var olmayan bir yol **hata**dır ve
+   asla aramaya düşmez. Operatörün adını verdiğinden başka bir politikayı
+   sessizce uygulamak, limit uygulamak için var olan bir araç için mevcut en
+   kötü sonuçtur.
+2. **`AGENTFUSE_POLICY`** — aynı katılıkta. Kolaylık değil **gereklilik**: bir
+   MCP istemcisinin sunucu yapılandırması `env` ve `args` vermeye izin verir,
+   ama çalışma dizini genellikle kullanıcının seçimi değildir (sık sık `/`),
+   yani bazen tek kanal budur.
+3. **Yukarı doğru arama** — `cwd`'den dosya sistemi köküne, her dizinde
+   `fusepolicy.yaml` → `fusepolicy.yml` → `.agentfuse/fusepolicy.yaml` →
+   `.agentfuse/fusepolicy.yml`. Yukarı, çünkü bir deponun politikası o deponun
+   herhangi bir alt dizininde başlatılan ajana uygulanmalı — `tsconfig.json` ve
+   `.editorconfig` ile aynı gerekçe. `.git` sınırında durmuyor, böylece
+   kullanıcı home dizinine kişisel bir varsayılan koyabilir; çözülen absolute
+   yol her zaman `policy_loaded` diagnostic'inde ve `validate` çıktısında
+   bildirildiği için şaşırtıcı bir seçim gizemli değil görünür olur.
+
+`.yaml` önce, çünkü dokümanlar, `init` ve JSON Schema ilişkilendirmesi hep
+`.yaml` diyor; `.yml` yine kabul ediliyor ki ötekini yazan kullanıcıya "dosyan
+yok" denmesin.
+
+**Politika içindeki relatif yollar politika dosyasına göre çözülür**, process
+cwd'sine göre değil (`LoadedPolicy.dir` + `resolveFromPolicy`). Bir MCP
+istemcisi `agentfuse wrap`'i kullanıcının seçmediği bir dizinde başlatır, yani
+`report.dir: .agentfuse/reports` "onu isteyen politikanın yanı" demek zorunda;
+aksi halde raporlar kimsenin bakmadığı bir yere düşer.
+
+**Varsayılanlar tek bir yerden gelir:** core'daki Zod şeması. `config.ts`
+hiçbir yerde kendi fallback değerini vermiyor — ikinci bir varsayılan kopyası
+birinciden sapar ve yayınlanmış JSON Schema o zaman insanların editörüne
+runtime'ın inanmadığı bir şey söyler. Bunun tek istisnası
+`commands/models.ts`'teki `DEFAULT_MODEL`, ve o bilinçli: `models install`
+politika **olmadan** da koşmak zorunda, çünkü `init`'in çıktısı modeli
+politikadan önce kurmayı öneriyor.
+
+### Embedding yoksa ne olur — uygulanan tam tablo
+
+`resolveEmbeddingProvider` (`embeddings.ts`) tek karar noktası; dört satırın
+dördü de ayrı testle pinli.
+
+| Yapılandırma | Paket kullanılabilir | Sonuç |
+| --- | --- | --- |
+| `semantic.enabled: false` | — | dedektör **hiç bağlanmaz**, sessizce. Kapalı olmasını istemek ve kapalı bulmak bir düşüş değildir. Bu satır `mode: enforce`'ta da sessizdir. |
+| `semantic.provider: none` | — | aynısı. Belgelenmiş kapatma anahtarı budur. |
+| `provider: local` | var | bağlanır (`attachSemanticLoopDetector`). |
+| `provider: local` + `mode: warn` | yok | **stderr'e uyarı, koşum devam eder**, kural katmanı **tam güçte**. ADR-001'in "crippleware yasak" maddesi bu satırın gerekçesi; testi de kelimesi kelimesine bunu ölçüyor: paket yokken `exact_repeat` üçüncü çağrıda tripliyor. |
+| `provider: local` + `mode: enforce` | yok | **ilk çağrıdan önce hard error** (`exit 4`). Operatör "benim adıma devreyi kes" dedi; adı geçen dedektörlerden biri yokken yine de başlamak, aracın istenen korumanın bir alt kümesinin yeterince yakın olduğuna sessizce karar vermesi olurdu. |
+| `provider: openai` (herhangi bir mod) | — | bu sürümde backend yok; `warn`'da uyarı, `enforce`'ta hata. Hiç bağlamayıp raporun skorladığını ima etmesine izin vermekten iyi. |
+| paket var ama `createEmbeddingProvider` yok | — | yukarıdaki iki satırın aynısı, **farklı mesajla**: "kur" ile "güncelle" farklı talimatlardır. |
+
+**Faz 4 için taşıyıcı not:** bu monorepo içinde `@agentfuse/embeddings-local`
+specifier'ı **çözülüyor** — npm workspaces her paketi `node_modules`'a
+symlink'liyor ve import Faz 1'in stub'ını buluyor. Stub iki factory'den
+hiçbirini export etmediği için CLI "kurulu ama eski" satırını alıyor, ki doğru
+davranış bu. `embeddings.test.ts` her iki durumu da (çözülür / çözülmez)
+kapsıyor, böylece Faz 4 stub'ı gerçek implementasyonla değiştirdiğinde test
+kırılmaz ama boşluk da kalmaz.
+
+**Bağımlılık yönü bir testle zorlanıyor.** `discipline.test.ts`
+`packages/cli/package.json`'ın `dependencies`, `devDependencies`,
+`peerDependencies` ve `optionalDependencies` alanlarının hiçbirinde
+`@agentfuse/embeddings-local` olmamasını; `tsconfig.json`'da ona project
+reference olmamasını; ve kaynakta yalnız `import(EMBEDDINGS_PACKAGE)` biçiminde
+geçmesini (statik specifier'lı `from '…'` biçiminde hiç geçmemesini)
+kontrol ediyor. Ayrıca CLI'nin bildirdiği bağımlılık listesinin tam olarak Faz
+1'in tablosu olmasını pinliyor: `@agentfuse/core`, `@agentfuse/proxy`,
+`gpt-tokenizer`, `yaml`. Precedent core'un `purity.test.ts`'i.
+
+### stdio disiplini
+
+Aynı `discipline.test.ts` **`main.ts` dışında hiçbir kaynak dosyanın**
+`console.*`, `process.stdout`, `process.stderr` ya da `process.exit`'e
+dokunmamasını zorluyor. Wrap modunda bu process'in stdout'u ajanın JSON-RPC
+akışıdır; paylaşılan bir modüldeki tek bir `console.log` ondan sonraki her
+frame'i bozar ve suç sarılan sunucuya kalır. Bu yüzden her komut bir
+`CliContext` alır ve bir sayı döndürür; gerçek stream'leri, `argv`'yi, `cwd`'yi
+ve exit code'u bağlayan tek yer `main.ts`.
+
+`process.exit()` değil `process.exitCode`: `exit()` son yazmayı — yani neyin
+yanlış gittiğini anlatan hata mesajını — kesebilir.
+
+`report` ve `validate`'in stdout'a yazması beklenen ve doğru: ikisi de proxy
+yolunda değil.
+
+### `report` neden `Diagnostics.block()` kullanıyor
+
+Core'un `renderTripReport`'u kutu çizgili bir tablo üretiyor. `Diagnostics`'in
+`emit()`'i her satıra prefix basar ve bu tabloyu mahveder; `block()` Faz 5'te
+tam bunun için eklendi: bir işaret satırı, sonra metin **olduğu gibi**. `report`
+onu stdout'a bağlı bir `Diagnostics` üzerinden yazıyor, böylece canlı bir trip
+ile sonradan okunan rapor birebir aynı görünüyor.
+
+**Bilinen ödünç:** bu, stdout'a bir `[agentfuse] {"event":"trip_report",…}`
+satırı da koyuyor, yani `agentfuse report last > incident.txt` o satırı da
+alıyor. Makine yolu bilinçli olarak temiz bırakıldı: `--json` core'un yazdığı
+dokümanı hiçbir şeye sarmadan veriyor. Faz 7 rapor UX'ini elden geçirirken bu
+işaret satırını kaldırmak isterse, karar noktası burası.
+
+### `init`'in çıktısı yayınlanmış şemaya karşı doğrulanıyor
+
+Zod şemasına karşı değil: `z.toJSONSchema` onun bir **projeksiyonu** ve ikisi
+ayrışabilir. Runtime'ın kabul ettiği ama editörün kırmızıyla altını çizdiği bir
+başlangıç dosyası, tam olarak yakalanmaya değer hata. Bunun için bir JSON
+Schema doğrulayıcı gerekti ve faz brifingi yeni bağımlılık yasakladı (haklı
+olarak: tek test için `ajv` iyi bir takas değil). Şema on dört anahtar kelime
+kullanıyor, hepsi yapısal — `src/testing/json-schema.ts` kırk satır.
+
+**Doğrulayıcının kendisi test ediliyor:** `init.test.ts` ona dokuz bilinen
+ihlali (yazım hatalı key, eksik `version`, yanlış `mode`, bozuk süre, tam sayı
+olmayan sayaç, 1'in üstünde `threshold`, `action`'sız kural, geçersiz `action`,
+tümüyle yanlış tip) reddettirmeden başlangıç dosyasını kabul etmesine
+güvenmiyor. Her şeyi sessizce geçiren bir doğrulayıcı, hiç test olmamasından
+kötüdür.
+
+`init`'in yazdığı dosya ayrıca `parsePolicy` ile de geçiriliyor (iki artefakt,
+ikisi de yanlış olabilir) ve yalnız bir yerde şemanın varsayılanından sapıyor:
+`budgets.on_exceeded: halt`. Gerekçe dosyanın kendi yorumunda: cevaplanamayan
+bir onay, fazladan adımı olan bir rettir, ve onay akışı Faz 7'de.
+
+### Faz 6b'nin `runtime.ts`'ten alacağı şey
+
+`createRuntime(options)` → `Runtime`; `wrapStdioServer`'ın istediği argüman
+kümesi bu ve fazlası değil. 6b'nin yapacağı çağrı aşağı yukarı şudur:
+
+```ts
+const flag = args.value('policy');
+const loaded = loadPolicy({ flag, env: ctx.env, cwd: ctx.cwd });
+const runtime = await createRuntime({
+  loaded, context: ctx,
+  quiet: args.bool('quiet'),
+  mode: asMode(args.value('mode')),
+  hook: args.value('hook'),
+});
+const handle = wrapStdioServer({
+  command, args: childArgs, env, cwd,
+  engine: runtime.engine,
+  serverName,
+  diagnostics: runtime.diagnostics,   // --quiet zaten içinde
+  writeReport: runtime.writeReport,   // proxy dosya I/O'su yapmıyor
+  onSessionEnd: runtime.onSessionEnd, // Faz 3'ün forget() notası burada
+});
+// kapanışta:
+await handle.close();
+await runtime.close();      // sayaçları loglar, provider'ı bırakır
+```
+
+Alan alan:
+
+- **`engine`** — portları bağlanmış `FuseEngine`. `tokenizer` ve `cost` CLI'nin,
+  `clock`/`ids`/`sessions` core'un varsayılanları. `--hook` verilmişse hook
+  zaten `onDecision` ile kayıtlı.
+- **`writeReport`** — `ToolCallGuardOptions.writeReport` imzasında, rapor
+  store'una bağlı. Ajanın kesinti metninde göreceği yol bunun döndürdüğüdür;
+  asla fırlatmaz, başarısız olursa `undefined` döner ve `report_write_failed`
+  diagnostic'i yazar.
+- **`onSessionEnd`** — `ToolCallGuardOptions.onSessionEnd` imzasında
+  (`(summary: SessionSummary) => void`), `detector.forget(summary.sessionId)`
+  çağırır. Proxy oturumu **kendisi** bitiriyor (`stdio-wrap.ts` içinde
+  `instance.endSession()`), o yüzden 6b `engine.endSession`'ı elle çağırmamalı.
+- **`diagnostics`** — `--quiet` bunun `quiet` seçeneğine geçmiş durumda;
+  `wrapStdioServer`'a `quiet` yerine bunu geçin, yoksa iki ayrı
+  `Diagnostics` (biri startup uyarıları için, biri proxy için) kurulur ve
+  rate-limit pencereleri ayrışır.
+- **`policy`** — `--mode` uygulanmış hali. `engine.policy.sha256` bunun hash'i;
+  `--mode` gerçekten değiştirdiyse dosyanın hash'inden farklıdır ve olması
+  gereken de bu.
+- **`reports`** — `FileReportStore`; `dir` alanı `report.dir`'in çözülmüş hali.
+  `agentfuse report`'un okuduğu yer.
+- **`detector`** — `SemanticLoopDetector | undefined`. `undefined` olması bir
+  hata değil, tablonun üç satırının normal sonucu.
+- **`close({ timeoutMs })`** — semantik sayaçları `semantic_stats` olarak
+  yazar, sonra `detector.close()`'u **sınırlı** bekler (varsayılan 2000 ms).
+  Sınırlı, çünkü `close()` uçuştaki batch'i ve provider'ın kendi `close()`'unu
+  bekliyor; takılmış bir model o await'i takar ve kapanan bir proxy gerçekten
+  kapanmak zorundadır. İki kez çağrılabilir.
+
+**`runtime.ts`'te olmayan ve 6b'nin yazacağı şeyler:**
+
+- `annotationsFor(toolName)` — `annotations.trust_hints: true` iken okunan
+  sunucu ipuçları. Bir `tools/list` önbelleği ister; önbellek bağlantı başına
+  ve bridge'in yanında yaşamalı, o yüzden runtime'ın işi değil.
+- `resolveSessionId` — yalnız HTTP; `sessionIdResolverFor` proxy'de hazır.
+- `clientCapabilities` — Faz 5'in çelişki kaydı #5: proxy varsayılan olarak
+  `RELAYABLE_CLIENT_CAPABILITIES` beyan ediyor ve CLI bunu ezebilir.
+- `serverName` — sarılan sunucunun takma adı. Her fingerprint'in parçası, yani
+  bir bayrak (`--name`) ve varsayılanı hak ediyor; runtime onu görmüyor.
+- `asPort` — `--port` ayrıştırıcısı. Taslakta vardı, `serve` ile birlikte
+  gelmesi için silindi.
+
+**Hatırlatma (Faz 5'ten):** modern era'yı elle `new Server()` ile servis etmek
+mümkün değil, `serveStdio`/`createMcpHandler` zorunlu; ve
+`@modelcontextprotocol/node` kurulu değil, yani `serve`'in Node HTTP köprüsü ya
+yazılacak ya o paket eklenecek. HTTP gateway'in kendisi P1 ve kendi ADR'ını hak
+ediyor (Faz 5 §çelişki kaydı #4).
+
+### Faz 6a'nın çelişki kaydı
+
+1. **`report`'un stdout'una giden işaret satırı** (yukarıda). Brifing
+   `Diagnostics.block()` kullanılmasını istedi ve öyle yapıldı; `block()`'un
+   ayrılmaz parçası olan JSON işaret satırı bu yüzden stdout'a düşüyor.
+   Alternatifi metni satır satır yazmaktı, ki bu da brifingin adını verdiği
+   API'yi kullanmamak olurdu. Kayda geçirildi, sessizce sapılmadı.
+2. **`AGENTFUSE_POLICY` brifingde yoktu.** Brifing "bir CLI bayrağı override'ı
+   ve bir arama sırası" istiyordu; ortam değişkeni basamağı eklendi çünkü bir
+   MCP istemcisinin sunucu yapılandırmasında çalışma dizini kullanıcının
+   seçimi değil ve bazen tek kanal bu. Kapsam değiştiren bir karar değil, ama
+   brifingde olmayan bir yüzey.
+3. **`core` ve `proxy` değiştirilmedi.** Kapatılması gereken gerçek bir boşluk
+   çıkmadı; `writeReport`, `onSessionEnd`, `Diagnostics.block()` ve
+   `renderTripReport` dikişlerinin hepsi olduğu gibi yeterliydi. Faz 5'in
+   bıraktığı seam listesinden yalnız `annotationsFor` ve `resolveSessionId`
+   tüketilmedi ve ikisi de 6b'nin.
+
+---
+
 ## Sırada ne var
 
-### Faz 6 — CLI, kritik yol buradan geçiyor
+### Faz 6b — `wrap` ve `serve`, kritik yol buradan geçiyor
 
-Tam brifingi plan dosyasında. Komutlar: `wrap`, `serve`, `init`, `validate`,
-`report`, `models install`. Proxy tarafı hazır; Faz 6'nın bağlanacağı dikişler
-yukarıdaki "Faz 6'nın bağlanacağı dikişler" başlığında tek tek sayıldı. Oradan
-çıkarılacak üç kısa madde:
+Faz 6a'nın bıraktığı her şey hazır ve testli; kalan iş transport ve child
+process. Ne alınacağı yukarıdaki "Faz 6b'nin `runtime.ts`'ten alacağı şey"
+başlığında alan alan yazılı, örnek çağrı dahil. Üç kısa madde:
 
-- `agentfuse wrap` neredeyse tümüyle `wrapStdioServer()` çağrısıdır; CLI'nin
-  eklediği şey politika yükleme (`yaml` + `parsePolicy`), `gpt-tokenizer`
-  tabanlı `Tokenizer` portu, rapor yazan `writeReport` kancası ve
-  `--quiet`/`--mode` bayrakları.
-- Semantik katman CLI'de dinamik `import()` ile aranır; bulunursa
-  `attachSemanticLoopDetector` ile bağlanır ve `onSessionEnd` içinde
-  `detector.forget(sessionId)` çağrılır.
+- `agentfuse wrap` neredeyse tümüyle `wrapStdioServer()` çağrısıdır; politika
+  yükleme, `Tokenizer`/`CostModel` portları, `writeReport`, `onSessionEnd`,
+  `--quiet`/`--mode`/`--hook` ve semantik katman **6a'da bitti** —
+  `createRuntime()` hepsini kuruyor.
+- `cli.ts` ikisini de tabloda tutuyor ve `CliError` ile reddediyor;
+  `PHASE_6B_COMMANDS` listesi boşalınca `cli.test.ts`'teki "is the only part of
+  the table that is not wired up" testi de doğal olarak boş listeyi bekler hale
+  gelmeli. `--` ayıracı `args.ts`'te hazır ve testli: `wrap -- node server.mjs
+  --verbose` çocuğun `--verbose`'una dokunmuyor.
 - **Modern era'yı elle `new Server()` ile servis etmek mümkün değil** —
   `serveStdio` / `createMcpHandler` zorunlu, gerekçe Faz 5 bölümünde.
   `@modelcontextprotocol/node` kurulu değil, yani `serve` komutunun Node HTTP
-  köprüsü ya yazılacak ya o paket eklenecek.
+  köprüsü ya yazılacak ya o paket eklenecek; HTTP gateway'in kendisi P1 ve
+  kendi ADR'ını hak ediyor (Faz 5 §çelişki kaydı #4).
 
 ### Faz 4 — `@agentfuse/embeddings-local`
 
