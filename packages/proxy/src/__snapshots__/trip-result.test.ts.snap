@@ -1,0 +1,204 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`renderTripDiagnostic > is core’s renderer, not a second implementation 1`] = `
+"━━ AgentFuse · circuit tripped ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  LOOP_SEMANTIC  session=01J0SESSION  2026-09-15T12:00:00.000Z  mode=enforce
+  core's own message for LOOP_SEMANTIC
+
+  breaker: open  ·  cooldown: 3 approvals or 2m
+
+  budget      used         limit        
+  calls       12           200          [█·········]  6%
+  duration    61s          30m          [··········]  3%
+  tokens ~    400+3200     400000       [··········]  1%
+  usd ~       $0.05        $5.00        [··········]  1%
+  ~ tool-I/O floor estimate, not LLM usage
+
+  recent calls (oldest first)
+  1  filesystem__read_file       ok   12ms    {"path":"/etc/hosts"}
+  →  filesystem__read_file       ok   —       {"path":"/etc/hosts"}
+
+  policy sha256=0f1e2d3c4b5a  ·  trip=01J0TRIP  ·  agentfuse 0.0.0"
+`;
+
+exports[`the refusal text > has its own variant for APPROVAL_DENIED 1`] = `
+"AgentFuse circuit breaker OPEN — a human explicitly denied this call.
+
+Retrying this call unchanged — or with only cosmetic changes to its arguments — will be blocked too.
+
+Do this instead:
+  1. Accept the decision: ask the user what they would like instead.
+  2. Continue with the parts of the task that do not need this call.
+  3. Do not re-issue the call, and do not look for an equivalent tool to do it with.
+
+Trip report: .agentfuse/reports/01J0TRIP.json"
+`;
+
+exports[`the refusal text > has its own variant for APPROVAL_TIMEOUT 1`] = `
+"AgentFuse circuit breaker OPEN — nobody answered the approval request within 2m, and the policy denies unanswered approvals.
+
+Retrying this call unchanged — or with only cosmetic changes to its arguments — will be blocked too.
+
+Do this instead:
+  1. Tell the user an approval is pending and ask them to answer it.
+  2. Continue with the parts of the task that do not need this call.
+  3. Do not re-issue the call to trigger a second prompt.
+
+Trip report: .agentfuse/reports/01J0TRIP.json"
+`;
+
+exports[`the refusal text > has its own variant for BREAKER_OPEN 1`] = `
+"AgentFuse circuit breaker OPEN — the breaker is already open from an earlier trip (LOOP_SEMANTIC), with 95s of cooldown left. Every tool call in this session is refused until it closes.
+
+Retrying this call unchanged — or with only cosmetic changes to its arguments — will be blocked too.
+
+Do this instead:
+  1. Stop calling tools and report what you were trying to achieve when the circuit broke.
+  2. Tell the user a human reset (\`agentfuse approve --reset\`) or the cooldown will reopen the path.
+  3. Do not poll the breaker; a call that only checks whether it is closed is itself blocked.
+
+Trip report: .agentfuse/reports/01J0TRIP.json"
+`;
+
+exports[`the refusal text > has its own variant for BUDGET_CALLS 1`] = `
+"AgentFuse circuit breaker OPEN — this session has used its whole call budget (200 of 200 calls). No further tool call will be forwarded.
+
+Retrying this call unchanged — or with only cosmetic changes to its arguments — will be blocked too.
+
+Do this instead:
+  1. Summarise what you achieved and what is left, and hand it back now.
+  2. Ask the user to raise \`budgets.max_calls\` in fusepolicy.yaml if the task genuinely needs more.
+  3. Propose a smaller next step that a fresh session could finish.
+
+Trip report: .agentfuse/reports/01J0TRIP.json"
+`;
+
+exports[`the refusal text > has its own variant for BUDGET_DURATION 1`] = `
+"AgentFuse circuit breaker OPEN — this session has run for its whole time budget (1801s of 30m). No further tool call will be forwarded.
+
+Retrying this call unchanged — or with only cosmetic changes to its arguments — will be blocked too.
+
+Do this instead:
+  1. Summarise what you achieved and what is left, and hand it back now.
+  2. Ask the user to raise \`budgets.max_duration\` in fusepolicy.yaml if the task genuinely needs longer.
+  3. Propose a smaller next step that a fresh session could finish.
+
+Trip report: .agentfuse/reports/01J0TRIP.json"
+`;
+
+exports[`the refusal text > has its own variant for BUDGET_TOKENS 1`] = `
+"AgentFuse circuit breaker OPEN — this session has used its whole estimated token budget (~412,345 of 400,000 tokens_estimated; tool-I/O floor estimate, not LLM usage). No further tool call will be forwarded.
+
+Retrying this call unchanged — or with only cosmetic changes to its arguments — will be blocked too.
+
+Do this instead:
+  1. Summarise what you achieved and what is left, and hand it back now.
+  2. Stop pulling large payloads into context — read narrower slices, or ask for a summary instead of a dump.
+  3. Ask the user to raise \`budgets.max_tokens_estimated\` if the task genuinely needs more.
+
+Trip report: .agentfuse/reports/01J0TRIP.json"
+`;
+
+exports[`the refusal text > has its own variant for BUDGET_USD 1`] = `
+"AgentFuse circuit breaker OPEN — this session has used its whole estimated spend budget (~$5.42 of $5.00 usd_estimated; tool-I/O floor estimate, not LLM usage). No further tool call will be forwarded.
+
+Retrying this call unchanged — or with only cosmetic changes to its arguments — will be blocked too.
+
+Do this instead:
+  1. Summarise what you achieved and what is left, and hand it back now.
+  2. Stop pulling large payloads into context — that is what the estimate is measuring.
+  3. Ask the user to raise \`budgets.max_usd_estimated\` if the task genuinely needs more.
+
+Trip report: .agentfuse/reports/01J0TRIP.json"
+`;
+
+exports[`the refusal text > has its own variant for LOOP_CYCLE 1`] = `
+"AgentFuse circuit breaker OPEN — your last calls repeat a cycle of 2 steps (A-B-A-B). The loop is not converging on anything.
+
+Retrying this call unchanged — or with only cosmetic changes to its arguments — will be blocked too.
+
+Do this instead:
+  1. Pick one branch of the cycle and carry it through to a conclusion before touching the other.
+  2. Write down what you actually know so far; the oscillation usually means two attempts are undoing each other.
+  3. If both branches are blocked, say so to the user rather than alternating.
+
+Trip report: .agentfuse/reports/01J0TRIP.json"
+`;
+
+exports[`the refusal text > has its own variant for LOOP_ERROR_REPEAT 1`] = `
+"AgentFuse circuit breaker OPEN — read_file has failed 3 times in a row with the same error (ENOENT: «path»). The cause has not changed between attempts.
+
+Retrying this call unchanged — or with only cosmetic changes to its arguments — will be blocked too.
+
+Do this instead:
+  1. Read the error text and fix the cause, not the call — a missing file, a wrong permission, a malformed argument.
+  2. If the cause is outside your reach, reach the same goal another way.
+  3. If neither is possible, report the error verbatim to the user and stop.
+
+Trip report: .agentfuse/reports/01J0TRIP.json"
+`;
+
+exports[`the refusal text > has its own variant for LOOP_EXACT_REPEAT 1`] = `
+"AgentFuse circuit breaker OPEN — you have now made 3 calls with byte-identical arguments (limit 3). The result will not change.
+
+Retrying this call unchanged — or with only cosmetic changes to its arguments — will be blocked too.
+
+Do this instead:
+  1. Treat the last result as final and move on to the next step of the task.
+  2. If it was not usable, change what you are asking for — a different tool, a different path, a genuinely different question.
+  3. If you cannot proceed, tell the user what you tried and what you need from them.
+
+Trip report: .agentfuse/reports/01J0TRIP.json"
+`;
+
+exports[`the refusal text > has its own variant for LOOP_SEMANTIC 1`] = `
+"AgentFuse circuit breaker OPEN — your last 8 calls are 91% similar to one another on average (limit 83%). The arguments keep changing; the work does not.
+
+Retrying this call unchanged — or with only cosmetic changes to its arguments — will be blocked too.
+
+Do this instead:
+  1. Stop varying the arguments and state the sub-problem in words — what specifically is not working.
+  2. Change strategy, not wording: a different tool, a different level of abstraction, a different assumption.
+  3. Hand the user what you have, plus the one question that would unblock you.
+
+Trip report: .agentfuse/reports/01J0TRIP.json"
+`;
+
+exports[`the refusal text > has its own variant for POLICY_APPROVAL 1`] = `
+"AgentFuse circuit breaker OPEN — policy requires a human to approve this tool, and no approval was granted.
+
+Retrying this call unchanged — or with only cosmetic changes to its arguments — will be blocked too.
+
+Do this instead:
+  1. Ask the user directly for permission, explaining exactly what the call would do.
+  2. Meanwhile, continue with the parts of the task that need no approval.
+  3. Do not re-issue the call hoping for a different answer.
+
+Trip report: .agentfuse/reports/01J0TRIP.json"
+`;
+
+exports[`the refusal text > has its own variant for POLICY_DENY 1`] = `
+"AgentFuse circuit breaker OPEN — policy denies shell__exec (rule \`shell__*\`). This is a standing configuration decision, not a reaction to what you did.
+
+Retrying this call unchanged — or with only cosmetic changes to its arguments — will be blocked too.
+
+Do this instead:
+  1. Reach the goal with a tool the policy does allow.
+  2. If there is no such tool, tell the user which tool you needed and why.
+  3. Do not probe for variations of the same tool name; the rule is a pattern, not a blocklist of one.
+
+Trip report: .agentfuse/reports/01J0TRIP.json"
+`;
+
+exports[`the refusal text > has its own variant for POLICY_WARN 1`] = `
+"AgentFuse circuit breaker OPEN — policy flags net__fetch for review.
+
+Retrying this call unchanged — or with only cosmetic changes to its arguments — will be blocked too.
+
+Do this instead:
+  1. Continue, but say in your next message that this tool is flagged.
+  2. Prefer an unflagged tool if one would do the same job.
+  3. If the user did not expect this tool to be in play, say so.
+
+Trip report: .agentfuse/reports/01J0TRIP.json"
+`;

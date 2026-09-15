@@ -23,6 +23,7 @@ import {
   Server,
   type ServerCapabilities,
 } from '@modelcontextprotocol/server';
+import { serveStdio } from '@modelcontextprotocol/server/stdio';
 import { type Bridge, createBridge, type ToolCallGate } from '../bridge.js';
 
 /** Identity the scenario servers present. */
@@ -219,3 +220,67 @@ export const ANY_RESULT = {
     validate: (value: unknown) => ({ value: value as Record<string, unknown> }),
   },
 };
+
+/**
+ * The same harness, but with both legs driven through `serveStdio` over
+ * in-memory transports, so it can be run in either era.
+ *
+ * Why `serveStdio` rather than a plain `Server` on each end: a low-level
+ * `Server` cannot serve the modern era at all. Its inbound dispatch resolves
+ * the wire codec from `_negotiatedProtocolVersion`, which stays unset (and
+ * therefore legacy) until something binds it — and the only things that bind it
+ * are `initialize` and the SDK-internal `setNegotiatedProtocolVersion` that the
+ * serving entries call. Adding `2026-07-28` to `supportedProtocolVersions` is
+ * not enough: the `server/discover` handler gets installed, but the request is
+ * refused as "method not found" before reaching it, because the legacy codec
+ * does not define the method. `serveStdio` is the public way through, and it
+ * takes a caller-supplied transport, which is what makes this harness possible.
+ */
+export async function createServedHarness(options: {
+  readonly era: 'legacy' | 'modern';
+  readonly onToolCall?: ToolCallGate;
+  readonly clientInfo?: Implementation;
+}): Promise<Harness> {
+  const { server: scenario, log } = createScenarioServer();
+  const negotiation =
+    options.era === 'modern'
+      ? ({ mode: { pin: '2026-07-28' } } as const)
+      : ({ mode: 'legacy' } as const);
+
+  const [upstreamA, upstreamB] = InMemoryTransport.createLinkedPair();
+  const upstreamEntry = serveStdio(() => scenario, { transport: upstreamB });
+  const upstream = new Client(
+    { name: 'agentfuse', version: '0.0.0' },
+    { capabilities: { sampling: {}, elicitation: {}, roots: {} }, versionNegotiation: negotiation },
+  );
+  await upstream.connect(upstreamA);
+
+  const bridge = createBridge({
+    client: upstream,
+    serverInfo: upstream.getServerVersion() ?? SCENARIO_INFO,
+    capabilities: upstream.getServerCapabilities(),
+    instructions: upstream.getInstructions(),
+    onToolCall: options.onToolCall ?? ((call) => call.forward()),
+  });
+
+  const [downstreamA, downstreamB] = InMemoryTransport.createLinkedPair();
+  const downstreamEntry = serveStdio(() => bridge.server, { transport: downstreamB });
+  const client = new Client(options.clientInfo ?? { name: 'test-agent', version: '9.9.9' }, {
+    capabilities: { roots: {} },
+    versionNegotiation: negotiation,
+  });
+  await client.connect(downstreamA);
+
+  return {
+    client,
+    bridge,
+    log,
+    scenario,
+    close: async () => {
+      await client.close();
+      await downstreamEntry.close();
+      await bridge.close();
+      await upstreamEntry.close();
+    },
+  };
+}

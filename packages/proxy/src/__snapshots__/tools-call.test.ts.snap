@@ -1,0 +1,77 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`the refusal crosses both eras intact > in the legacy era 1`] = `
+{
+  "_meta": {
+    "io.tunedness.agentfuse/trip": {
+      "code": "LOOP_EXACT_REPEAT",
+      "reportId": "id000000000000000000000003",
+    },
+  },
+  "content": [
+    {
+      "text": "AgentFuse circuit breaker OPEN — you have now made 2 calls with byte-identical arguments (limit 2). The result will not change.
+
+Retrying this call unchanged — or with only cosmetic changes to its arguments — will be blocked too.
+
+Do this instead:
+  1. Treat the last result as final and move on to the next step of the task.
+  2. If it was not usable, change what you are asking for — a different tool, a different path, a genuinely different question.
+  3. If you cannot proceed, tell the user what you tried and what you need from them.
+
+Trip report: id000000000000000000000003",
+      "type": "text",
+    },
+  ],
+  "isError": true,
+  "structuredContent": {
+    "agentfuse": {
+      "trip": {
+        "breaker": "open",
+        "code": "LOOP_EXACT_REPEAT",
+        "reportId": "id000000000000000000000003",
+      },
+    },
+  },
+}
+`;
+
+exports[`the refusal crosses both eras intact > in the modern era 1`] = `
+{
+  "_meta": {
+    "io.modelcontextprotocol/serverInfo": {
+      "name": "scenario",
+      "version": "1.2.3",
+    },
+    "io.tunedness.agentfuse/trip": {
+      "code": "LOOP_EXACT_REPEAT",
+      "reportId": "id000000000000000000000003",
+    },
+  },
+  "content": [
+    {
+      "text": "AgentFuse circuit breaker OPEN — you have now made 2 calls with byte-identical arguments (limit 2). The result will not change.
+
+Retrying this call unchanged — or with only cosmetic changes to its arguments — will be blocked too.
+
+Do this instead:
+  1. Treat the last result as final and move on to the next step of the task.
+  2. If it was not usable, change what you are asking for — a different tool, a different path, a genuinely different question.
+  3. If you cannot proceed, tell the user what you tried and what you need from them.
+
+Trip report: id000000000000000000000003",
+      "type": "text",
+    },
+  ],
+  "isError": true,
+  "structuredContent": {
+    "agentfuse": {
+      "trip": {
+        "breaker": "open",
+        "code": "LOOP_EXACT_REPEAT",
+        "reportId": "id000000000000000000000003",
+      },
+    },
+  },
+}
+`;

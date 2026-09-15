@@ -42,6 +42,7 @@
 import {
   type BreakerPhase,
   type Decision,
+  formatDuration,
   type Reason,
   renderTripReport,
   TOKEN_ESTIMATE_NOTE,
@@ -112,10 +113,6 @@ function grouped(value: number): string {
   return value.toLocaleString('en-US');
 }
 
-function seconds(ms: number): string {
-  return `${Math.ceil(ms / 1000)}s`;
-}
-
 /**
  * One variant per code.
  *
@@ -180,7 +177,7 @@ const ADVICE: Record<TripCode, Advice> = {
     headline: (reason) => {
       const value = num(reason.evidence, 'value');
       const limit = num(reason.evidence, 'limit');
-      return `this session has run for its whole time budget (${value === undefined ? 'the limit' : seconds(value)} of ${limit === undefined ? 'the limit' : seconds(limit)}). No further tool call will be forwarded.`;
+      return `this session has run for its whole time budget (${value === undefined ? 'the limit' : formatDuration(value)} of ${limit === undefined ? 'the limit' : formatDuration(limit)}). No further tool call will be forwarded.`;
     },
     alternatives: [
       'Summarise what you achieved and what is left, and hand it back now.',
@@ -254,7 +251,7 @@ const ADVICE: Record<TripCode, Advice> = {
   APPROVAL_TIMEOUT: {
     headline: (reason) => {
       const timeout = num(reason.evidence, 'timeoutMs');
-      return `nobody answered the approval request${timeout === undefined ? '' : ` within ${seconds(timeout)}`}, and the policy denies unanswered approvals.`;
+      return `nobody answered the approval request${timeout === undefined ? '' : ` within ${formatDuration(timeout)}`}, and the policy denies unanswered approvals.`;
     },
     alternatives: [
       'Tell the user an approval is pending and ask them to answer it.',
@@ -268,7 +265,7 @@ const ADVICE: Record<TripCode, Advice> = {
       const cause = text(reason.evidence, 'tripCode');
       return (
         `the breaker is already open from an earlier trip${cause === undefined ? '' : ` (${cause})`}` +
-        `${remaining === undefined || remaining <= 0 ? '' : `, with ${seconds(remaining)} of cooldown left`}. Every tool call in this session is refused until it closes.`
+        `${remaining === undefined || remaining <= 0 ? '' : `, with ${formatDuration(remaining)} of cooldown left`}. Every tool call in this session is refused until it closes.`
       );
     },
     alternatives: [
@@ -289,6 +286,28 @@ export function primaryReason(decision: Decision): Reason | undefined {
     if (matching !== undefined) return matching;
   }
   return decision.reasons.at(-1) ?? decision.reasons[0];
+}
+
+/**
+ * A reason for a block that arrived without one.
+ *
+ * The engine always explains itself, but `onDecision` is a public escape hatch
+ * and ADR-004 lets a hook raise the action while returning no `reasons` at all.
+ * Throwing here would be the one thing this whole file exists to prevent: the
+ * agent would receive a JSON-RPC error instead of a refusal it can read, and a
+ * misconfigured hook would look like a broken server. So a block is always
+ * explainable, even when the explanation is "something upstream of the engine
+ * said no".
+ */
+function unexplained(decision: Decision): Reason {
+  const gated = decision.action === 'require_approval';
+  return {
+    code: gated ? 'POLICY_APPROVAL' : 'POLICY_DENY',
+    message: gated
+      ? 'An onDecision hook required approval for this call without giving a reason.'
+      : 'An onDecision hook denied this call without giving a reason.',
+    evidence: { rule: 'onDecision', action: decision.action },
+  };
 }
 
 /** Renders the agent-facing refusal text. Snapshot-tested; change it on purpose. */
@@ -323,10 +342,7 @@ export function renderTripText(reason: Reason, reportRef: string | undefined): s
  */
 export function buildTripResult(input: TripResultInput): CallToolResult {
   const { decision, reportPath } = input;
-  const reason = primaryReason(decision);
-  if (reason === undefined) {
-    throw new Error('buildTripResult was given a decision with no reasons; nothing to explain.');
-  }
+  const reason = primaryReason(decision) ?? unexplained(decision);
 
   const report = decision.report;
   const reportId = report?.tripId;
