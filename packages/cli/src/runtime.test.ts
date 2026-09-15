@@ -1,7 +1,7 @@
 import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
-import type { EmbeddingProvider } from '@agentfuse/core';
+import { type EmbeddingProvider, NoopTelemetrySink } from '@agentfuse/core';
 import { HashingProvider, ScriptedApprovalGateway } from '@agentfuse/core/testing';
 import { DIAGNOSTIC_PREFIX } from '@agentfuse/proxy';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
@@ -18,6 +18,7 @@ import {
   withMode,
   withTimeout,
 } from './runtime.js';
+import type { FetchLike } from './telemetry/exporter.js';
 
 let root: string;
 let stdout: StringWriter;
@@ -203,9 +204,12 @@ describe('createRuntime', () => {
       loaded: policyFile('version: 1\nmode: warn\ntelemetry:\n  enabled: true\n'),
       context: context(),
       loadEmbeddings: missing,
+      // Injected so the suite never reaches for a collector that may or may not
+      // be listening on the developer's machine.
+      telemetry: { fetch: async () => new Response('{}', { status: 200 }) },
     });
 
-    // Two warnings and several events went somewhere, and none of it here.
+    // A warning and several events went somewhere, and none of it here.
     expect(stderr.text).not.toBe('');
     expect(stdout.text).toBe('');
 
@@ -358,16 +362,177 @@ describe('the warnings a runtime gives at startup', () => {
     await runtime.close();
   });
 
-  it('says telemetry is not exported yet when it was asked for', async () => {
+  it('warns and carries on when the OTLP endpoint cannot be used', async () => {
     const runtime = await createRuntime({
-      loaded: policyFile(`${'version: 1\ntelemetry:\n  enabled: true\n'}`),
+      loaded: policyFile(TELEMETRY_POLICY('not a url')),
       context: context(),
       loadEmbeddings: missing,
     });
 
-    expect(stderr.text).toContain('OTLP export is not in this build yet');
+    // Loud, but not fatal. A typo in an endpoint must not take down the wrap
+    // and leave the agent with no fuse in front of it.
+    expect(stderr.text).toContain('cannot be used');
+    expect(events()).toContain('telemetry_unavailable');
+    expect(runtime.telemetry).toBeUndefined();
 
     await runtime.close();
+  });
+});
+
+/** A policy with telemetry switched on and pointed at `endpoint`. */
+const TELEMETRY_POLICY = (endpoint: string): string =>
+  `version: 1\nloop_detection:\n  semantic:\n    provider: none\ntelemetry:\n  enabled: true\n  otlp_endpoint: ${endpoint}\n  service_name: test-service\n`;
+
+describe('the telemetry port', () => {
+  /** Records every export instead of opening a socket. */
+  function recorder(): { calls: { url: string; body: unknown }[]; fetch: FetchLike } {
+    const calls: { url: string; body: unknown }[] = [];
+    return {
+      calls,
+      fetch: async (url, init) => {
+        calls.push({ url, body: JSON.parse(String(init.body)) });
+        return new Response('{}', { status: 200 });
+      },
+    };
+  }
+
+  it('is core’s no-op sink unless the policy asks for it', async () => {
+    const seen = recorder();
+    const runtime = await createRuntime({
+      loaded: policyFile('version: 1\nloop_detection:\n  semantic:\n    provider: none\n'),
+      context: context(),
+      telemetry: { fetch: seen.fetch },
+    });
+
+    // Off by default, per umbrella ADR-003: no sink, no queue, no timer, and
+    // nothing said about it on stderr either.
+    expect(runtime.telemetry).toBeUndefined();
+    expect(runtime.engine.ports.telemetry).toBeInstanceOf(NoopTelemetrySink);
+    expect(events()).not.toContain('telemetry_enabled');
+
+    const decision = await runtime.engine.beforeCall({
+      sessionId: 'S1',
+      serverName: 'fs',
+      toolName: 'read_file',
+      args: {},
+    });
+    runtime.engine.afterCall(decision.callId, {
+      isError: false,
+      resultSummary: 'ok',
+      resultBytes: 2,
+    });
+    await runtime.close();
+
+    expect(seen.calls).toEqual([]);
+  });
+
+  it('is the OTLP sink when it is enabled, and says where it is pointed', async () => {
+    const seen = recorder();
+    const runtime = await createRuntime({
+      loaded: policyFile(TELEMETRY_POLICY('http://127.0.0.1:4318')),
+      context: context(),
+      telemetry: { fetch: seen.fetch },
+    });
+
+    expect(runtime.telemetry).toBeDefined();
+    expect(runtime.engine.ports.telemetry).toBe(runtime.telemetry);
+    expect(stderr.text).toContain('"endpoint":"http://127.0.0.1:4318"');
+    expect(stderr.text).toContain('"service":"test-service"');
+
+    await runtime.close();
+  });
+
+  it('flushes what a session produced when the runtime closes', async () => {
+    const seen = recorder();
+    const runtime = await createRuntime({
+      loaded: policyFile(TELEMETRY_POLICY('http://127.0.0.1:4318')),
+      context: context(),
+      telemetry: { fetch: seen.fetch },
+    });
+
+    const decision = await runtime.engine.beforeCall({
+      sessionId: 'S1',
+      serverName: 'fs',
+      toolName: 'read_file',
+      args: { path: 'a.ts' },
+    });
+    runtime.engine.afterCall(decision.callId, {
+      isError: false,
+      resultSummary: 'ok',
+      resultBytes: 2,
+    });
+    await runtime.close();
+
+    expect(seen.calls.map((call) => call.url)).toEqual([
+      'http://127.0.0.1:4318/v1/traces',
+      'http://127.0.0.1:4318/v1/logs',
+    ]);
+    expect(events()).toContain('telemetry_stats');
+  });
+
+  it('keeps exporting under --quiet', async () => {
+    const seen = recorder();
+    const runtime = await createRuntime({
+      loaded: policyFile(TELEMETRY_POLICY('http://127.0.0.1:4318')),
+      context: context(),
+      quiet: true,
+      telemetry: { fetch: seen.fetch },
+    });
+
+    const decision = await runtime.engine.beforeCall({
+      sessionId: 'S1',
+      serverName: 'fs',
+      toolName: 'read_file',
+      args: {},
+    });
+    runtime.engine.afterCall(decision.callId, {
+      isError: false,
+      resultSummary: 'ok',
+      resultBytes: 2,
+    });
+    await runtime.close();
+
+    // `--quiet` is about the operator's terminal, not their collector.
+    expect(stderr.text).toBe('');
+    expect(seen.calls.length).toBeGreaterThan(0);
+  });
+
+  it('gives the sink the inbound traceparent of a call still in flight', async () => {
+    const seen = recorder();
+    const runtime = await createRuntime({
+      loaded: policyFile(TELEMETRY_POLICY('http://127.0.0.1:4318')),
+      context: context(),
+      telemetry: { fetch: seen.fetch },
+    });
+
+    const traceparent = `00-${'a'.repeat(32)}-${'b'.repeat(16)}-01`;
+    const decision = await runtime.engine.beforeCall({
+      sessionId: 'S1',
+      serverName: 'fs',
+      toolName: 'read_file',
+      args: {},
+      traceparent,
+    });
+    runtime.engine.afterCall(decision.callId, {
+      isError: false,
+      resultSummary: 'ok',
+      resultBytes: 2,
+    });
+    await runtime.close();
+
+    const spans = seen.calls
+      .filter((call) => call.url.endsWith('/v1/traces'))
+      .flatMap((call) => {
+        const body = call.body as {
+          resourceSpans: { scopeSpans: { spans: Record<string, string>[] }[] }[];
+        };
+        return body.resourceSpans.flatMap((entry) =>
+          entry.scopeSpans.flatMap((scope) => scope.spans),
+        );
+      });
+    expect(spans).toHaveLength(1);
+    expect(spans[0]?.traceId).toBe('a'.repeat(32));
+    expect(spans[0]?.parentSpanId).toBe('b'.repeat(16));
   });
 });
 

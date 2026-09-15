@@ -1,4 +1,4 @@
-import { readdirSync, readFileSync } from 'node:fs';
+import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
@@ -121,6 +121,73 @@ describe('the embeddings dependency direction', () => {
           source,
         );
       })
+      .map((file) => file.slice(SRC.length));
+
+    expect(offenders).toEqual([]);
+  });
+});
+
+describe('the OpenTelemetry dependency direction', () => {
+  /**
+   * ADR-010: the OTLP export is written by hand and the OTel SDK is not a
+   * dependency. `@opentelemetry/semantic-conventions` alone unpacks to about
+   * 12 MB and sells us nothing — umbrella ADR-003 fixed our attribute names
+   * under `tunedness.*`, so OTel's own conventions are not the ones we use —
+   * and telemetry is off by default, which makes every byte of it a download
+   * for a feature nobody switched on.
+   *
+   * The phase brief asked for "zero OTel modules loaded when telemetry is
+   * off". Writing the encoding ourselves turns that from a discipline about
+   * dynamic imports into a fact about the tree: the packages are not there.
+   * These tests are how that stays true.
+   */
+
+  const WORKSPACE = fileURLToPath(new URL('../../..', import.meta.url));
+
+  function manifestsInWorkspace(): [string, Manifest][] {
+    const out: [string, Manifest][] = [['package.json', root()]];
+    for (const name of readdirSync(join(WORKSPACE, 'packages'))) {
+      const path = join('packages', name, 'package.json');
+      out.push([path, JSON.parse(readFileSync(join(WORKSPACE, path), 'utf8')) as Manifest]);
+    }
+    return out;
+  }
+
+  function root(): Manifest {
+    return JSON.parse(readFileSync(join(WORKSPACE, 'package.json'), 'utf8')) as Manifest;
+  }
+
+  it('is declared by no manifest in the workspace', () => {
+    for (const [path, declared] of manifestsInWorkspace()) {
+      const names = Object.keys({
+        ...declared.dependencies,
+        ...declared.devDependencies,
+        ...declared.peerDependencies,
+        ...declared.optionalDependencies,
+      });
+      expect(
+        names.filter((name) => name.startsWith('@opentelemetry/')),
+        path,
+      ).toEqual([]);
+    }
+  });
+
+  it('is in no installed lockfile entry, so nothing pulls it in transitively', () => {
+    const lock = readFileSync(join(WORKSPACE, 'package-lock.json'), 'utf8');
+
+    // Installed packages are the `node_modules/<name>` keys. The name does
+    // appear elsewhere in the file — vitest declares `@opentelemetry/api` as an
+    // *optional peer* — and that is precisely a dependency nobody installed.
+    expect(lock).not.toContain('"node_modules/@opentelemetry');
+  });
+
+  it('is not installed, which is the whole point', () => {
+    expect(existsSync(join(WORKSPACE, 'node_modules', '@opentelemetry'))).toBe(false);
+  });
+
+  it('is imported by no source file', () => {
+    const offenders = sourceFiles(SRC)
+      .filter((file) => stripComments(readFileSync(file, 'utf8')).includes('@opentelemetry'))
       .map((file) => file.slice(SRC.length));
 
     expect(offenders).toEqual([]);

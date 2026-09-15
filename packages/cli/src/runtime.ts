@@ -63,7 +63,7 @@ import {
   type SemanticLoopDetector,
   type SessionSummary,
 } from '@agentfuse/core';
-import { Diagnostics } from '@agentfuse/proxy';
+import type { Diagnostics } from '@agentfuse/proxy';
 import { type ApprovalResolution, resolveApprovalGateway } from './approvals/index.js';
 import { type LoadedPolicy, resolveFromPolicy } from './config.js';
 import {
@@ -75,6 +75,9 @@ import { messageOf } from './errors.js';
 import { loadDecisionHook, type ModuleLoader } from './hook.js';
 import { type CliContext, writeNotice } from './io.js';
 import { FileReportStore } from './reports.js';
+import { ObservedDiagnostics } from './telemetry/diagnostics.js';
+import { type ResolveTelemetryOptions, resolveTelemetry } from './telemetry/index.js';
+import type { OtlpTelemetrySink } from './telemetry/sink.js';
 import { costModelFor, GptTokenizer } from './tokenizer.js';
 
 /**
@@ -107,6 +110,13 @@ export interface RuntimeOptions {
    * their own.
    */
   readonly approvals?: ApprovalGateway | undefined;
+  /**
+   * Telemetry seams: an injected `fetch`, clock, id source and batching knobs.
+   *
+   * Never set in production — the endpoint and the on/off switch come from the
+   * policy, exactly like every other row of a decision table in this package.
+   */
+  readonly telemetry?: Omit<ResolveTelemetryOptions, 'policy' | 'onDiagnostic'> | undefined;
   /** Injected for tests. */
   readonly loadEmbeddings?: EmbeddingsLoader | undefined;
   /** Injected for tests. */
@@ -126,6 +136,14 @@ export interface Runtime {
   readonly quiet: boolean;
   /** `undefined` when the semantic layer is off or unavailable. */
   readonly detector: SemanticLoopDetector | undefined;
+  /**
+   * The OTLP sink, when `telemetry.enabled` is true and the endpoint is usable.
+   *
+   * `undefined` is the default and means the engine keeps core's
+   * `NoopTelemetrySink`: nothing is queued, no timer is armed and no socket is
+   * ever opened. See the table in `telemetry/index.ts`.
+   */
+  readonly telemetry: OtlpTelemetrySink | undefined;
   /**
    * The approval channel in force.
    *
@@ -205,7 +223,15 @@ export async function createRuntime(options: RuntimeOptions): Promise<Runtime> {
   const quiet = options.quiet ?? false;
   const policy = withMode(loaded.policy, options.mode);
 
-  const diagnostics = new Diagnostics({ quiet, sink: context.stderr });
+  // The single `Diagnostics` of a run, with the OTLP sink hung off it as a
+  // second reader. Phase 6b's rule holds — one instance, one rate-limit window
+  // — and the observer is a holder rather than an argument because the sink
+  // needs somewhere to report a failed export, which is this same object.
+  let observe: ((event: string, fields: Record<string, unknown>) => void) | undefined;
+  const diagnostics: Diagnostics = new ObservedDiagnostics(
+    { quiet, sink: context.stderr },
+    (event, fields) => observe?.(event, fields),
+  );
   const warn = (lines: readonly string[]): void => {
     if (quiet) return;
     writeNotice(context.stderr, 'warning', lines);
@@ -245,12 +271,41 @@ export async function createRuntime(options: RuntimeOptions): Promise<Runtime> {
           close: async () => undefined,
         };
 
+  // Before the engine too: the sink is a constructor port, like the gateway.
+  const telemetry = resolveTelemetry({
+    ...options.telemetry,
+    policy,
+    onDiagnostic: (event, fields) => diagnostics.emit(event, fields),
+  });
+  if (telemetry.kind === 'degraded') {
+    warn(telemetry.warning);
+    diagnostics.emit('telemetry_unavailable', { endpoint: policy.telemetry.otlp_endpoint });
+  }
+  const sink = telemetry.kind === 'ready' ? telemetry.sink : undefined;
+
   const tokenizer = new GptTokenizer();
   const engine = new FuseEngine(policy, {
     tokenizer,
     cost: costModelFor(policy.pricing),
     ...(approvals.kind === 'ready' ? { approvals: approvals.gateway } : undefined),
+    ...(sink !== undefined ? { telemetry: sink } : undefined),
   });
+
+  if (telemetry.kind === 'ready') {
+    // Late, for the same reason the approval host is: the sink existed before
+    // the engine did. The lookup reads the inbound `traceparent` off the
+    // in-flight record, which is the only place it lives — the proxy puts it
+    // there through `beforeCall` and forwards it upstream itself.
+    telemetry.sink.bindCallLookup(
+      (sessionId, callId) =>
+        engine.ports.sessions.get(sessionId)?.inFlight.get(callId)?.traceparent,
+    );
+    observe = (event, fields) => telemetry.sink.observeDiagnostic(event, fields);
+    diagnostics.emit('telemetry_enabled', {
+      endpoint: telemetry.endpoint,
+      service: policy.telemetry.service_name,
+    });
+  }
 
   if (approvals.kind === 'ready') {
     // Late, and it has to be: the socket was listening before the engine
@@ -288,13 +343,6 @@ export async function createRuntime(options: RuntimeOptions): Promise<Runtime> {
     diagnostics.emit('hook_loaded', { hook: options.hook });
   }
 
-  if (policy.telemetry.enabled) {
-    warn([
-      'telemetry.enabled is true, and OTLP export is not in this build yet.',
-      'Nothing is being exported; decisions are still reported on stderr and in the trip reports.',
-    ]);
-  }
-
   const resolution = await resolveEmbeddingProvider({
     request: semanticRequestOf(engine.policy),
     mode: policy.mode,
@@ -330,6 +378,7 @@ export async function createRuntime(options: RuntimeOptions): Promise<Runtime> {
     diagnostics,
     quiet,
     detector,
+    telemetry: sink,
     approvals: approvals.kind === 'ready' ? approvals.gateway : undefined,
     approvalSocket: approvals.kind === 'ready' ? approvals.socketPath : undefined,
     tokenizer,
@@ -344,7 +393,16 @@ export async function createRuntime(options: RuntimeOptions): Promise<Runtime> {
       // that exited without removing it leaves the next one a stale path to
       // reason about.
       if (approvals.kind === 'ready') await approvals.close();
-      if (detector === undefined) return;
+      // Last, and also unconditionally: the exporter flushes what is queued and
+      // writes its counters, and it has to see the lines written on the way out
+      // (`semantic_stats`, `wrap_end`) before it goes.
+      const flush = async (): Promise<void> => {
+        await sink?.shutdown();
+      };
+      if (detector === undefined) {
+        await flush();
+        return;
+      }
 
       const stats = detector.stats;
       // Queue failures are deliberately not telemetry events (umbrella ADR-003
@@ -368,6 +426,7 @@ export async function createRuntime(options: RuntimeOptions): Promise<Runtime> {
       await withTimeout(detector.close(), timeoutMs, () =>
         diagnostics.emit('semantic_close_timeout', { timeoutMs }),
       );
+      await flush();
     },
   };
 }
