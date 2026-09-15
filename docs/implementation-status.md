@@ -1,7 +1,7 @@
 # AgentFuse — uygulama durumu ve devir notu
 
-**Son güncelleme:** 2026-09-15 · **`main` HEAD:** `c5fa5d1` · **Durum:** Faz 2 bitti,
-Faz 3 ve 5 yarıda kaldı
+**Son güncelleme:** 2026-09-15 · **`main` HEAD:** `abd96d8` · **Durum:** Faz 3 bitti,
+Faz 5 yarıda kaldı
 
 Bu dosya, işi başka bir oturumda kaldığı yerden sürdürebilmek için tutulur.
 Ürün tanımı burada değil — tek doğruluk kaynağı `../.ssot/PRD.md` ve
@@ -18,7 +18,7 @@ dosyasındadır.
 | 0 | `.ssot` düzeltmeleri | **Bitti** |
 | 1 | Workspace iskeleti | **Bitti** — `2e2c4a4` |
 | 2 | Çekirdek karar motoru | **Bitti** — `c5fa5d1` |
-| 3 | Asenkron semantik döngü katmanı | **Yarıda** — `wip/phase-3-5-partial` |
+| 3 | Asenkron semantik döngü katmanı | **Bitti** — `abd96d8` |
 | 4 | `@agentfuse/embeddings-local` | Başlanmadı |
 | 5 | `@agentfuse/proxy` (MCP adaptörü) | **Yarıda** — `wip/phase-3-5-partial` |
 | 6 | CLI (`agentfuse`) | Başlanmadı |
@@ -37,16 +37,26 @@ kritik yol: 0-1-2-5-6-9-10
 ### `main` yeşil — 2026-09-15'te bizzat koşuldu
 
 ```
-npm run lint          → Checked 76 files. No fixes applied.
+npm run lint          → Checked 86 files. No fixes applied.
 npm run typecheck     → temiz
 npm run build         → temiz
-npm test              → Test Files 14 passed · Tests 250 passed
+npm test              → Test Files 19 passed · Tests 348 passed (614 ms)
 npm run schema:check  → schema up to date
 ```
 
 Coverage kapısı `vitest.config.ts` içinde `packages/core/src/**` için %90'da ve
 **gerçekten zorluyor** (Faz 2'de 100'e çekilip kasten kırılarak doğrulandı).
-Faz 2 sonundaki ölçüm: statements %99.05, branches %94.85, functions %100.
+Faz 3 sonundaki ölçüm: statements %99.24, branches %95.47, functions %100,
+lines %99.78. Faz 2 sonundaki değerler karşılaştırma için: %99.05 / %94.85 /
+%100.
+
+Senkron yolun ölçülen maliyeti (`beforeCall` + `afterCall` + `observe`, 20 000
+çağrı, 50 oturum, `HashingProvider(384)` bağlı, `mode: warn`): ortalama
+0.018 ms, **p95 0.023 ms**, p99 0.038 ms. PRD §6'nın çağrı başına p95 < 50 ms
+bütçesi bu katman için üç büyüklük mertebesi boş duruyor — çünkü embedding
+hesabı bu yolda değil. Bu rakam kural katmanının maliyetidir; gerçek modelin
+gecikmesi kuyrukta ölçülür ve bir `tools/call`'a hiç dokunmaz. Kesin ölçüm ve
+eşik kalibrasyonu Faz 9'un işi.
 
 ---
 
@@ -185,95 +195,230 @@ hariç hepsi senkron:
   düşürebilir ve reason ekleyebilir. Yeniden yazan proxy olmak McpGuard'ın
   bölgesi. Fırlatan hook yakalanır, telemetriye yazılır ve no-op sayılır.
 
-### Faz 3 için bırakılan seam'ler
+### Faz 3 için bırakılan seam'ler (hepsi Faz 3'te tüketildi)
 
 - `EmbeddingProvider` `ports/index.ts`'te **donduruldu** (L2-normalize
-  zorunluluğu TSDoc'ta). Değiştirmeyin, karşısına yazın.
+  zorunluluğu TSDoc'ta). Değiştirmeyin, karşısına yazın. Faz 3 bunu
+  değiştirmedi.
 - `SessionState.pendingTrip` ve `SessionState.degraded` alanları mevcut.
   `pendingTrip` **yalnızca** `breakerGuard` tarafından tüketilir (ilk gelen
   kazanır).
 - `FuseEngine.onRecordComplete(listener)` — `afterCall` sonunda çağrılır,
   embedding kuyruğunun bağlanacağı nokta.
 - `FuseEngine.markPendingTrip(sessionId, reason)` ve `markDegraded(sessionId)` —
-  scorer'ın internals'a dokunmadan verdict bırakma yolu.
+  scorer'ın internals'a dokunmadan verdict bırakma yolu. Faz 3 `markDegraded`'a
+  opsiyonel bir `cause` parametresi ekledi (aşağıya bakın); varsayılanı
+  `'sampled'` olduğu için çağrı biçimi değişmedi.
 - `loop_detection.semantic.*` şemada tam tanımlı.
 - Mevcut `describe('the semantic seam')` testleri bu kontratı pinliyor.
 
 ---
 
-## Faz 3 ve 5 — yarıda kaldı
+## Faz 3 — asenkron semantik döngü katmanı (bitti, `abd96d8`)
 
-**Neyin yanlış gittiği:** iki faz paralel koşarken makine uykuya geçti, iki ajan
-da yanıt ortasında koptu. İkisi de ciddi iş çıkarmıştı ama hiçbiri bitirmedi ve
-commit atmadı.
+Üç commit: `6b472ce` skorlayıcı + embedding dublörü, `b053582` kuyruk,
+`abd96d8` dedektör + motora bağlama. `packages/core/src` ağacına eklenenler:
+
+```
+loop/     window embed-text queue hashing-provider
+guards/   semantic-loop
+```
+
+Ürün yüzeyi: ana giriş noktasından `EmbeddingWindow`, `EmbeddingQueue`,
+`SemanticLoopDetector`, `attachSemanticLoopDetector`, `semanticEmbeddingText`;
+`@agentfuse/core/testing` alt yolundan `HashingProvider`.
+
+### Taslak dosyalar hakkında verilen kararlar
+
+`wip/phase-3-5-partial`'daki (`798720b`) üç Faz 3 dosyası tek tek değerlendirildi.
+Branch'e dokunulmadı.
+
+| Dosya | Karar | Gerekçe |
+| --- | --- | --- |
+| `loop/window.ts` | **tutuldu**, testleri yazıldı | Kapalı form doğru, halka tamponu doğru, `ensureCapacity`'nin gerekçesi (kural bazlı `window` override'ı) geçerli. Savunabildiğimiz bir tasarımdı; değiştirmek için sebep yoktu. |
+| `loop/hashing-provider.ts` | **tutuldu**, testleri yazıldı | FNV-1a trigram + işaret biti hilesi ilgisiz metinleri gerçekten dik tutuyor. `@agentfuse/core/testing` alt yoluna taşındı — `FakeClock` hangi gerekçeyle oradaysa bu da öyle: üretimde provider olarak yapılandırılamasın. |
+| `loop/queue.ts` | **yeniden yazıldı** (iskeleti korundu) | Sayaçlar, batch döngüsü, en-eskiyi-düşüren taşma mantığı iyiydi. Ama taslak, hata sonrası backoff için bir `Scheduler` portu ve **gerçek `setTimeout`** getiriyordu. |
+
+### `Scheduler` portu neden atıldı
+
+Faz 2, approval timeout'unun sahibini gateway yaptı ve gerekçeyi yazıya geçirdi:
+core'un tek zaman kaynağı enjekte edilen `Clock`'tur, kendi timer'ını kurmaz.
+`core` içinde bir `TimerScheduler` yayınlamak bu kararla çelişirdi. Yerine:
+
+- başarısız batch sonrası gecikme, `clock.now()` ile karşılaştırılan bir
+  **deadline** (`#retryAfter`),
+- worker'ı yeniden uyandıran şey bir sonraki `enqueue`.
+
+Bu zaten doğru tetikleyici: kuyruk yalnız çağrı akarken anlamlıdır ve kimsenin
+eklemediği bir backlog, zaten geçip gitmiş bir pencereye aittir. Yan kazançlar:
+yüzeyden bir port eksildi, her hata yolu bir sayıyı ilerleterek test edilebilir
+oldu, ve arka plan işi bir process'i açık tutamaz.
+
+`purity.test.ts` artık `setTimeout`, `setInterval`, `setImmediate`,
+`queueMicrotask`, `process.hrtime` ve `performance.now` taraması yapıyor —
+bu karar bir paragraf değil, kırılan bir test.
+
+### Sürüklenme (drift) — yeniden hesaplama aralığı 1024
+
+`S` toplamı `Float64Array`, toplananlar `Float32`. Bir ekle/çıkar çifti en fazla
+~2⁻⁵³ bağıl hassasiyet kaybettirir; binlercesi bile kimsenin yapılandıracağı bir
+`threshold`'un 1e-3 çözünürlüğünü kıpırdatamaz. **1024 bu yüzden gereklilikten
+değil, ucuzluktan seçildi:** yeniden hesaplama `O(W·d)` ve 1024 push'a
+amortize edildiğinde `W ≤ 64` için push başına bir toplamadan az. Asıl işi,
+provider bir gün denormal ya da tam birim olmayan bir vektör verirse hasarı
+sınırlamak.
+
+İki ayrı test var: biri 20 000 push/evict sonrası artımlı `S`'i sıfırdan
+hesaplanmışla karşılaştırıyor, diğeri aynı özelliği **yeniden hesaplama kapalıyken**
+50 000 döngüde pinliyor — böylece aralığın ileride sessizce taşıyıcı hale gelmesi
+imkânsız. Kapalı form ayrıca rastgele pencerelerde naif `O(W²)` referansla
+1e-6 içinde karşılaştırılıyor; üreteç tohumlu bir LCG, `Math.random()` yok.
+
+### Adaptif örnekleme tetikleyicisi
+
+Eşik **projeksiyonlu backlog**: ölçülen batch gecikmesinin EWMA'sı (α = 0.3)
+çarpı bekleyen batch sayısı (`ceil(depth / batchSize)`), 2000 ms'yi geçerse.
+Ham derinlik değil, çünkü 40'lık bir derinlik, bir batch'in bir milisaniye mi
+bir saniye mi sürdüğünü bilmeden hiçbir şey ifade etmez. Eşiğin üstünde kuyruk
+**her ikinci teklifi kabul eder** — varış hızı yarıya iner, pencere seyrekleşir,
+ve etkilenen oturum `degraded` işaretlenir.
+
+Taslak burada daha zekiydi: yalnız kuyrukta zaten aynı fingerprint'i olan
+teklifleri örnekliyordu. Fikir iyi ama doğrulanmamış ve tespit kalitesi Faz 9'un
+alanı; düz alternasyon açıklanması ve test edilmesi daha kolay. **Faz 9 için
+not:** fingerprint'e duyarlı örnekleme, ROC taramasında ölçülecek bir iyileştirme
+adayıdır.
+
+### `degraded` iki nedene ayrıldı
+
+`SessionState.degraded` artık `'sampled' | 'unavailable'`:
+
+- `'sampled'` — yük atıldı (taşma ya da örnekleme), pencere politikanın istediğinden
+  seyrek,
+- `'unavailable'` — provider patladı, **hiçbir şey** skorlanmadı, yalnız
+  deterministik kurallar koştu.
+
+Embedding backend'i ölüyken "sampled" yazan bir rapor yalan söyler; ADR-007'nin
+"tahmin, kaydını okuyanın göreceği yerde taşır" kuralı tespit sadakati için de
+geçerli. `'unavailable'` `'sampled'`'ı ezer, sonradan gelen bir yük atma bildirimi
+onu düşüremez. `SessionSummary.degraded` boolean kaldı; varyantı yüzeye çıkarmak
+Faz 7'nin rapor UX'inin işi.
+
+### Embedding metni bir kontrattır
+
+`loop/embed-text.ts` tek yer:
+
+```
+<server>__<tool>
+<argsNormalized, en çok 800 karakter>
+result: <özet, en çok 256 karakter>
+```
+
+- **Argümanlar `record.argsNormalized`'dan gelir**, yeniden normalize edilmez.
+  Exact-repeat kuralı ile semantik kural "aynı çağrı" konusunda anlaşmak zorunda;
+  iki normalizer birbirinden sapardı.
+- **Sonuç dahildir.** Sayfalayan bir ajan neredeyse aynı istekleri ve tamamen
+  farklı sonuçları üretir; başarısız bir yazmayı yeniden deneyen ajan ikisinde de
+  neredeyse aynısını üretir. Sonuç olmadan birincisi ikincisine benziyor ve
+  pagination bu ürünün en çok kaçınması gereken yanlış pozitif.
+- **Hata, imzasını başa yazar:** `ERROR(<errorSignature>): `. Aynı türden iki
+  hata, çevresindeki metin farklı olsa da gömme uzayında yan yana düşer.
+- `{tool}` yerine `toolKey(server, tool)` yazılıyor — fingerprint de aynı
+  gerekçeyle `server \0 tool \0 args` üzerinden kuruluyor; iki farklı sunucudaki
+  `read_file` aynı iş değil.
+- 800 karakter sınırı yalnız **geniş** argümanlarda devreye girer: `normalizeArgs`
+  256 karakteri aşan her tek string'i zaten ortadan çökertiyor.
+
+**Bu metin değişirse Faz 9'un kalibre ettiği her eşik anlamını yitirir.**
+
+### Dedektör
+
+`guards/semantic-loop.ts` bir guard değil — hattın içinde koşmaz.
+`onRecordComplete`'e abone olur, sıcak yolun dışında gömer, pencere yakınsayınca
+`markPendingTrip` ile not bırakır, `breakerGuard` bunu bir sonraki çağrıda tüketir.
+
+- **Motoru import etmez.** Üç metotlu `SemanticHost` arayüzüne yazılmıştır
+  (`policy`, `onRecordComplete`, `markPendingTrip`, `markDegraded`); `FuseEngine`
+  bunu yapısal olarak karşılar. Bağımlılık tek yön: motor semantik katmanı
+  tanımıyor.
+- **Ayar anlık görüntüsü iş başına.** Kural bazlı `loop_detection` override'ı
+  eşleştiği çağrıya aittir; vektör geri geldiğinde oturum başka bir aracı
+  kullanıyor olabilir. Pencere kapasitesi değişirse `ensureCapacity` ödenmiş
+  geçmişi korur.
+- **Trip sonrası pencere temizlenir.** Yoksa onu tripleyen geçmiş bir sonraki
+  çağrıda yine tripler — `resetBreaker`'ın oturum penceresini düşürmesiyle aynı
+  gerekçe.
+- **Oturum haritası sınırlı** (varsayılan 1024, en az kullanılan düşer): dedektör
+  bir oturumun store'dan silindiğini göremez. Daha iyisini bilen host `forget()`
+  çağırır — **Faz 5 için not: `endSession`'dan sonra `detector.forget(sessionId)`
+  çağırın.**
+- `lastScore(sessionId)` salt gözlem: raporun trip yanında göstereceği sayı ve
+  Faz 9'un ROC taramasının private state'e uzanmadan okuyacağı şey.
+
+### Sonraki fazlara bırakılan notlar
+
+- **Faz 4:** `EmbeddingProvider` dokunulmadı. `HashingProvider`, gerçek backend'in
+  geçmesi gereken davranış testlerinin de şablonu (`hashing-provider.test.ts`
+  içindeki "behaves plausibly" blokları).
+- **Faz 5:** dedektör `attachSemanticLoopDetector({ host: engine, provider, clock,
+  telemetry })` ile bağlanır; oturum kapanışında `forget()`, kapanışta `close()`.
+  Provider bulunamazsa hiç bağlamayın — kural katmanı tam işlevli kalır.
+- **Faz 6:** `provider: 'none'` ya da `semantic.enabled: false`, CLI dinamik
+  `import()` ile `@agentfuse/embeddings-local`'ı bulamadığında kullanacağı
+  kapatma anahtarıdır; dedektör o çağrıları `skipped` sayar.
+- **Faz 8:** kuyruk hatası bilinçli olarak `TelemetrySink`'e yazılmaz — çatı
+  ADR-003 şemayı dört olay tipinde sabitliyor ve "embedding backend hasta" bunların
+  hiçbiri değil. Sayaçlar `SemanticLoopStats`'ta; nasıl loglanacağı host'un işi.
+- **Faz 9:** `threshold: 0.83` / `window: 8` / `consecutive_windows: 2` hâlâ yer
+  tutucu. Negatif corpus'un bu katmana özel tuzakları: pagination (`cursor`
+  maskelemeden muaf, ama sonuç metni de değişmeli), N benzer dosyanın toplu
+  düzenlenmesi, yakınsayan build-test döngüsü. `lastScore()` ve
+  `loop_detection.windowScore` olayı taramanın okuma noktaları.
+
+---
+
+## Faz 5 — yarıda kaldı
+
+**Neyin yanlış gittiği:** Faz 3 ve 5 paralel koşarken makine uykuya geçti, iki
+ajan da yanıt ortasında koptu. İkisi de ciddi iş çıkarmıştı ama hiçbiri bitirmedi
+ve commit atmadı. Faz 3 o zamandan beri bitirildi; geri kalan Faz 5'tir.
 
 Kısmi çıktı **`wip/phase-3-5-partial`** branch'inde (`798720b`) duruyor —
 `main`'i yeşil bırakmak için oraya park edildi. O dosyalar:
 
 - typecheck ve lint'ten **geçiyor**,
-- mevcut 250 testi **kırmıyor** (253 geçti, 3'ü kendi dosyalarına ait değil),
-- ama **hiçbirinin tek testi yok** ve **hiçbiri motora/proxy'ye bağlı değil**,
-- bu yüzden coverage kapısı reddediyor (%74 < %90) — kapı doğru çalışıyor.
+- mevcut testleri **kırmıyor**,
+- ama **hiçbirinin tek testi yok** ve **hiçbiri proxy'ye bağlı değil**,
+- bu yüzden coverage kapısı onları olduğu gibi kabul etmez.
 
 | Dosya | Boyut | Ne | Eksik |
 | --- | --- | --- | --- |
-| `packages/core/src/loop/window.ts` | 9.2k | kayan pencere skorlayıcı | testler, O(W²) referans karşılaştırması |
-| `packages/core/src/loop/queue.ts` | 14k | sınırlı embedding kuyruğu | testler, taşma/hata senaryoları |
-| `packages/core/src/loop/hashing-provider.ts` | 4.1k | ONNX'siz `EmbeddingProvider` dublörü | testler |
 | `packages/proxy/src/era.ts` | 6.6k | era tespiti | testler |
 | `packages/proxy/src/remap.ts` | 7.5k | progressToken + requestId haritaları | testler, sızıntı testi |
 | `packages/proxy/src/diagnostics.ts` | 3.6k | stderr disiplini | testler |
 
-Faz 3'ten eksik: `guards/semantic-loop.ts`, `onRecordComplete` üzerinden
-bağlama, tüm testler.
 Faz 5'ten eksik: `bridge.ts`, `tools-call.ts`, `trip-result.ts`,
 `stdio-wrap.ts`, `http-serve.ts`, tüm testler.
 
 **Bu dosyaları gözden geçirilecek taslak sayın, üzerine inşa edilecek temel
-değil.** Devam eden kişi dosya bazında tut/yeniden yaz/at kararı vermeli.
+değil.** Devam eden kişi dosya bazında tut/yeniden yaz/at kararı vermeli — Faz 3
+üçünden ikisini tuttu, birini yeniden yazdı.
 
 ### Paralelleştirme dersi
 
 Faz 3 ve 5 ayrık paketlere dokunduğu için paralel koşuldu ve bu kısım işe
 yaradı — çakışma olmadı. Ama iki uzun ajanı birlikte koşturmak, makine uykuya
 geçtiğinde **iki fazı birden** kaybettirdi. Bir sonraki denemede ya tek faz
-koşturun, ya da her ajana "ara commit at" talimatı verin.
+koşturun, ya da her ajana "ara commit at" talimatı verin. Faz 3 ikinci denemede
+üç ara commit'le yürütüldü ve bu işe yaradı.
 
 ---
 
 ## Sırada ne var
 
-### Faz 3 ve 5'i bitir (kritik yol Faz 5'ten geçiyor)
+### Faz 5'i bitir — kritik yol buradan geçiyor
 
-Her ikisinin tam brifingi plan dosyasında. Özet gereksinimler:
-
-**Faz 3 — semantik katman.** ADR-002'nin kısıtı belirleyici: embedding hesabı
-**asla** bir `tools/call`'ı bloklamaz, geciktirmez ya da başarısız kılmaz; kesme
-kararı bir sonraki çağrıda uygulanır (`pendingTrip` → `BreakerGuard`). Bütçe:
-çağrı başına eklenen p95 < 50 ms.
-
-Skor **ortalama ikili kosinüs**, kapalı formda: L2-normalize vektörler için
-`Σᵢ<ⱼ eᵢ·eⱼ = (‖S‖² − W)/2` olduğundan, halka tamponu üzerinde koşan toplam
-vektörü `S` tutulur (push'ta ekle, evict'te çıkar) ve
-
-```
-score = (‖S‖² − W) / (W · (W − 1))
-```
-
-Bu, O(W²·d) yerine çağrı başına **O(d)**. Artımlı çıkarmanın kayan nokta
-sürüklenmesi gerçek bir tehlike — periyodik olarak `S`'i sıfırdan yeniden
-hesaplayın ve bunu testleyin.
-
-Kuyruk: 64 işlik sınır, taşmada **en eski** işler düşer (güncel pencere
-önemlidir), `embed()` başına 8'e kadar batch, EWMA gecikme ölçümüyle adaptif
-örnekleme, `degraded: 'sampled'` işareti. Reddeden provider **asla** çağrıyı
-kırmaz — AgentFuse kural-only tespite düşer, proxy ayakta kalır.
-
-Onay eşiği: `threshold` (0.83) `consecutive_windows` (2) ardışık pencerede
-aşılmalı. Bir zirve gürültü, iki ardışık zirve patern.
-
-`HashingProvider` kritik: **CI'ın 301 MB ORT kurmadan semantik yolu koşabilmesini
-sağlayan şey bu.**
+Tam brifingi plan dosyasında. Özet gereksinimler:
 
 **Faz 5 — MCP proxy.** Topoloji: **downstream bağlantı başına bir upstream
 `Client`.** Multiplekslemek sampling/elicitation/roots'u kırıyor, çünkü legacy
