@@ -15,9 +15,15 @@
  *
  * What we *do* mint is the identity of our own span. With an inbound context
  * the span is a child of the agent's; without one it is the root of a trace
- * that starts here, carries no parent, and puts nothing back on the wire. In
- * that case calls no longer share a trace id, and the correlation key is
- * `tunedness.session_id` — which every span and every event carries anyway.
+ * that starts here and carries no parent. In that case calls no longer share a
+ * trace id, and the correlation key is `tunedness.session_id` — which every
+ * span and every event carries anyway.
+ *
+ * {@link formatTraceparent} does put that minted identity back on the wire, on
+ * the request the proxy forwards to the guarded server, so the server's work
+ * hangs beneath our span instead of beside it. That is not fabrication: the
+ * string names a span this process exports. The rule above still holds in full
+ * — with telemetry off there is no span to name and nothing is written.
  */
 
 import { randomBytes } from 'node:crypto';

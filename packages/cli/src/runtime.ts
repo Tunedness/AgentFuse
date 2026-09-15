@@ -63,7 +63,7 @@ import {
   type SemanticLoopDetector,
   type SessionSummary,
 } from '@agentfuse/core';
-import type { Diagnostics } from '@agentfuse/proxy';
+import type { Diagnostics, StdioWrapOptions } from '@agentfuse/proxy';
 import { type ApprovalResolution, resolveApprovalGateway } from './approvals/index.js';
 import { type LoadedPolicy, resolveFromPolicy } from './config.js';
 import {
@@ -171,6 +171,16 @@ export interface Runtime {
    * bound pushed it out.
    */
   readonly onSessionEnd: (summary: SessionSummary) => void;
+  /**
+   * `ToolCallGuardOptions.traceparentFor`, bound — or `undefined`.
+   *
+   * `undefined` whenever there is no OTLP sink, which is the default and every
+   * `telemetry.enabled: false` run: the proxy then forwards the agent's
+   * `traceparent` verbatim, exactly as it did before this existed. With a sink
+   * it returns the span that call was already given, so the guarded server's
+   * work is a child of AgentFuse's span rather than a sibling of it.
+   */
+  readonly traceparentFor: StdioWrapOptions['traceparentFor'];
   /** Releases the semantic layer and the approval socket. Safe to call twice. */
   close(options?: { readonly timeoutMs?: number }): Promise<void>;
 }
@@ -386,6 +396,10 @@ export async function createRuntime(options: RuntimeOptions): Promise<Runtime> {
     onSessionEnd: (summary) => {
       detector?.forget(summary.sessionId);
     },
+    // Bound to the sink or not bound at all: the decision minted the span, and
+    // the guard asks for it by call id just before it forwards.
+    traceparentFor:
+      sink === undefined ? undefined : (_call, decision) => sink.traceparentFor(decision.callId),
     close: async (closeOptions) => {
       if (closed) return;
       closed = true;

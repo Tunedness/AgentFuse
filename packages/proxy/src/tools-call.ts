@@ -88,6 +88,26 @@ export interface ToolCallGuardOptions {
   readonly writeReport?: ((decision: Decision) => string | undefined) | undefined;
   /** Notified when {@link ToolCallGuard.endSession} runs. */
   readonly onSessionEnd?: ((summary: SessionSummary) => void) | undefined;
+  /**
+   * The `traceparent` to put on the request forwarded upstream, in place of the
+   * agent's.
+   *
+   * Without this the guarded server's work is a **sibling** of AgentFuse's own
+   * span rather than its child, so a trace cannot show that the tool call
+   * happened inside the guarded hop. The host is the only party that can close
+   * that: it is the one that mints the span, and it mints it while the decision
+   * is being made — which is why the decision is handed over too, and why the
+   * hook is read after `beforeCall` rather than before it.
+   *
+   * Returning `undefined` — which is also what an unset hook means — forwards
+   * the agent's context verbatim and puts nothing new on the wire. **A host
+   * must never synthesise a value here.** A `traceparent` naming a span nobody
+   * exports grafts a fabricated span onto a real trace, which is worse than no
+   * trace at all; see `FORWARDED_META_KEYS` in `remap.ts`.
+   */
+  readonly traceparentFor?:
+    | ((call: GuardedToolCall, decision: Decision) => string | undefined)
+    | undefined;
 }
 
 /** The gate plus the lifecycle hook the serving entry owns. */
@@ -238,8 +258,15 @@ export function createToolCallGuard(options: ToolCallGuardOptions): ToolCallGuar
     // the failures understates what the agent actually did. Written as two
     // explicit arms rather than a `finally`, so the outcome is definitely
     // assigned on both.
+    // Read here rather than before the decision: the host mints the span while
+    // the decision is emitted, so the identity to re-inject does not exist any
+    // earlier. `undefined` leaves the outbound `_meta` exactly as it is today.
+    const upstreamTraceparent = options.traceparentFor?.(call, decision);
+
     try {
-      const result = await call.forward();
+      const result = await call.forward(
+        upstreamTraceparent === undefined ? undefined : { traceparent: upstreamTraceparent },
+      );
       engine.afterCall(decision.callId, outcomeOfResult(result));
       return result;
     } catch (error) {

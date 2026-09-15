@@ -32,13 +32,23 @@
  * call still gets its event placed in the agent's trace.
  *
  * With no inbound context the span is the root of a trace that starts here: a
- * fresh trace id, no parent, and nothing written back onto the wire. Calls then
- * no longer share a trace id and the correlation key is
- * `tunedness.session_id`, which every span and every event carries regardless.
+ * fresh trace id and no parent. Calls then no longer share a trace id and the
+ * correlation key is `tunedness.session_id`, which every span and every event
+ * carries regardless.
+ *
+ * That identity is also what goes **upstream**. {@link
+ * OtlpTelemetrySink.traceparentFor} renders it as a `traceparent` and
+ * `runtime.ts` hands it to `ToolCallGuardOptions.traceparentFor`, so the
+ * guarded server's own work is a child of this span rather than a sibling of
+ * it. Nothing is fabricated by doing so — the string names a span that is
+ * already on its way to the collector — and with telemetry off there is no
+ * span, no lookup and no override, so the agent's context crosses the proxy
+ * exactly as it does today.
  *
  * `tracestate` and `baggage` are forwarded upstream by the proxy but never
  * reach this package — the engine's record carries `traceparent` and nothing
- * else — so an exported span names its parent and no vendor state.
+ * else — so an exported span names its parent and no vendor state, and the
+ * re-injected `traceparent` travels beside the agent's own `tracestate`.
  *
  * `budget_event` and `loop_detection` carry **no** trace ids. A budget crossing
  * belongs to a session rather than a call, and a loop detection names the
@@ -85,7 +95,13 @@ import {
   strings,
   unixNano,
 } from './otlp.js';
-import { parseTraceparent, type RandomBytes, type SpanContext, spanContextFor } from './trace.js';
+import {
+  formatTraceparent,
+  parseTraceparent,
+  type RandomBytes,
+  type SpanContext,
+  spanContextFor,
+} from './trace.js';
 
 /** The span name every forwarded tool call gets. */
 export const SPAN_NAME = 'mcp.tools/call';
@@ -237,6 +253,21 @@ export class OtlpTelemetrySink implements TelemetrySink {
       source: text(fields, 'source') ?? 'unknown',
       waitMs: asked === undefined ? 0 : Math.max(0, this.#now() - asked),
     });
+  }
+
+  /**
+   * The `traceparent` naming our span for a call, for re-injection upstream.
+   *
+   * `ToolCallGuardOptions.traceparentFor` is bound to this in `runtime.ts`, so
+   * the guarded server's work becomes a child of the proxy's span instead of
+   * its sibling. The identity is the one minted for the decision and is
+   * therefore already on its way to the collector — nothing is fabricated here,
+   * and `undefined` (a call with no span, which is every call when telemetry is
+   * off) leaves the agent's own context on the wire untouched.
+   */
+  traceparentFor(callId: string): string | undefined {
+    const context = this.#contexts.get(callId);
+    return context === undefined ? undefined : formatTraceparent(context);
   }
 
   /** Flushes whatever is queued and stops the exporter. */

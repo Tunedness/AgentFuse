@@ -5,7 +5,11 @@ import { CounterIdGenerator, FuseEngine, parsePolicy } from '@agentfuse/core';
 import { Client } from '@modelcontextprotocol/client';
 import { InMemoryTransport } from '@modelcontextprotocol/server';
 import { afterEach, beforeAll, describe, expect, it } from 'vitest';
-import { RELAYABLE_CLIENT_CAPABILITIES, wrapStdioServer } from './stdio-wrap.js';
+import {
+  RELAYABLE_CLIENT_CAPABILITIES,
+  type StdioWrapOptions,
+  wrapStdioServer,
+} from './stdio-wrap.js';
 
 const FIXTURES = fileURLToPath(new URL('./testing/fixtures/', import.meta.url));
 const WRAP_HOST = `${FIXTURES}wrap-host.mjs`;
@@ -318,7 +322,7 @@ describe('the wrap driven in process', () => {
    * and lands on the test runner's own stderr, where it cannot be captured and
    * would bury every other line.
    */
-  async function inProcessWrap(mode: 'warn' | 'enforce') {
+  async function inProcessWrap(mode: 'warn' | 'enforce', extra: Partial<StdioWrapOptions> = {}) {
     const engine = new FuseEngine(
       parsePolicy({ version: 1, mode, loop_detection: { exact_repeat: { count: 2 } } }),
       { ids: new CounterIdGenerator('session') },
@@ -331,6 +335,7 @@ describe('the wrap driven in process', () => {
       serverName: 'quiet',
       quiet: true,
       transport: downstreamB,
+      ...extra,
     });
     const client = new Client({ name: 'in-process-agent', version: '1.0.0' }, { capabilities: {} });
     await client.connect(downstreamA);
@@ -399,6 +404,26 @@ describe('the wrap driven in process', () => {
     expect(engine.endSession(sessionId ?? '').calls).toBe(0);
     expect(handle.sessionId).toBeUndefined();
 
+    await handle.close();
+  });
+
+  it('hands the traceparent hook down to the guarded path', async () => {
+    const asked: string[] = [];
+    const { handle, client } = await inProcessWrap('warn', {
+      traceparentFor: (call, decision) => {
+        asked.push(`${String(call.request.params.name)}:${decision.callId}`);
+        return undefined;
+      },
+    });
+
+    await client.callTool({ name: 'echo', arguments: { a: 1 } });
+
+    // The seam is the serving entry's to pass through; what it does with the
+    // answer is `tools-call.ts`'s business and is tested there.
+    expect(asked).toHaveLength(1);
+    expect(asked[0]).toMatch(/^echo:/);
+
+    await client.close();
     await handle.close();
   });
 

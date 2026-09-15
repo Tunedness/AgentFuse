@@ -458,6 +458,11 @@ async function serveWrap(options: ServeWrapOptions): Promise<number> {
     writeReport: runtime.writeReport,
     onSessionEnd: runtime.onSessionEnd,
     annotationsFor: catalogue.annotationsFor,
+    // Absent unless telemetry is on, and then it re-parents the guarded
+    // server's work onto AgentFuse's span. See `runtime.traceparentFor`.
+    ...(runtime.traceparentFor !== undefined
+      ? { traceparentFor: runtime.traceparentFor }
+      : undefined),
     ...(options.clientCapabilities !== undefined
       ? { clientCapabilities: options.clientCapabilities }
       : undefined),

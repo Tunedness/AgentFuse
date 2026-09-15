@@ -148,6 +148,24 @@ export function clientInfoOf(meta: MetaBag | undefined): ClientIdentity | undefi
 }
 
 /**
+ * What a caller may put on the outbound `_meta` in place of the agent's value.
+ *
+ * The only member is `traceparent`, and the rule around it is the same one
+ * {@link FORWARDED_META_KEYS} states: nothing here is ever *invented*. A caller
+ * supplies a `traceparent` when it has minted a real span of its own and wants
+ * the guarded server's work to hang beneath it; with no span there is no
+ * override, and the agent's context travels on untouched.
+ *
+ * Deliberately a bag of overrides rather than a `traceparent` parameter: this
+ * module is the one place that knows which `_meta` keys cross the proxy, and a
+ * second key would otherwise arrive as a second positional argument.
+ */
+export interface OutboundMetaOverrides {
+  /** Replaces `traceparent` on the forwarded request. Never fabricated. */
+  readonly traceparent?: string | undefined;
+}
+
+/**
  * The identity and trace keys to graft onto an outbound request's `_meta`.
  *
  * `fallbackClientInfo` fills in `io.modelcontextprotocol/clientInfo` when the
@@ -155,10 +173,16 @@ export function clientInfoOf(meta: MetaBag | undefined): ClientIdentity | undefi
  * `Server` learned the caller's identity from `initialize`. Stamping it onto a
  * legacy-era request is safe: legacy `_meta` is an open bag, and a server that
  * does not read the key is unaffected by its presence.
+ *
+ * `overrides.traceparent`, when given, wins over the agent's — including when
+ * the agent sent none at all, which is how a call that started no trace of its
+ * own still gets one. An absent override leaves the result byte-identical to
+ * what it would be without the parameter.
  */
 export function forwardedMeta(
   meta: MetaBag | undefined,
   fallbackClientInfo?: ClientIdentity | undefined,
+  overrides?: OutboundMetaOverrides | undefined,
 ): Params | undefined {
   const out: Params = {};
   let any = false;
@@ -170,6 +194,11 @@ export function forwardedMeta(
   }
   if (out[CLIENT_INFO_META_KEY] === undefined && fallbackClientInfo !== undefined) {
     out[CLIENT_INFO_META_KEY] = fallbackClientInfo;
+    any = true;
+  }
+  const traceparent = overrides?.traceparent;
+  if (traceparent !== undefined && traceparent !== '') {
+    out[TRACEPARENT_META_KEY] = traceparent;
     any = true;
   }
   return any ? out : undefined;
@@ -211,13 +240,18 @@ export function splitProgressToken(params: Params | undefined): SplitParams {
 /**
  * Builds the params to send upstream: the agent's, with the forwarded `_meta`
  * keys merged over whatever `_meta` survived {@link splitProgressToken}.
+ *
+ * See {@link OutboundMetaOverrides} for what `overrides` may replace. Without
+ * it — the default, and every path but the guarded `tools/call` — the bytes
+ * that go out are exactly the agent's.
  */
 export function upstreamParams(
   params: Params | undefined,
   downstreamMeta: MetaBag | undefined,
   fallbackClientInfo?: ClientIdentity | undefined,
+  overrides?: OutboundMetaOverrides | undefined,
 ): Params | undefined {
-  const forwarded = forwardedMeta(downstreamMeta, fallbackClientInfo);
+  const forwarded = forwardedMeta(downstreamMeta, fallbackClientInfo, overrides);
   if (forwarded === undefined) return params;
   const existing = asBag(params?._meta);
   return { ...params, _meta: { ...existing, ...forwarded } };

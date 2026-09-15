@@ -20,6 +20,8 @@ import {
 } from './remap.js';
 
 const TRACEPARENT = '00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01';
+/** The same trace, a span the proxy minted: what a re-injection looks like. */
+const OVERRIDE_TRACEPARENT = '00-4bf92f3577b34da6a3ce929d0e0e4736-0123456789abcdef-01';
 
 describe('mergeMeta', () => {
   it('is undefined when there is nothing to merge', () => {
@@ -174,6 +176,35 @@ describe('forwardedMeta', () => {
 
     expect(forwarded).toEqual({ [CLIENT_INFO_META_KEY]: { name: 'from-request' } });
   });
+
+  it('lets an override replace the agent’s traceparent', () => {
+    const forwarded = forwardedMeta(
+      { [TRACEPARENT_META_KEY]: TRACEPARENT, [TRACESTATE_META_KEY]: 'vendor=1' },
+      undefined,
+      { traceparent: OVERRIDE_TRACEPARENT },
+    );
+
+    // The trace id is the same in both, so `tracestate` still belongs to the
+    // trace it is forwarded with: only the span being named changed.
+    expect(forwarded).toEqual({
+      [TRACEPARENT_META_KEY]: OVERRIDE_TRACEPARENT,
+      [TRACESTATE_META_KEY]: 'vendor=1',
+    });
+  });
+
+  it('adds a traceparent the agent never sent when one is overridden in', () => {
+    expect(forwardedMeta(undefined, undefined, { traceparent: OVERRIDE_TRACEPARENT })).toEqual({
+      [TRACEPARENT_META_KEY]: OVERRIDE_TRACEPARENT,
+    });
+  });
+
+  it('treats an absent or empty override as no override at all', () => {
+    const meta = { [TRACEPARENT_META_KEY]: TRACEPARENT };
+
+    expect(forwardedMeta(meta, undefined, {})).toEqual(meta);
+    expect(forwardedMeta(meta, undefined, { traceparent: '' })).toEqual(meta);
+    expect(forwardedMeta(undefined, undefined, { traceparent: '' })).toBeUndefined();
+  });
 });
 
 describe('splitProgressToken', () => {
@@ -259,6 +290,30 @@ describe('upstreamParams', () => {
       name: 'echo',
       _meta: { [CLIENT_INFO_META_KEY]: { name: 'claude-code' } },
     });
+  });
+
+  it('carries a traceparent override through', () => {
+    expect(
+      upstreamParams({ name: 'echo' }, { [TRACEPARENT_META_KEY]: TRACEPARENT }, undefined, {
+        traceparent: OVERRIDE_TRACEPARENT,
+      }),
+    ).toEqual({ name: 'echo', _meta: { [TRACEPARENT_META_KEY]: OVERRIDE_TRACEPARENT } });
+  });
+
+  it('is identical with an absent override and with no override argument', () => {
+    // The regression that would hurt: an override seam must cost nothing on the
+    // wire when nobody uses it.
+    const params = { name: 'echo', _meta: { other: 1 } };
+    const meta = { [TRACEPARENT_META_KEY]: TRACEPARENT };
+
+    const bare = { name: 'echo' };
+
+    expect(upstreamParams(params, meta, undefined, undefined)).toEqual(
+      upstreamParams(params, meta),
+    );
+    // Nothing to forward and nothing to override: the agent's own object, not
+    // a copy of it.
+    expect(upstreamParams(bare, undefined, undefined, {})).toBe(bare);
   });
 });
 

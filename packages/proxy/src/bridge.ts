@@ -65,6 +65,7 @@ import type { MetaBag } from './era.js';
 import {
   type ClientIdentity,
   mergeMeta,
+  type OutboundMetaOverrides,
   type Params,
   RequestRemap,
   splitProgressToken,
@@ -109,8 +110,15 @@ export interface GuardedToolCall {
    *
    * Calling it is the decision: a gate that returns without calling it has
    * blocked the call, and nothing reached the guarded server.
+   *
+   * `overrides` is how a gate that minted a span of its own re-parents the
+   * guarded server's work beneath it. Called with nothing — which is every
+   * other forwarded method, and the guarded path whenever there is no span —
+   * the outbound `_meta` is the agent's, byte for byte. This parameter does not
+   * let the gate rewrite the agent's *request*: see
+   * {@link OutboundMetaOverrides} for the one key it reaches.
    */
-  forward(): Promise<CallToolResult>;
+  forward(overrides?: OutboundMetaOverrides): Promise<CallToolResult>;
 }
 
 /**
@@ -209,7 +217,8 @@ export function createBridge(options: BridgeOptions): Bridge {
    *   downstream, related to the originating request so Streamable HTTP can
    *   place it;
    * - the agent's identity and trace context are grafted onto the outbound
-   *   `_meta`, so the guarded server sees the real caller;
+   *   `_meta`, so the guarded server sees the real caller — unless the caller
+   *   supplied an override, which only the guarded `tools/call` path does;
    * - the handler's `AbortSignal` is chained in, which is what makes
    *   `notifications/cancelled` propagate across the proxy;
    * - the in-flight entry is released in a `finally`, so no path — result,
@@ -220,9 +229,10 @@ export function createBridge(options: BridgeOptions): Bridge {
     rawParams: Params | undefined,
     ctx: ServerContext,
     meta: MetaBag | undefined,
+    overrides?: OutboundMetaOverrides | undefined,
   ): Promise<Result> => {
     const { params, progressToken } = splitProgressToken(rawParams);
-    const outbound = upstreamParams(params, meta, handshakeClientInfo());
+    const outbound = upstreamParams(params, meta, handshakeClientInfo(), overrides);
     const downstreamRequestId = ctx.mcpReq.id;
     remap.begin(downstreamRequestId, progressToken);
 
@@ -277,8 +287,8 @@ export function createBridge(options: BridgeOptions): Bridge {
       request,
       ctx,
       meta,
-      forward: async () => {
-        const result = await forward('tools/call', request.params as Params, ctx, meta);
+      forward: async (overrides) => {
+        const result = await forward('tools/call', request.params as Params, ctx, meta, overrides);
         if (!isCallToolResult(result)) {
           throw new Error(
             `The upstream server answered tools/call with something that is not a CallToolResult: ${JSON.stringify(result).slice(0, 200)}`,

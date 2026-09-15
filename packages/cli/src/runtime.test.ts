@@ -534,6 +534,47 @@ describe('the telemetry port', () => {
     expect(spans[0]?.traceId).toBe('a'.repeat(32));
     expect(spans[0]?.parentSpanId).toBe('b'.repeat(16));
   });
+
+  it('binds traceparentFor only when there is a sink to ask', async () => {
+    const seen = recorder();
+    const off = await createRuntime({
+      loaded: policyFile('version: 1\nloop_detection:\n  semantic:\n    provider: none\n'),
+      context: context(),
+      telemetry: { fetch: seen.fetch },
+    });
+
+    // Telemetry off: the proxy gets no hook, so the agent's `traceparent`
+    // crosses the wrap verbatim, exactly as it did before the seam existed.
+    expect(off.traceparentFor).toBeUndefined();
+    await off.close();
+
+    const runtime = await createRuntime({
+      loaded: policyFile(TELEMETRY_POLICY('http://127.0.0.1:4318')),
+      context: context(),
+      telemetry: { fetch: seen.fetch },
+    });
+    const traceparent = `00-${'a'.repeat(32)}-${'b'.repeat(16)}-01`;
+    const decision = await runtime.engine.beforeCall({
+      sessionId: 'S1',
+      serverName: 'fs',
+      toolName: 'read_file',
+      args: {},
+      traceparent,
+    });
+
+    // The span the decision minted, named for the request going upstream: same
+    // trace as the agent's, our span id, and not the agent's own.
+    const injected = runtime.traceparentFor?.({} as never, decision);
+    expect(injected).toMatch(new RegExp(`^00-${'a'.repeat(32)}-[0-9a-f]{16}-01$`));
+    expect(injected).not.toContain('b'.repeat(16));
+
+    runtime.engine.afterCall(decision.callId, {
+      isError: false,
+      resultSummary: 'ok',
+      resultBytes: 2,
+    });
+    await runtime.close();
+  });
 });
 
 describe('the semantic layer', () => {

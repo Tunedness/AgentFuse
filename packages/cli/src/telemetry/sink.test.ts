@@ -202,6 +202,29 @@ describe('trace context', () => {
     expect(records[0]?.traceId).toBe(TRACE_ID);
   });
 
+  it('hands the minted span back as a traceparent, for the upstream request', async () => {
+    inbound.set('C1', TRACEPARENT);
+    sink.emit(decision({ action: 'allow' }));
+
+    const injected = sink.traceparentFor('C1');
+    const { spans } = await exported(call());
+
+    // What the wrapped server is told, and what the collector is told, are the
+    // same span: the guarded server's work hangs beneath ours.
+    expect(injected).toBe(`00-${TRACE_ID}-${String(spans[0]?.spanId)}-01`);
+  });
+
+  it('has no traceparent for a call it never minted a span for', async () => {
+    // Which is every call when telemetry is off — there is no sink at all then
+    // — and any call whose context has already been consumed or evicted.
+    expect(sink.traceparentFor('never-seen')).toBeUndefined();
+
+    sink.emit(decision({ action: 'allow' }));
+    sink.emit(call());
+
+    expect(sink.traceparentFor('C1')).toBeUndefined();
+  });
+
   it('keeps the call context map bounded', async () => {
     const small = new OtlpTelemetrySink({ exporter, capacity: 2 });
     for (const callId of ['a', 'b', 'c']) small.emit(decision({ callId, action: 'deny' }));

@@ -85,7 +85,7 @@ const DEFAULT_CLIENT_INFO: Implementation = { name: 'agentfuse', version: '0.0.0
 export interface StdioWrapOptions
   extends Pick<
     ToolCallGuardOptions,
-    'engine' | 'serverName' | 'annotationsFor' | 'writeReport' | 'onSessionEnd'
+    'engine' | 'serverName' | 'annotationsFor' | 'writeReport' | 'onSessionEnd' | 'traceparentFor'
   > {
   /** The executable to run. */
   readonly command: string;
@@ -221,6 +221,9 @@ export function wrapStdioServer(options: StdioWrapOptions): StdioWrapHandle {
         ...(options.writeReport !== undefined ? { writeReport: options.writeReport } : undefined),
         ...(options.onSessionEnd !== undefined
           ? { onSessionEnd: options.onSessionEnd }
+          : undefined),
+        ...(options.traceparentFor !== undefined
+          ? { traceparentFor: options.traceparentFor }
           : undefined),
       });
 

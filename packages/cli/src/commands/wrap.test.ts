@@ -419,6 +419,22 @@ describe('what the serving entry is handed', () => {
 
     expect('clientCapabilities' in harness.seen()).toBe(false);
     expect('requestTimeoutMs' in harness.seen()).toBe(false);
+    // Telemetry is off in this policy, so there is no span to re-parent the
+    // guarded server's work onto and the hook is not handed over at all.
+    expect('traceparentFor' in harness.seen()).toBe(false);
+
+    harness.host.stdin.emit('close');
+    await harness.exitCode;
+  });
+
+  it('hands over the traceparent hook once telemetry is on', async () => {
+    policyPath = writePolicy(
+      `${PLAIN_POLICY}telemetry:\n  enabled: true\n  otlp_endpoint: http://127.0.0.1:4318\n`,
+    );
+    const harness = start(['--policy', policyPath, '--', 'node', 'server.mjs']);
+    await until(() => hasServed(harness), 'the serving entry');
+
+    expect(typeof harness.seen().traceparentFor).toBe('function');
 
     harness.host.stdin.emit('close');
     await harness.exitCode;

@@ -64,6 +64,7 @@ export {
 export type {
   ClientIdentity,
   ForwardedRequest,
+  OutboundMetaOverrides,
   Params,
   ProgressToken,
   SplitParams,

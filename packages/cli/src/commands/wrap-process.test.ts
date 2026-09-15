@@ -51,6 +51,9 @@ const STARTUP_NOISE = Buffer.concat([
 /** Bytes it writes on every `tools/call`. */
 const CALL_NOISE = Buffer.from([0x2e, 0x00, 0x2e]);
 
+/** A W3C trace context as an agent would send it. */
+const AGENT_TRACEPARENT = '00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01';
+
 let root: string;
 let policyPath: string;
 
@@ -160,6 +163,31 @@ describe.runIf(built)('a real wrap, end to end', () => {
     // The session summary is the proof the call was metered rather than merely
     // forwarded. It is only written when AgentFuse is not quiet, so the count
     // is checked through a second run below.
+  });
+
+  it('forwards the agent’s trace context untouched with telemetry off', async () => {
+    // The regression that would hurt. Telemetry is off by default (umbrella
+    // ADR-003), so there is no span to re-parent onto, and the bytes the
+    // wrapped server sees have to be the agent's own — `_meta` and all.
+    const agent = startWrap({ env: { FIXTURE_ECHO_META: '1' } });
+    try {
+      await agent.initialize();
+      const called = await agent.call('tools/call', {
+        name: 'echo',
+        arguments: { greeting: 'hello' },
+        _meta: { traceparent: AGENT_TRACEPARENT, tracestate: 'vendor=1', baggage: 'a=1' },
+      });
+
+      const echoed = JSON.parse(textOf(called)) as { _meta: Record<string, string> };
+      expect(echoed._meta.traceparent).toBe(AGENT_TRACEPARENT);
+      expect(echoed._meta.tracestate).toBe('vendor=1');
+      expect(echoed._meta.baggage).toBe('a=1');
+
+      agent.endInput();
+      expect((await agent.exit()).code).toBe(0);
+    } finally {
+      await agent.dispose();
+    }
   });
 
   it('reports one call in the session summary', async () => {
@@ -430,8 +458,9 @@ describe.runIf(built)('a real wrap with telemetry switched on', () => {
     await collector.close();
   });
 
-  it('puts the span in the agent’s trace and leaves the wire context alone', async () => {
+  it('puts the span in the agent’s trace and hands it to the wrapped server', async () => {
     const agent = startWrap({ env: { FIXTURE_ECHO_META: '1' } });
+    let echoedTraceparent: string | undefined;
     try {
       await agent.initialize();
       const called = await agent.call('tools/call', {
@@ -440,12 +469,8 @@ describe.runIf(built)('a real wrap with telemetry switched on', () => {
         _meta: { traceparent: TRACEPARENT },
       });
 
-      // The wrapped server sees the agent's context, forwarded by the proxy and
-      // not rewritten: AgentFuse's span is a child of the agent's span, and
-      // the upstream call stays a sibling rather than being re-parented onto a
-      // context AgentFuse invented.
       const echoed = JSON.parse(textOf(called)) as { _meta: Record<string, string> };
-      expect(echoed._meta.traceparent).toBe(TRACEPARENT);
+      echoedTraceparent = echoed._meta.traceparent;
 
       agent.endInput();
       expect((await agent.exit()).code).toBe(0);
@@ -462,10 +487,38 @@ describe.runIf(built)('a real wrap with telemetry switched on', () => {
     // overwrite the caller's own span in every backend.
     expect(span?.spanId).not.toBe(PARENT_SPAN);
 
+    // And the wrapped server was told about *that* span, so its own work is a
+    // child of the guarded hop rather than a sibling of it. Same trace, our
+    // span id, the agent's sampling flag: nothing invented, and the one string
+    // on the wire names a span this run actually exported.
+    expect(echoedTraceparent).toBe(`00-${TRACE_ID}-${span?.spanId}-01`);
+
     const names = collector.logRecords.map((entry) => entry.eventName);
     expect(names).toContain('tunedness.tool_call');
     // Four types, and no more, whatever a session does.
     expect([...new Set(names)].every((name) => String(name).startsWith('tunedness.'))).toBe(true);
+  });
+
+  it('roots the upstream context too when the agent sent none', async () => {
+    const agent = startWrap({ env: { FIXTURE_ECHO_META: '1' } });
+    let echoedTraceparent: string | undefined;
+    try {
+      await agent.initialize();
+      const called = await agent.call('tools/call', { name: 'echo', arguments: {} });
+      echoedTraceparent = (JSON.parse(textOf(called)) as { _meta?: Record<string, string> })._meta
+        ?.traceparent;
+
+      agent.endInput();
+      await agent.exit();
+    } finally {
+      await agent.dispose();
+    }
+
+    await collector.waitFor(() => collector.spans.length > 0);
+    const [span] = collector.spans;
+    // The trace starts here, and the wrapped server joins it. Still not a
+    // fabrication: the span is on its way to the collector as this is asserted.
+    expect(echoedTraceparent).toBe(`00-${span?.traceId}-${span?.spanId}-01`);
   });
 
   it('roots a trace here when the agent sent no context, and names the session', async () => {

@@ -427,6 +427,130 @@ describe('the session lifecycle', () => {
   });
 });
 
+describe('the traceparent the guarded server is forwarded', () => {
+  /** The host's span: same trace as the agent's, a span id of its own. */
+  const OURS = '00-4bf92f3577b34da6a3ce929d0e0e4736-0123456789abcdef-01';
+
+  /** The `_meta` the scenario server saw on the last `tools/call`. */
+  function lastMeta(): Record<string, unknown> {
+    return (harness?.log.metas.at(-1) ?? {}) as Record<string, unknown>;
+  }
+
+  it('is the host’s span when the hook names one', async () => {
+    const { engine } = engineFor({ version: 1 });
+    const guard = createToolCallGuard({
+      engine,
+      serverName: 'scenario',
+      sessionId: SESSION,
+      traceparentFor: () => OURS,
+    });
+    harness = await createHarness({ onToolCall: guard.gate });
+
+    await harness.client.callTool({
+      name: 'echo',
+      arguments: {},
+      _meta: { [TRACEPARENT_META_KEY]: TRACEPARENT },
+    });
+
+    // The point of the seam: the guarded server's work is a child of the
+    // proxy's span, not a sibling of it.
+    expect(lastMeta()[TRACEPARENT_META_KEY]).toBe(OURS);
+  });
+
+  it('is added even when the agent sent no context at all', async () => {
+    const { engine } = engineFor({ version: 1 });
+    const guard = createToolCallGuard({
+      engine,
+      serverName: 'scenario',
+      sessionId: SESSION,
+      traceparentFor: () => OURS,
+    });
+    harness = await createHarness({ onToolCall: guard.gate });
+
+    await harness.client.callTool({ name: 'echo', arguments: {} });
+
+    expect(lastMeta()[TRACEPARENT_META_KEY]).toBe(OURS);
+  });
+
+  it('sees the decision it is about, which is where the span id comes from', async () => {
+    const { engine } = engineFor({ version: 1 });
+    const seen: { tool?: string; callId?: string } = {};
+    const guard = createToolCallGuard({
+      engine,
+      serverName: 'scenario',
+      sessionId: SESSION,
+      traceparentFor: (call, decision) => {
+        seen.tool = call.request.params.name;
+        seen.callId = decision.callId;
+        return undefined;
+      },
+    });
+    harness = await createHarness({ onToolCall: guard.gate });
+
+    await harness.client.callTool({ name: 'echo', arguments: {} });
+
+    // The host mints the span while the decision is emitted, so the hook is
+    // read after `beforeCall` and is handed the call id to look it up by.
+    expect(seen.tool).toBe('echo');
+    expect(seen.callId).toBe('id000000000000000000000001');
+  });
+
+  it('leaves the agent’s bytes untouched with no hook and with an undecided one', async () => {
+    // The regression that would hurt: telemetry off, or a call with no span,
+    // has to look exactly like it did before the seam existed.
+    const { engine } = engineFor({ version: 1 });
+    const unhooked = createToolCallGuard({ engine, serverName: 'scenario', sessionId: SESSION });
+    harness = await createHarness({ onToolCall: unhooked.gate });
+
+    await harness.client.callTool({
+      name: 'echo',
+      arguments: {},
+      _meta: { [TRACEPARENT_META_KEY]: TRACEPARENT },
+    });
+    const withoutHook = lastMeta();
+    await harness.close();
+
+    const hooked = createToolCallGuard({
+      engine,
+      serverName: 'scenario',
+      sessionId: 'second-session',
+      traceparentFor: () => undefined,
+    });
+    harness = await createHarness({ onToolCall: hooked.gate });
+
+    await harness.client.callTool({
+      name: 'echo',
+      arguments: {},
+      _meta: { [TRACEPARENT_META_KEY]: TRACEPARENT },
+    });
+
+    expect(withoutHook[TRACEPARENT_META_KEY]).toBe(TRACEPARENT);
+    expect(lastMeta()).toEqual(withoutHook);
+  });
+
+  it('is not consulted for a call the engine blocked', async () => {
+    const { engine } = engineFor(repeatTrippingPolicy());
+    let asked = 0;
+    const guard = createToolCallGuard({
+      engine,
+      serverName: 'scenario',
+      sessionId: SESSION,
+      traceparentFor: () => {
+        asked += 1;
+        return OURS;
+      },
+    });
+    harness = await createHarness({ onToolCall: guard.gate });
+
+    await harness.client.callTool({ name: 'echo', arguments: {} });
+    const blocked = await harness.client.callTool({ name: 'echo', arguments: {} });
+
+    // Nothing was forwarded, so there is no outbound request to re-parent.
+    expect(blocked.isError).toBe(true);
+    expect(asked).toBe(1);
+  });
+});
+
 describe('the refusal crosses both eras intact', () => {
   it.each(['legacy', 'modern'] as const)('in the %s era', async (era) => {
     const { engine } = engineFor(repeatTrippingPolicy());
