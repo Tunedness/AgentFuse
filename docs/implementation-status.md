@@ -1,9 +1,9 @@
 # AgentFuse — uygulama durumu ve devir notu
 
-**Son güncelleme:** 2026-09-16 · **`main`'deki son kod commit'i:** `a92f06d`
-(`main` HEAD bunu izleyen bu doküman commit'i) · **Durum:** Faz 8 bitti ve
-Faz 7/8'den kalan iki boşluk kapatıldı; kritik yolda sırada Faz 9, paralelde
-Faz 4
+**Son güncelleme:** 2026-09-16 · **`main`'deki son kod commit'i:** `146b709`
+(`main` HEAD bunu izleyen bu doküman commit'i) · **Durum:** Faz 4 bitti;
+geriye Faz 9 (benchmark'lar + eşik kalibrasyonu) ve Faz 10 (doküman + v0.1.0)
+kaldı
 
 Bu dosya, işi başka bir oturumda kaldığı yerden sürdürebilmek için tutulur.
 Ürün tanımı burada değil — tek doğruluk kaynağı `../.ssot/PRD.md` ve
@@ -21,7 +21,7 @@ dosyasındadır.
 | 1 | Workspace iskeleti | **Bitti** — `2e2c4a4` |
 | 2 | Çekirdek karar motoru | **Bitti** — `c5fa5d1` |
 | 3 | Asenkron semantik döngü katmanı | **Bitti** — `abd96d8` |
-| 4 | `@agentfuse/embeddings-local` | Başlanmadı |
+| 4 | `@agentfuse/embeddings-local` | **Bitti** — `97c836c` `f999fb9` `146b709` |
 | 5 | `@agentfuse/proxy` (MCP adaptörü) | **Bitti** — `ebce8f0` |
 | 6 | CLI (`agentfuse`) | **Bitti** — 6a: `373c240` `f503322` `58741ba` `c80c4db` · 6b: `54d858e` `19c96f8` `7447c48` |
 | 7 | Onay akışı + rapor UX | **Bitti** — `84b903e` `935146d` `a7a8ddc` |
@@ -40,23 +40,28 @@ kritik yol: 0-1-2-5-6-9-10
 ### `main` yeşil — 2026-09-16'da bizzat koşuldu
 
 ```
-npm run lint          → Checked 187 files. No fixes applied. (exit 0)
+npm run lint          → Checked 204 files. No fixes applied. (exit 0)
 npm run typecheck     → temiz (tsc -b && tsc -p tsconfig.test.json)
 npm run build         → temiz
-npm test              → Test Files 65 passed · Tests 1527 passed (~6 s)
+npm test              → Test Files 74 passed · Tests 1614 passed | 1 skipped (~7,7 s)
 npm run schema:check  → schema up to date
 ```
 
-Faz 8 sonundaki sayılar 64 dosya / 1472 test idi; iki boşluğu kapatan çalışma
-bir dosya (`core/src/util/text.test.ts`) ve 55 test ekledi. Yeniden yazılan
-testler onay kapılarının dönüş tipini izliyor: `requestApproval` artık bir
-nesne döndürdüğü için `resolves.toBe('approved')` diyen her iddia
-`toEqual({ verdict: … })` oldu, ve `wrap-process.test.ts`'in "sarılan sunucu
-ajanın bağlamını değişmeden görüyor" testi artık tersini — bizim span'imizi
-gördüğünü — pinliyor. `lint` çıktısındaki 42 `info` (`useLiteralKeys`) Faz
-7'den beri aynı ve exit 0'ı etkilemiyor. Yeni üç `biome-ignore` var, üçü de
-`noControlCharactersInRegex` için ve gerekçesi aynı: kontrol karakterlerini
-eşlemek o regex'in tek işi.
+Faz 4 öncesindeki sayılar 65 dosya / 1527 test idi; bu faz dokuz dosya ve 88
+test ekledi, bir tanesini (`index.test.ts` stub testi) sildi. **Atlanan tek
+test** `model.test.ts`'teki soğuk indirme; `AGENTFUSE_TEST_DOWNLOAD=1`
+olmadan koşmuyor — aşağıya bakın. `lint` çıktısındaki 42 `info`
+(`useLiteralKeys`) Faz 7'den beri aynı ve exit 0'ı etkilemiyor. Faz 4 yeni
+`biome-ignore` eklemedi.
+
+Değişen tek CLI dosyası `packages/cli/src/embeddings.test.ts`, ve değişmek
+zorundaydı: "gerçek loader" testi, depo içinde çözülen paketin
+`createEmbeddingProvider` export etmediğini pinliyordu — Faz 6a Faz 1'in
+stub'ını doğru pinlemişti. Artık iki factory'nin de orada olduğunu ve
+`loadInstaller`'ın gerçeğini bulduğunu pinliyor. Factory'yi **çağırmıyor**:
+çağırmak 23 MB'lık modeli ve ORT'yi yüklerdi, bu süit ise offline koşar.
+`packages/cli/src/embeddings.ts` ve `commands/models.ts` hiç değişmedi —
+kontrat zaten doğru yazılmıştı, Faz 4 onu karşıladı.
 
 Coverage kapısı `vitest.config.ts` içinde `packages/core/src/**` için %90'da ve
 **gerçekten zorluyor** (Faz 2'de 100'e çekilip kasten kırılarak doğrulandı).
@@ -67,17 +72,25 @@ Bu çalışmanın sonundaki ölçümler (`coverage/lcov.info` üzerinden, glob b
 | `packages/core/src/**` (kapılı) | %99.89 | %100 | %95.65 |
 | `packages/proxy/src/**` (kapısız) | %98.90 | %100 | %91.51 |
 | `packages/cli/src/**` (kapısız) | %99.93 | %100 | %99.52 |
+| `packages/embeddings-local/src/**` (kapısız) | %98.03 | %96.55 | %87.25 |
 
-Üç paket de Faz 8 sonundaki rakamının (99.89/100/95.45, 98.88/100/91.18,
-99.93/100/99.51) üstünde ya da eşit; core ve proxy ilk kez Faz 6a'dan beri
-değişti. `telemetry/` dizini dört metrikte de **%100** kaldı.
+İlk üçü Faz 8 sonrası "iki boşluk" çalışmasındaki rakamlarının **birebir
+aynısı** — Faz 4 o üç pakete dokunmadı (tek istisna bir CLI *testi*, ki
+coverage'a girmiyor). `telemetry/` dizini dört metrikte de **%100** kaldı.
 
-Metin reporter'ının satırları: `core/src` %98.31 / %96.46 / %100 / %99.36,
-`proxy/src` %98.46 / %91.17 / %100 / %98.87, `cli/src` %99.47 / %98.84 / %100 /
-%99.80, `cli/src/commands` %100 / %99.58 / %100 / %100. `cli/src/approvals` ve
-`cli/src/telemetry` tabloda **hiç görünmüyor**, çünkü v8'in metin reporter'ı
-her dosyası %100 olan dizini listelemiyor. "All files" %99.48 / %96.95 / %100 /
-%99.78 (Faz 7 sonunda %99.43 / %96.62 / %100 / %99.76).
+`embeddings-local` kapısız ve kapıya alınmadı: kapı bilinçli olarak yalnız
+`core`'da, çünkü ürünün güvenlik ağı orası. Kapalı kalan satırlar iki türden:
+`?? process.env` biçimindeki savunma varsayılanları, ve `session.ts`'te ORT'nin
+beklenmedik bir çıktı verdiği iki yol (`last_hidden_state` yok, ya da float32
+değil) — ikincisini test etmek gerçek bir ONNX grafiği üretmeyi gerektirirdi.
+
+Metin reporter'ının satırları: `core/src` %98.37 / %96.87 / %100 / %99.39,
+`proxy/src` %98.48 / %91.50 / %100 / %98.89, `cli/src` %99.47 / %98.84 / %100 /
+%99.80, `cli/src/commands` %100 / %99.59 / %100 / %100,
+`embeddings-local/src` %97.29 / %87.25 / %96.55 / %98.02. `cli/src/approvals`
+ve `cli/src/telemetry` tabloda **hiç görünmüyor**, çünkü v8'in metin reporter'ı
+her dosyası %100 olan dizini listelemiyor. "All files" %99.34 / %96.55 / %99.84
+/ %99.66.
 
 **`main.ts` metin reporter'ında %0 görünür ve bu beklenen.** Dosya tek bir
 top-level `await run(...)` ifadesidir ve gerçek stream'leri bağlar; yalnızca
@@ -166,7 +179,7 @@ Paket manifest'lerinde zorlanıyor, konvansiyona bırakılmıyor:
 | `@agentfuse/core` | `zod` **yalnızca** |
 | `@agentfuse/proxy` | `@agentfuse/core` + `@modelcontextprotocol/{server,client,core}` |
 | `agentfuse` | `@agentfuse/core`, `@agentfuse/proxy`, `yaml`, `gpt-tokenizer` |
-| `@agentfuse/embeddings-local` | (Faz 4'te dolacak) |
+| `@agentfuse/embeddings-local` | `@agentfuse/core`, `onnxruntime-node`, `@huggingface/tokenizers` (Faz 4) |
 
 **`core` saftır:** `@modelcontextprotocol/*` yok, `@agentfuse/embeddings-local`
 yok, `node:fs`/`net`/`child_process` yok. `node:crypto` kabul. Zaman enjekte
@@ -399,9 +412,11 @@ result: <özet, en çok 256 karakter>
 
 ### Sonraki fazlara bırakılan notlar
 
-- **Faz 4:** `EmbeddingProvider` dokunulmadı. `HashingProvider`, gerçek backend'in
-  geçmesi gereken davranış testlerinin de şablonu (`hashing-provider.test.ts`
-  içindeki "behaves plausibly" blokları).
+- **Faz 4 (yapıldı):** `EmbeddingProvider` dokunulmadı. `HashingProvider`, gerçek
+  backend'in geçmesi gereken davranış testlerinin de şablonuydu
+  (`hashing-provider.test.ts` içindeki "behaves plausibly" blokları) ve
+  `model.test.ts` aynı özellikleri gerçek modelde pinliyor. İkisi de aynı porta
+  yazdığı için yan yana duruyorlar: CI dublörle koşuyor, kalibrasyon gerçeğiyle.
 - **Faz 6** (Faz 5'te değil — proxy motoru kurmuyor, kendisine verileni
   kullanıyor): dedektör `attachSemanticLoopDetector({ host: engine, provider,
   clock, telemetry })` ile bağlanır; oturum kapanışında `forget()`, kapanışta
@@ -421,6 +436,307 @@ result: <özet, en çok 256 karakter>
   maskelemeden muaf, ama sonuç metni de değişmeli), N benzer dosyanın toplu
   düzenlenmesi, yakınsayan build-test döngüsü. `lastScore()` ve
   `loop_detection.windowScore` olayı taramanın okuma noktaları.
+
+---
+
+## Faz 4 — `@agentfuse/embeddings-local` (bitti)
+
+Üç commit: `97c836c` core'a bağlanma + model + sağlayıcı, `f999fb9` indirme
+kapısı + disiplin testleri, `146b709` CI'ın çekmediği CUDA çalışma zamanı.
+`packages/embeddings-local/src` ağacı:
+
+```
+index.ts            — yalnız yeniden export + BACKEND_ID + sürüm
+models.ts           — pinlenmiş model tablosu (revision + sha256 + boyut)
+cache.ts            — cache kökü, yerleşim, sha256 doğrulaması
+download.ts         — offline kapısı, sınırlı indirme, atomik rename
+install.ts          — installModel + ensureModelFiles
+create.ts           — createEmbeddingProvider + tokenizer yüklemesi
+batch.ts            — packBatch + meanPool (saf, ORT'siz)
+provider.ts         — LocalEmbeddingProvider (core'un portu)
+session.ts          — ORT adaptörü; onnxruntime-node'a dokunan TEK dosya
+```
+
+Ürün yüzeyi ikiye indirgenir ve şeklini `packages/cli/src/embeddings.ts`
+belirler: `createEmbeddingProvider({ model })` ve
+`installModel({ model, onProgress? })`. Faz 1'in `EmbeddingBackend` arayüzü
+silindi, yerine core'un dondurulmuş `EmbeddingProvider`'ı geldi; tsconfig
+`references` artık `../core`'u gösteriyor.
+
+### Havuzlama tarifi — sessizce yanlış olabilecek tek yer
+
+`last_hidden_state` üzerinde **attention mask uygulanmış ortalama havuzlama**,
+ardından **L2 normalizasyon**. `all-MiniLM-L6-v2`'nin sentence-transformers
+yapılandırması `pooling_mode_mean_tokens`; bu checkpoint'in `[CLS]` konumu
+cümle temsili olarak hiç eğitilmedi. Yani bariz görünen alternatif —
+`last_hidden_state[:, 0]` — 384 tane sonlu, birim uzunlukta ve **anlamsız**
+sayı üretir. Her testin şekil kontrolü yaptığı bir dünyada bu hata geçer ve
+Faz 9 eşiklerini gürültüye kalibre eder.
+
+Taşıyıcı olan şey **maskenin toplama uygulanması**. Token sayısına bölme
+değil: hemen ardından L2 normalizasyon geliyor ve pozitif bir sabitle ölçekleme
+yönü değiştirmiyor, yani mean pooling ile sum pooling aynı birim vektörü
+veriyor. Bölme tarifin parçası olduğu için duruyor; bir okuyucu "vektörleri
+sessizce bozacak satır" ararsa bölmeye değil, maskeli `continue`'ya bakmalı.
+
+**L2 normalizasyon süs değil.** Faz 3'ün kapalı form pencere skoru
+`(‖S‖² − W) / (W · (W − 1))` ancak birim vektörlerde ortalama ikili kosinüs
+oluyor. Her çıktının normu testle pinli (`toBeCloseTo(1, 5)`), hem sahte
+oturumda hem gerçek modelde.
+
+Kenar durumlar `HashingProvider` ile aynı kararı veriyor: tümüyle maskelenmiş
+bir satır ya da sıfır hidden state, sıfır vektör yerine kendi baz yönünü alıyor
+(`e₀`). Sıfır vektör her kosinüsü NaN yapar ve tüm pencereyi zehirler.
+
+**Kesme (truncation) son `[SEP]`'i koruyor.** Kodlama `[CLS] t₁ … tₙ [SEP]`
+olarak geliyor; `maxTokens`'ta kesip son konuma `[SEP]` yazmak tek dizi için
+"longest_first" kesmesinin yaptığı şey. `maxTokens` 512 değil **256**, çünkü
+model sentence-transformers ile `max_seq_length: 256` ile eğitildi. Padding
+batch'in en uzun satırına yapılıyor, `maxTokens`'a değil.
+
+### int8 nicemleme batch'e duyarlı — Faz 9'un bilmesi gereken sayı
+
+`model_quantized.onnx` **dinamik nicemlenmiş**: aktivasyon ölçeği tüm girdi
+tensörü üzerinden türetiliyor, yani bir metin farklı komşularla batch'lendiğinde
+biraz farklı dönüyor. Ölçülen en kötü hâl: aynı metnin tek başına ve altılık bir
+batch içindeki vektörleri arasında **kosinüs 0.9983**. Aynı batch içinde aynı
+girdi bit-birebir aynı.
+
+Bu, bu vektörler üzerinde hesaplanan bir skorun **anlam tabanı ±0.002**
+demektir. Faz 9 bundan ince bir çözünürlükte eşik kalibre etmemeli. Kaçınmanın
+tek yolu fp32 export'a (≈90 MB) geçmek olurdu; ADR-003 int8 dedi ve bu faz o
+kararı yeniden açmadı.
+
+Not: Faz 3'ün sürüklenme bölümü "`threshold`'un 1e-3 çözünürlüğü" diyor. O cümle
+**bizim aritmetiğimiz** hakkında ve hâlâ doğru; buradaki ±0.002 modelin kendi
+özelliği ve daha büyük. İkisi çelişmiyor, ama kalibrasyonda bağlayıcı olan
+ikincisi.
+
+### Model, cache yerleşimi ve sha256 pinleme
+
+Model `Xenova/all-MiniLM-L6-v2`, revision `751bff37…` (HF'nin `main`'i hareketli
+bir branch olduğu için commit sha'sı URL'e gömülü). Üç dosya indiriliyor:
+
+| Dosya | Boyut | Neden |
+| --- | --- | --- |
+| `onnx/model_quantized.onnx` | 22 972 370 B | int8 grafik |
+| `tokenizer.json` | 711 661 B | WordPiece tanımı |
+| `tokenizer_config.json` | 366 B | `Tokenizer` yapıcısının ikinci argümanı |
+
+Toplam **23 684 397 B (≈23,7 MB)**. Üçünün de sha256'sı `models.ts`'te sabit.
+
+Yerleşim:
+
+```
+<cache kökü>/agentfuse/models/<owner>--<model>/<revision>/<dosya>
+```
+
+- Kök sırası: açık `cacheDir` seçeneği → `AGENTFUSE_CACHE_DIR` →
+  `XDG_CACHE_HOME/agentfuse` → `~/.cache/agentfuse`. Boş dize "ayarlanmamış"
+  sayılıyor; `export XDG_CACHE_HOME=` yazan bir kabuk cache'i `/agentfuse`'a
+  göndermesin diye.
+- **Revision bir dizin adımı**, dosya adının parçası değil: modeli yeniden
+  pinlemek eskisinin yanına yazar, üstüne değil. Bisect, downgrade ve tek
+  makinede iki checkout bundan sonra da çalışır.
+- `/` → `--`: hem repo başına tek dizin, hem de bir id'nin `..` ile kökten
+  çıkamaması. Zaten yalnız pinli id'ler buraya ulaşıyor; bu kapalı kapının
+  ikinci kilidi.
+
+**Tabloda olmayan bir model id'si reddediliyor.** "Elimizde digest yoksa
+doğrulamadan geç" bir kapı değildir. Gerçekçi sebep politika dosyasındaki bir
+yazım hatası olduğu için mesaj bilinen id'leri listeliyor.
+
+### İndirme bir kapı olarak yazıldı
+
+Karşı taraftaki baytlar birazdan native bir çıkarım çalışma zamanına
+verilecek, yani düşmanca kabul ediliyor. Sırayla:
+
+1. **`AGENTFUSE_OFFLINE=1` duvar**, ipucu değil: soket açılmadan önce
+   reddediyor ve mesaj hem değişkenin adını hem aradığı yolu yazıyor. Önlediği
+   şey belirsiz hata: "offline çalışıyor" diye otuz saniyelik bir DNS timeout'u.
+   `0` ve boş dize kapalı sayılıyor, başka her değer açık.
+2. **Boyut sınırı pinin kendisi.** Beklenen bayt sayısı tavan; daha uzun bir
+   gövde akış ortasında `AbortController` ile kesiliyor, belleğe alınıp sonra
+   reddedilmiyor. Sonsuz bir gövde diski de dolduramıyor.
+3. **Geçici dosya hedef dizinde** ve rastgele sonekli. Aynı dizin = `rename`
+   aynı dosya sisteminde atomik; rastgele sonek = aynı modeli aynı anda indiren
+   iki process ayrı dosyalara yazıp her biri tam bir dosyayı üstüne rename
+   ediyor. Okuyan ya hiçbir şey görüyor ya bütün bir dosya. Naif bir
+   `createWriteStream(dest)`'in ürettiği yarım dosyayı, **yükleme anındaki hiçbir
+   digest kontrolü kötü ağdan ayırt edemez** — bu yüzden mesele rename.
+4. **Digest rename'den önce.** Uyuşmazlık geçici dosyayı siler ve iki digest'i
+   de yazarak fırlatır. "Yine de dene" yolu yok.
+
+Doğrulama **yükleme ön koşulu**, indirmenin yan etkisi değil: `ensureModelFiles`
+hiçbir şey indirmediğinde de her dosyayı doğruluyor. Bu yüzden `models install`
+aynı zamanda bir onarım aracı — sonradan bozulmuş bir cache aynı kontrolle
+yakalanıyor ve yalnız bozuk dosya yeniden çekiliyor.
+
+**`createEmbeddingProvider` indirmiyor.** Eksik model, `agentfuse models
+install`'u adıyla anan bir hata. Proxy başlatmanın sessizce 23 MB'lık bir
+indirmeye dönüşmesi, CLI'ın kendi mesajının zaten söylediği şeye aykırı olurdu.
+`download: true` seçeneği var ve CLI hiç geçmiyor.
+
+### Sınır: ORT'ye dokunan tek dosya
+
+`session.ts` `onnxruntime-node`'a, `create.ts` `@huggingface/tokenizers`'a
+dokunan tek dosyalar ve **ikisi de dinamik import**. Gerekçe iki katlı:
+
+- Paketin giriş noktası ucuz kalıyor. CLI onu yalnızca "backend kurulu mu"
+  sorusunu cevaplamak için import ediyor, `agentfuse models install` ise henüz
+  koşturamayacağı bir modeli indirmek için. İkisi de yüz megabaytlık bir native
+  addon'u dlopen etmemeli.
+- Geri kalan her şey ORT'siz koşabilir ve koşuyor: batch'leme, havuzlama, cache
+  kapısı ve indirme mantığı, hiç native kod yüklemeyen bir süitle kapsanıyor.
+
+`session.run` **await ediliyor, senkron karşılığı kullanılmıyor.**
+`onnxruntime-node` çalışmayı bir libuv worker'ında yürütüp promise çözüyor —
+Faz 3'ün asenkron kuyruğunun üzerine oturduğu özellik tam olarak bu. Senkron
+yol, 5–20 ms'lik bir matris çarpımını JSON-RPC frame'i ileten thread'e taşırdı
+ve PRD §6'nın p95 bütçesi onu da kapsamaya başlardı.
+
+ORT ayarları: `executionProviders: ['cpu']`, `intraOpNumThreads` en fazla 4
+(`availableParallelism()`, cgroup limitlerini gören tek API), `interOpNumThreads`
+1, `logSeverityLevel: 3` ve `ort.env.logLevel = 'error'`. Son ikisi stdout
+disiplini için: `agentfuse wrap`'te bu process'in stdout'u ajanın JSON-RPC
+akışı.
+
+### Bağımlılık yönü artık iki taraftan zorlanıyor
+
+`packages/cli/src/discipline.test.ts` kuralı CLI tarafından pinliyordu; yeni
+`packages/embeddings-local/src/discipline.test.ts` aynı kuralı **tüm workspace**
+için pinliyor:
+
+- Kökteki, `packages/*` altındaki ve `bench`'teki hiçbir manifest bu paketi
+  hiçbir bağımlılık alanında adlandıramaz — **kendisi dahil değil**, henüz var
+  olmayan paketler dahil.
+- Başka hiçbir paketin tsconfig'i ona project reference veremez.
+- Bu paketin dışındaki hiçbir kaynak dosya specifier'ı statik import edemez.
+  Desen *import biçimleri* üzerinde, ad üzerinde değil: CLI mesajının paketi
+  adıyla anması gerekiyor ve bu bir kenar değil.
+- Bu paketin bağımlılıkları tam olarak üç: `@agentfuse/core`,
+  `@huggingface/tokenizers`, `onnxruntime-node`.
+
+Ayrıca `session.ts`/`create.ts` sınırı ve stdout disiplini aynı dosyada pinli.
+
+### Testler — hangisi neye ihtiyaç duyuyor
+
+| Test | Ağ | Model dosyası |
+| --- | --- | --- |
+| `batch`, `cache`, `download`, `install`, `create`, `provider`, `session`, `index`, `discipline` | hayır | hayır |
+| `model.test.ts` › "the real model" | hayır | **evet** — cache'te varsa koşar, yoksa `describe.runIf` ile atlanır |
+| `model.test.ts` › "a cold download" | **evet** | hayır (geçici dizine indirir) — yalnız `AGENTFUSE_TEST_DOWNLOAD=1` ile |
+
+**Varsayılan `npm test` ne ağ ister ne model.** Sahte bir `fetch`, sahte bir
+tokenizer ve sahte bir session, indirme kapısının ve havuzlamanın her satırını
+kapsıyor. Geriye hiçbir dublörün cevaplayamayacağı soru kalıyor — bu vektörler
+gerçekten bir şey ifade ediyor mu — ve o sorunun bedeli 23 MB.
+
+Gerçek model testleri, model cache'te olduğunda **kendiliğinden** koşuyor: yani
+`agentfuse models install` yapmış bir geliştirici onları bedava alıyor, CI
+almıyor. Soğuk indirme testi deponun internete soket açan tek testi;
+`AGENTFUSE_TEST_DOWNLOAD=1 npm test` ile 18,5 s sürüyor ve ikinci bir
+`installModel` çağrısının hiçbir şey indirmediğini de pinliyor.
+
+### Ölçülen kurulum maliyeti
+
+| Ne | Ölçüm |
+| --- | --- |
+| `npm install onnxruntime-node@1.30.0 @huggingface/tokenizers@0.2.0` | 1 dk 32 sn (17 paket) |
+| `node_modules` büyümesi | 177 MB → 472 MB (**+295 MB**) |
+| `onnxruntime-node` tarball (sıkıştırılmış) | **113 507 888 B (113,5 MB)** |
+| `onnxruntime-node` açılmış | 292 MB (`dist.unpackedSize` 301 068 136) |
+| `@huggingface/tokenizers` | 600 KB (`dist.unpackedSize` 360 962 — sıfır dep) |
+| Isınmış cache ile `npm ci` | 1,7 sn (npm içerik cache'inden hard link'liyor) |
+
+`onnxruntime-node`'un postinstall'ı bu makinede (npm 11 install-scripts
+kapısı yüzünden) hiç koşmadı ve **gerekmedi**: darwin/arm64 ikilileri tarball'da
+geliyor ve ORT sorunsuz yükleniyor.
+
+### CI maliyeti — ölçüldü, bir yarısı düzeltildi, yarısı karar bekliyor
+
+**Düzeltilen ve tartışmasız olan.** `onnxruntime-node`'un postinstall'ı
+platform başına bir manifest okuyor ve `linux/x64` — yani `ubuntu-latest` —
+için varsayılan gereksinim `cuda12`. O ikililer bilinçli olarak npm tarball'ında
+**yok**, dolayısıyla script `Microsoft.ML.OnnxRuntime.Gpu.Linux`'u nuget.org'dan
+indiriyor: `content-length` ile ölçüldü, **236 037 232 B (236 MB)**. Bu,
+`setup-node`'un `cache: npm` ile geri yüklediği npm cache'inin **dışında**, yani
+her koşumda her job için yeniden. Dört job (Node 20/22/24 + schema-drift) ×
+236 MB ≈ **CI koşumu başına 944 MB**, hiç kullanmayacağımız bir GPU çalışma
+zamanı için. `146b709` workflow seviyesinde `ONNXRUNTIME_NODE_INSTALL: skip`
+koydu; `session.ts` zaten `executionProviders: ['cpu']` pinliyor, vazgeçilen
+hiçbir şey yok.
+
+**Kalan ve gerçek bir takas olan.** Geriye ADR-003'ün zaten kabul ettiği
+maliyet kalıyor: job başına 113,5 MB tarball (ilk koşumdan sonra `setup-node`
+onu `~/.npm` içinde cache'liyor) ve 292 MB'lık açılım. Seçenekler ve
+gerekçeleri:
+
+| Seçenek | Ne olur |
+| --- | --- |
+| **(a) Kabul et** — bugünkü hâl | Job başına ~113,5 MB indirme (soğuk cache) + 292 MB açılım. `npm ci` içerik cache'inden hard link'lediği için açılım ucuz; ölçülen 1,7 sn. |
+| (b) `onnxruntime-node`'u `optionalDependencies`'e alıp CI'da `--omit=optional` | **Doğrudan çalışmıyor:** `tsc` `session.ts`'in dinamik import'u için tipleri çözmek zorunda ve paket yoksa build/typecheck kırılır. Çalışması için tipleri `onnxruntime-common`'dan (1,1 MB) almak, specifier'ı literal olmayan bir değişkene taşımak ve ORT yüzeyini elle bildirmek gerekir — yani **dördüncü bir bağımlılık beyanı** ve gerçek API'ye karşı tip güvenliğinin bırakılması. Faz brifingi "yalnız bu iki paketi kur" dediği için tek başına karara bağlanmadı. |
+| (c) `actions/cache` ile `node_modules` cache'lemek | 292 MB'lık açılımı benzer boyutta bir restore'a çeviriyor, yani kazanç belirsiz; GitHub'ın depo başına 10 GB cache sınırı, ~470 MB'lık bir ağacın dört varyantıyla zorlanır. |
+| (d) Matrisi daraltmak (tam kapıyı tek Node sürümünde koşturmak) | CI'ın neyi kanıtladığını değiştirir; maliyet düşüşü uğruna kapsam düşürmek. |
+
+**Öneri: (a).** Asıl israf (b)'de değil postinstall'daydı ve o kapatıldı;
+kalan kısım ADR-003'ün bilerek kabul ettiği maliyet. (b) istenirse ayrı bir
+karar olarak alınmalı, çünkü bağımlılık listesini ve tip güvenliğini birlikte
+değiştiriyor.
+
+**Faz 10 için not:** bu postinstall yalnız CI'ın derdi değil. `npm install
+@agentfuse/embeddings-local` yazan bir linux/x64 kullanıcısı da aynı 236 MB'lık
+CUDA indirmesini yapar. Doküman bunu yazmalı ve
+`ONNXRUNTIME_NODE_INSTALL=skip` ile kurmayı önermeli; CPU yolunda hiçbir şey
+kaybedilmiyor.
+
+### Ölçülen kalite — Faz 9'un kalibre edeceği sayılar
+
+Fixture'lar `semanticEmbeddingText` üzerinden kuruldu, gevşek cümleler olarak
+değil: o fonksiyon bir kontrat ve başka bir metin şeklinde alınan ölçüm Faz 9'un
+devralacağı ölçüm olmazdı.
+
+| Çift | Kosinüs |
+| --- | --- |
+| `search_issues` sayfa 1 ↔ sayfa 2 | **0.9971** |
+| `search_issues` "login bug" ↔ "login error" | **0.9791** |
+| sayfa 2 ↔ yeniden ifade edilmiş | 0.9764 |
+| `write_file` başarılı ↔ aynı `write_file` hatalı | 0.8797 |
+| `search_issues` ↔ `write_file` | **0.1165** |
+| `search_issues` ↔ `postgres query` | **0.1254** |
+| `write_file` ↔ `postgres query` | **0.0656** |
+| hatalı `write_file` ↔ `postgres query` | 0.0471 |
+
+Norm ölçümleri 1.000000005 / 0.999999989 aralığında. Yakın-aynı ile ilgisiz
+arasında neredeyse bir büyüklük mertebesi var; doğru havuzlamanın görüntüsü bu,
+CLS havuzlamanın ya da maskesiz ortalamanın görüntüsü değil.
+
+Gecikme (M-serisi dizüstü, 4 thread): session açılışı **75 ms** (23 MB'ın
+sha256'sı + grafik optimizasyonu dahil), sekizlik batch **10,7 ms** (50 batch
+üzerinden ortalama). İkisi de sıcak yolda değil.
+
+**Pagination uyarısı Faz 9 için burada da geçerli:** sayfa 1 ↔ sayfa 2 çifti
+0.9971 veriyor, yani yalnız argüman/sonuç metni üzerinden bakıldığında bu ürünün
+en çok kaçınması gereken yanlış pozitif, gerçek bir döngüden **ayırt edilemeyecek
+kadar yakın**. Faz 3'ün "sonuç metni de değişmeli" notu bunun için var ve
+fixture'da sonuçlar kasten farklı ("3 issues found" / "4 issues found") — buna
+rağmen 0.9971. Negatif corpus'ta bu vakanın ağırlığı yüksek olmalı.
+
+### Faz 9'un bu fazdan alacakları
+
+- **Gerçek bir embedder var ve `HashingProvider` gitmedi.** İkisi aynı porta
+  yazıyor, yani ROC taraması ikisiyle de koşturulabilir; kalibrasyon yalnız
+  gerçek modelle anlamlı, regresyon testi ikisiyle de.
+- Kurulum: `npm install @agentfuse/embeddings-local` (workspace içinde zaten
+  kurulu) + `agentfuse models install`. Cache `AGENTFUSE_CACHE_DIR` ile ayrı
+  bir dizine alınabilir.
+- **Eşik çözünürlüğü tabanı ±0.002** (yukarıdaki int8 bölümü). Bundan ince bir
+  ayrım ölçüm değil gürültü.
+- Havuzlama metni değişirse kalibrasyon çöp olur — bu Faz 3'ün notuydu ve
+  şimdi `model.test.ts` fixture'ları da o metne bağlı.
+- `lastScore()` ve `loop_detection.windowScore` okuma noktaları değişmedi.
+- Benchmark koşumu `AGENTFUSE_TEST_DOWNLOAD` bayrağına ihtiyaç duymaz; modeli
+  bir kez kurup cache'ten okur.
 
 ---
 
@@ -893,13 +1209,16 @@ dördü de ayrı testle pinli.
 | `provider: openai` (herhangi bir mod) | — | bu sürümde backend yok; `warn`'da uyarı, `enforce`'ta hata. Hiç bağlamayıp raporun skorladığını ima etmesine izin vermekten iyi. |
 | paket var ama `createEmbeddingProvider` yok | — | yukarıdaki iki satırın aynısı, **farklı mesajla**: "kur" ile "güncelle" farklı talimatlardır. |
 
-**Faz 4 için taşıyıcı not:** bu monorepo içinde `@agentfuse/embeddings-local`
+**Faz 4 sonrası güncelleme:** bu monorepo içinde `@agentfuse/embeddings-local`
 specifier'ı **çözülüyor** — npm workspaces her paketi `node_modules`'a
-symlink'liyor ve import Faz 1'in stub'ını buluyor. Stub iki factory'den
-hiçbirini export etmediği için CLI "kurulu ama eski" satırını alıyor, ki doğru
-davranış bu. `embeddings.test.ts` her iki durumu da (çözülür / çözülmez)
-kapsıyor, böylece Faz 4 stub'ı gerçek implementasyonla değiştirdiğinde test
-kırılmaz ama boşluk da kalmaz.
+symlink'liyor. Faz 6a yazıldığında import Faz 1'in stub'ını buluyordu ve stub
+iki factory'den hiçbirini export etmediği için CLI "kurulu ama eski" satırını
+alıyordu; o satır artık bu pakete uygulanmıyor, çünkü Faz 4 ikisini de export
+ediyor. `embeddings.test.ts` hâlâ her iki durumu da (çözülür / çözülmez)
+kapsıyor; çözülen dalın iddiası tersine çevrildi ve factory'yi **çağırmıyor**
+(çağırmak modeli ve ORT'yi yüklerdi). Tablonun "kurulu ama eski" satırı
+enjekte edilmiş bir loader ile hâlâ testli — o satır bir sürüm uyuşmazlığını
+tarif ediyor ve gelecekte yine olabilir.
 
 **Bağımlılık yönü bir testle zorlanıyor.** `discipline.test.ts`
 `packages/cli/package.json`'ın `dependencies`, `devDependencies`,
@@ -2142,28 +2461,22 @@ metnini modelin bağlamına koymanın kendi ürün kararı olması (ve ADR-004'�
 "AgentFuse ne olacağına karar verir, ne söyleneceğine değil" çizgisine yakın
 durması). Bir ADR satırı bunu ya onaylamalı ya da tersini söylemeli.
 
-### Faz 4 — `@agentfuse/embeddings-local`
-
-**Ayrı koşulmalı:** `onnxruntime-node` kurulumu 301 MB indirir ve postinstall
-çalıştırır; eşzamanlı `npm install`'la çakışmaması için tek başına. Kullanıcıya
-kurulum öncesi haber verin.
-
-Yığın: ham `onnxruntime-node@1.30.0` + `@huggingface/tokenizers@0.2.0` (361 KB,
-sıfır dep). `@huggingface/transformers` reddedildi (`sharp` çekiyor, ORT
-1.24.3'e pinliyor), `fastembed` reddedildi (bakımsız, ORT 1.21'e pinli). Model
-`Xenova/all-MiniLM-L6-v2` int8 (~23 MB), `~/.cache/agentfuse/models/`
-(`XDG_CACHE_HOME` gözetilir), sha256 doğrulamalı, `AGENTFUSE_OFFLINE=1` ile
-kapatılabilir. Kabul kriteri: **başka hiçbir paket buna bağımlı olmamalı.**
-
-Not: Faz 1'de `embeddings-local` `@agentfuse/core`'a bağlanmadı, bu yüzden
-`src/index.ts` `EmbeddingBackend` arayüzünü yerel tanımlıyor. Faz 4 bunu core'un
-dondurulmuş `EmbeddingProvider`'ıyla değiştirmeli ve tsconfig `references`'ını
-düzeltmeli.
+**Faz 4'ten çıkan bir nokta daha:** `onnxruntime-node`'un postinstall'ı
+linux/x64'te nuget.org'dan 236 MB'lık bir CUDA çalışma zamanı çekiyor. CI'da
+`ONNXRUNTIME_NODE_INSTALL=skip` ile kapatıldı, ama aynı şey
+`@agentfuse/embeddings-local` kuran her linux kullanıcısının başına geliyor.
+Bu bir kurulum talimatı meselesi (Faz 10), ADR meselesi değil — ADR-003'ün
+"opsiyonel yoldaş paket" kararını değiştiren bir şey yok, yalnız o paketin
+gerçek kurulum maliyeti tahmin edilenden büyük.
 
 ### Faz 9–10
 
 Plan dosyasındaki brifingler geçerli. Kısaca: Faz 9 benchmark'lar ve eşik
 kalibrasyonu; Faz 10 dokümanlar ve v0.1.0.
+
+**Faz 9'un Faz 4'ten alacakları** yukarıdaki Faz 4 bölümünün son iki alt
+başlığında: ölçülen kosinüs sayıları, ±0.002'lik eşik çözünürlüğü tabanı,
+kurulum adımları ve pagination uyarısı.
 
 **Faz 9'un Faz 8'den alacakları:**
 
