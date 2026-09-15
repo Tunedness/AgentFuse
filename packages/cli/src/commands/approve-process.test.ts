@@ -7,7 +7,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { WireClient } from '../testing/wire.js';
+import { nonProtocolLines, WireClient } from '../testing/wire.js';
 
 /**
  * The approval flow as two real processes.
@@ -218,6 +218,12 @@ describe.runIf(built)('a real approval, two processes', () => {
 
       agent.endInput();
       expect((await agent.exit()).code).toBe(0);
+
+      // And through all of that, stdout carried protocol frames and nothing
+      // else. The prompt is on stderr because in this mode stdout *is* the
+      // agent's JSON-RPC stream — one line of it and every later frame is
+      // corrupt, with the wrapped server getting the blame.
+      expect(nonProtocolLines(agent.stdout)).toEqual([]);
     } finally {
       await agent.dispose();
     }

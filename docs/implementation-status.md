@@ -1,8 +1,8 @@
 # AgentFuse — uygulama durumu ve devir notu
 
-**Son güncelleme:** 2026-09-16 · **`main`'deki son kod commit'i:** `7447c48`
-(`main` HEAD bunu izleyen bu doküman commit'i) · **Durum:** Faz 6 bitti (6a +
-6b); kritik yolda sırada Faz 9, paralelde Faz 4/7/8
+**Son güncelleme:** 2026-09-16 · **`main`'deki son kod commit'i:** `a7a8ddc`
+(`main` HEAD bunu izleyen bu doküman commit'i) · **Durum:** Faz 7 bitti;
+kritik yolda sırada Faz 9, paralelde Faz 4/8
 
 Bu dosya, işi başka bir oturumda kaldığı yerden sürdürebilmek için tutulur.
 Ürün tanımı burada değil — tek doğruluk kaynağı `../.ssot/PRD.md` ve
@@ -23,7 +23,7 @@ dosyasındadır.
 | 4 | `@agentfuse/embeddings-local` | Başlanmadı |
 | 5 | `@agentfuse/proxy` (MCP adaptörü) | **Bitti** — `ebce8f0` |
 | 6 | CLI (`agentfuse`) | **Bitti** — 6a: `373c240` `f503322` `58741ba` `c80c4db` · 6b: `54d858e` `19c96f8` `7447c48` |
-| 7 | Onay akışı + rapor UX | Başlanmadı |
+| 7 | Onay akışı + rapor UX | **Bitti** — `84b903e` `935146d` `a7a8ddc` |
 | 8 | Telemetri (OTLP) | Başlanmadı |
 | 9 | Benchmark'lar (tespit + gecikme) | Başlanmadı |
 | 10 | Dokümanlar + v0.1.0 | Başlanmadı |
@@ -38,38 +38,43 @@ kritik yol: 0-1-2-5-6-9-10
 ### `main` yeşil — 2026-09-16'da bizzat koşuldu
 
 ```
-npm run lint          → Checked 153 files. No fixes applied. (exit 0)
+npm run lint          → Checked 171 files. No fixes applied. (exit 0)
 npm run typecheck     → temiz (tsc -b && tsc -p tsconfig.test.json)
 npm run build         → temiz
-npm test              → Test Files 50 passed · Tests 1143 passed (~2.7 s)
+npm test              → Test Files 58 passed · Tests 1355 passed (~5.2 s)
 npm run schema:check  → schema up to date
 ```
 
-Faz 6b öncesindeki sayılar 43 dosya / 951 test idi; eklenen 7 dosya ve 192 test
-tümüyle `packages/cli`'ye ait. Mevcut testlerden yalnız `cli.test.ts`'in
-"Faz 6b'nin komutları" bloğu (dört test) yeniden yazıldı; gerekçesi aşağıda
-(Faz 6b → "6a'nın modüllerinde değişen şey"). Başka hiçbir test dosyasına
-dokunulmadı.
+Faz 7 öncesindeki sayılar 50 dosya / 1143 test idi; eklenen 8 dosya ve 212 test
+tümüyle `packages/cli`'ye ait. Mevcut testlerden ikisi yeniden yazıldı ve
+gerekçeleri aşağıda: `runtime.test.ts`'in "approvals fail closed until phase 7"
+testi (artık gerçek bir gateway var) ve `report.test.ts`'in işaret satırını
+iddia eden testi (artık işaret satırı yok). `http.test.ts`'te bir `let`
+`const`'a çevrildi; deponun tek lint uyarısıydı ve Faz 7'nin kodundan değil.
 
 Coverage kapısı `vitest.config.ts` içinde `packages/core/src/**` için %90'da ve
 **gerçekten zorluyor** (Faz 2'de 100'e çekilip kasten kırılarak doğrulandı).
-Faz 6b sonundaki ölçümler (`coverage/lcov.info` üzerinden, glob bazında):
+Faz 7 sonundaki ölçümler (`coverage/lcov.info` üzerinden, glob bazında):
 
 | Paket | lines | functions | branches |
 | --- | --- | --- | --- |
 | `packages/core/src/**` (kapılı) | %99.89 | %100 | %95.45 |
 | `packages/proxy/src/**` (kapısız) | %98.88 | %100 | %91.18 |
-| `packages/cli/src/**` (kapısız) | %99.87 | %100 | %99.09 |
+| `packages/cli/src/**` (kapısız) | %99.92 | %100 | %99.41 |
 
 Core ve proxy rakamları Faz 6a'dakinin aynısı — iki pakete de dokunulmadı.
-CLI üç metrikte de yükseldi (%99.79 → %99.87 lines, %98.86 → %99.09 branches);
-6b'nin eklediği kod bilinçli olarak core'un çubuğunun üstünde tutuldu ve
-ölçülemez kalan dallar tek tek ya silindi ya yorumla gerekçelendi.
+CLI üç metrikte de yükseldi (%99.87 → %99.92 lines, %99.09 → %99.41 branches,
+functions %100'de kaldı). Yeni `approvals/` dizini dört metrikte de **%100**;
+ölçülemez kalan dallar tek tek ya silindi (iki "once-only" bayrağı gereksizdi —
+`resolve` zaten bir kez çalışır, `destroy` idempotent) ya da paylaşılan bir
+fonksiyona indirildi (`errorReporter`, `probeSocket`'teki `occupied`).
 
 Metin reporter'ının satırları: `core/src` %98.31 / %96.46 / %100 / %99.36,
-`proxy/src` %98.46 / %91.17 / %100 / %98.87, `cli/src` %99.44 / %98.78 / %100 /
-%99.79, `cli/src/commands` %100 / %99.54 / %100 / %100. "All files" %99.30 /
-%95.93 / %100 / %99.71 (Faz 6a sonunda %99.19 / %95.35 / %100 / %99.66).
+`proxy/src` %98.46 / %91.17 / %100 / %98.87, `cli/src` %99.46 / %98.82 / %100 /
+%99.80, `cli/src/commands` %100 / %99.58 / %100 / %100. `cli/src/approvals`
+tabloda **hiç görünmüyor**, çünkü v8'in metin reporter'ı her dosyası %100 olan
+dizini listelemiyor. "All files" %99.43 / %96.62 / %100 / %99.76 (Faz 6b
+sonunda %99.30 / %95.93 / %100 / %99.71).
 
 **`main.ts` metin reporter'ında %0 görünür ve bu beklenen.** Dosya tek bir
 top-level `await run(...)` ifadesidir ve gerçek stream'leri bağlar; yalnızca
@@ -1379,27 +1384,383 @@ kalmadı; silinebilir.**
 
 ---
 
+## Faz 7 — onay akışı ve rapor UX (bitti)
+
+Üç commit: `84b903e` unix socket + `approve`/`deny` + runtime bağlantısı,
+`935146d` `report`'un stdout'u, `a7a8ddc` webhook + kompozisyon + örnek alıcı.
+`packages/cli/src` ağacına eklenenler:
+
+```
+approvals/protocol.ts         ← socket yolu, frame şekilleri, doğrulama (I/O yok)
+approvals/socket.ts           ← dinleyici + istemci; hijyen kuralları burada
+approvals/cli-gateway.ts      ← bekleyen istem (prompt) + bekleyenler tablosu
+approvals/webhook-gateway.ts  ← HMAC imzalı POST
+approvals/compose.ts          ← iki kanal, tek cevap
+approvals/index.ts            ← karar tablosu (embeddings.ts'in kardeşi)
+commands/approve.ts           ← `approve` ve `deny`
+examples/approval-webhook.mjs ← bağımlılıksız alıcı örneği
+```
+
+### Socket nerede duruyor ve neden
+
+`resolveApprovalSocketPath` sırayla dener, **her basamak testli**:
+
+1. **`AGENTFUSE_APPROVAL_SOCKET`** — mutlak yol, talimat sayılır. Gerekçesi
+   `AGENTFUSE_POLICY` ile aynı: bir MCP istemcisinin sunucu yapılandırması
+   `env` verebiliyor ama `$HOME`'u ya da çalışma dizinini genelde seçemiyor.
+2. **`$XDG_RUNTIME_DIR/agentfuse/approvals.sock`** — Linux'ta **doğru** yer ve
+   bu basamağın var olma sebebi. O dizin kullanıcıya ait bir tmpfs, modu 0700
+   ve **oturum kapanınca siliniyor**; yani öldürülen bir process'in bıraktığı
+   socket oturumdan uzun yaşayamıyor. `$HOME` bunların hiçbirini vermiyor ve
+   NFS olabiliyor — unix socket'lerin NFS üzerindeki durumu "güvenilmez" ile
+   "desteklenmiyor" arasında.
+3. **`$HOME/.agentfuse/approvals.sock`** — geri kalan her yer, macOS dahil
+   (`XDG_RUNTIME_DIR` orada geleneksel olarak tanımsız). Dizin 0700 olarak
+   oluşturuluyor **ve her açılışta mode'u tekrar set ediliyor** — 2. basamağın
+   işletim sisteminden bedava aldığı garantiyi geri kazandıran şey bu.
+
+Yol uzunluğu ayrıca kontrol ediliyor (100 bayt): `sun_path` macOS'ta 104,
+Linux'ta 108 bayt ve çekirdek **kırpmıyor, reddediyor** — ortaya çıkan `EINVAL`
+yollardan hiç bahsetmiyor. Sınırı ve onu çözen değişkeni adıyla anan bir hata
+mesajı bu kontrolün tek gerekçesi.
+
+### Sahiplik ve bayatlık kuralları
+
+Bu socket **araç çağrısı serbest bırakıyor**, yani üç özellik taşıyıcı ve
+üçünün de testi var:
+
+- **Socket 0600, dizini 0700.** Asıl kapı dizin: bir unix socket dosyası
+  process umask'i ile yaratılıyor, yani `bind` ile `chmod` arasında bir pencere
+  var. Kimsenin geçemeyeceği bir üst dizin o pencereyi kapatıyor, ve dizinin
+  modu her açılışta *set ediliyor* — `mkdir`'ün mode argümanını da umask
+  değiştiriyor ve dizin zaten varsa hiçbir şey yapmıyor.
+- **Yaratmadığı hiçbir şeyi sahiplenmiyor.** Socket olmayan bir yol, ya da
+  başka bir kullanıcıya ait bir socket, **asla unlink edilmiyor**; "yolumda bir
+  şey var"ın güvenli okunuşu "başkasının" olmasıdır, "temizle" değil. Bayat
+  socket — ölen bir process'in bıraktığı — **bağlanılarak** tespit ediliyor ve
+  siliniyor, çünkü çökme sonrası olağan durum budur ve kullanıcıyı `rm`
+  çalıştırmaya zorlamak yanlış cevap olurdu. Kanıtlanamayan bir probe (ne
+  bağlanıyor ne reddediliyor) **canlı** sayılıyor: "ölü olduğunu kanıtlayamadım"
+  silme ruhsatı değildir.
+- **İkinci wrap birincinin socket'ini çalmıyor.** Bilinen yol cevap veriyorsa
+  orada verdict bekleyen canlı bir process var demektir; yeni gelen
+  `approvals-<pid>.sock`'a bağlanıyor ve **kendi prompt'larında o yolu
+  yazıyor** (`--socket <path>`). İki wrap da cevaplanabilir kalıyor.
+
+Bozuk frame'ler cevaplanıp bağlantı kapatılıyor, asla fırlatılmıyor: bu process
+bir ajanın araç çağrılarını proxy'liyor. Frame 8 KiB ile sınırlı, boşta duran
+bağlantı 5 sn sonra düşürülüyor, dinleyici `unref`'li (wrap'i ajanın pipe'ı
+ayakta tutar, bekleyen bir prompt değil).
+
+Windows'ta `uid` `-1` olduğu için sahiplik kontrolü atlanıyor;
+`os.userInfo()` fırlatırsa (rastgele `--user` ile koşan bir konteyner) da öyle.
+İkisi de başlamamak için sebep değil, kontrolü *yapamamak* için sebep.
+
+### Prompt bir ürün yüzeyidir ve `--quiet` onu susturmaz
+
+stdout protokol akışı ve ortada tty yok, o yüzden soru stderr'e yazılıyor —
+sarılan sunucunun çıktısını okuyan operatörün zaten baktığı yere, aynı
+`[agentfuse]` önekiyle. Taşıdığı şeyler: hangi sunucuda hangi araç, **politikanın**
+insanı çağırma sebebi, kırpılmış argümanlar, approval id'si ve yazılacak tam
+komut — varsayılan yolda değilse `--socket` dahil.
+
+**`--quiet` bunu susturmuyor.** `--quiet` AgentFuse'un kendi gevezeliğini —
+operatörün istemediği satırları — susturmak için var. Bir prompt gevezelik
+değil: politikanın kendi sorusu, operatörün kendi dosyasına yazdığı şey, ve
+susturulunca her `require_approval` iki dakika asılıp sonra hiçbir yerde
+gerekçesi olmayan bir redde dönüşüyor. Makine okunur `approval_pending` olayı
+`--quiet`'e uyuyor, yani makine satırı ile insan satırı ayrılabiliyor.
+
+Argümanlar bu katmanda redakte edilmiyor ve edilemez: `report.redact_args`
+açıkken motor `argsPreview` yerine fingerprint'i veriyor, çünkü ham argümanları
+gören tek yer motor. Prompt ne geldiyse onu yazıyor — testi de bunu ölçüyor.
+
+### İnsanın `--reason`'ı nereye gidiyor (ve nereye gitmiyor)
+
+`approval_resolved` teşhis satırına ve komutu yazan kişiye geri. **Ajana giden
+ret metnine ve JSON rapora gitmiyor, gidemiyor:**
+`ApprovalGateway.requestApproval` çıplak bir verdict string'i döndürüyor, ve
+rapor motor içinde, gateway cevap vermeden önce inşa ediliyor. İkisi de donmuş
+paketlerde. **Bunu kapatacak dikiş tek bir tip değişikliği:** portun
+`'approved' | 'denied' | 'timeout'` yerine `{ verdict, reason? }` döndürmesi —
+core değişikliği, yani kendi ADR satırını hak ediyor.
+
+### Timeout'un sahibi gateway (Faz 2 kararı, uygulandı)
+
+Engine `timeoutMs`'i geçiyor ve `'timeout'` bekliyor; iki gateway de kendi
+`setTimeout`'unu kuruyor (`unref`'li). `AbortSignal` **`'denied'` olarak**
+çözülüyor, `'timeout'` olarak değil: `'timeout'` `approvals.on_timeout`
+üzerinden geçiyor ve operatör onu `allow` yapmış olabilir, yani ölmüş bir
+oturumu `'timeout'` ile cevaplamak kimsenin onaylamadığı bir çağrıyı
+**iletebilirdi**. `'denied'` yanlış okunamaz, ve half_open olmayan bir devrede
+bir ret hiçbir şeyi kıpırdatmadığı için prompt'u terk eden bir reset az önce
+kapattığı devreyi hemen yeniden açmıyor.
+
+`CliApprovalGateway.requestApproval` temizliği `await`'ten **sonra** yapıyor:
+promise bir kez settle olduğu için üç yolun (verdict, saat, abort) hangisi önce
+vardıysa alttaki satırlar tam bir kez koşuyor ve hiçbirinin diğerine karşı
+koruma bayrağına ihtiyacı kalmıyor.
+
+### Webhook: imza şeması ve secret nereden geliyor
+
+`X-AgentFuse-Signature: v1=<hex>`, `<hex>` = **gönderilen gövdenin tam
+baytları** üzerinde `HMAC-SHA256(secret, body)`. Gövde bir kez serileştirilip
+hem imzalanıyor hem gönderiliyor; iki JSON serileştirici anlamda anlaşır,
+baytta anlaşmaz.
+
+**Timestamp imzalı gövdenin içinde** (`timestamp` alanı), yanında bir header'da
+değil: replay'i durdurmak için isteğin yaşını kontrol eden bir alıcının,
+kontrol ettiği yaşın MAC tarafından kapsanması gerekir — yoksa saldırgan eski
+bir gövdeyi taze bir header'la tekrar oynatır ve kontrol hiçbir şey kanıtlamaz.
+
+**Secret ortamdan gelir, politikadan asla.** `approvals.webhook.secret_env`
+*değişkenin adını* taşıyor; değeri `context.env`'den okunuyor. ADR-004:
+politika dosyası commit'lenip diff'lenmek için var, ve secret'ı kabul eden bir
+şema insanları onu commit'lemeye davet eder. Bir test secret'ın ne teşhis
+satırlarında ne tel üzerinde (MAC dışında) görünmediğini ölçüyor.
+
+Cevap güvenilmez girdi muamelesi görüyor: gövde **okunurken** sınırlanıyor
+(64 KiB), şekil alan alan doğrulanıyor, redirect `redirect: 'error'` ile
+reddediliyor (takip etmek imzalı gövdeyi operatörün adını vermediği bir host'a
+yeniden göndermek olurdu), ve tüm alışveriş `approvals.timeout` ile sınırlı.
+
+**Başarısızlık yönleri bilinçle farklı:**
+
+| ne oldu | verdict | neden |
+| --- | --- | --- |
+| düzgün `approved` / `denied` | aynısı | insan cevap verdi |
+| süresinde cevap yok | `timeout` | `approvals.on_timeout` karar verir |
+| HTTP hatası, transport hatası, redirect, büyük ya da bozuk gövde | `denied` | fail closed |
+
+Son satır taşıyıcı: **bozuk bir kanal `on_timeout`'tan geçmiyor.**
+`on_timeout: allow` diyen operatör "yavaş bir insan ajanımı bloklamasın" diyor,
+"ağ bozulduğunda her şeyi onayla" demiyor — ve ağı bozabilen bir saldırgan o
+ayarı topyekûn rızaya çeviremez.
+
+`examples/approval-webhook.mjs` bağımlılıksız bir alıcı. `examples.test.ts` onu
+**import edip** gerçek imzalayıcıya karşı koşturuyor: güvenlikle ilgili bir
+protokolün örneği yanlışsa hiç olmamasından kötüdür, ve yanlış olma biçimi
+(yeniden serileştirilmiş gövdeyi imzalamak, `===` ile karşılaştırmak, imzasız
+bir timestamp'e güvenmek) okuyarak görünmez.
+
+### İki gateway birlikteyken kural
+
+İstek **hepsine aynı anda** gidiyor, sonra:
+
+1. **İlk kesin cevap kazanır.** `approved` ve `denied` kesindir; diğer kanallar
+   hemen durduruluyor, sonradan gelen verdict `approval_discarded` olarak
+   kaydediliyor (düşürülmüyor — "ben onayladım ama reddedildi" log'dan
+   cevaplanabilmeli).
+2. **Timeout cevap değildir.** Bir kanalın pes etmesi isteği bitirmiyor;
+   ötekiler tam penceresini koruyor. Yalnız *her* kanal timeout ettiğinde
+   composite `'timeout'` bildiriyor — `on_timeout`'un yorumlamasına izin verilen
+   tek verdict bu.
+3. **Patlayan kanal timeout değil, rettir.** Hiçbiri kesin değilse ve en az biri
+   fırlattıysa composite reddediyor. Bozuk bir gateway'in `on_timeout: allow`
+   tarafından rızaya çevrilmesini durduran şey bu.
+
+Gerekçe: iki gateway yapılandırmak "bu kanalların herhangi biri benim adıma
+cevap verebilecek birine ulaşıyor" demektir — iki kanalın olabileceği tek
+faydalı şey yedeklilik. İkisinin de hemfikir olmasını istemek her onayı en yavaş
+kanala bağlar ve sessiz bir kanal her şeyi reddeder; çalışan bir terminal
+kurulumuna Slack webhook'u ekleyen operatör onayların bozulduğunu görürdü.
+Composite pencereyi yalnızca **kısaltabilir**, rıza uyduramaz: döndürdüğü her
+`approved` tam olarak bir kanalın `approved`'ına kadar izlenebilir.
+
+### Kanal açılamazsa: sert hata değil, yüksek sesle uyarı
+
+Bu, onay tablosunun yanındaki embedding tablosundan **bilinçli olarak ayrıldığı**
+tek nokta. Orada `provider: local` + `mode: enforce` + eksik paket sert bir
+çıkış (exit 4), gerekçesi de yazılı: yine de başlamak, AgentFuse'un istenen
+korumanın bir **alt kümesinin** yeterince yakın olduğuna sessizce karar vermesi
+olurdu.
+
+Onay kanalı ters yöne düşüyor. Kanal yokken `require_approval` bir redde
+çözülüyor — istenenden **daha katı**, asla daha gevşek, ve iletilmeyecek hiçbir
+şey iletilmiyor. Başlamayı reddetmek ise kullanıcının MCP sunucusunu da
+beraberinde götürüyor: wrap, istemcinin başlattığı şey, yani buradaki sert bir
+hata daha güvenli bir koşum üretmiyor — **hiç koşum** üretmiyor, ve önünde fuse
+olmayan bir ajan bırakıyor. O yüzden kanal susuyor ama yüksek sesle: kanalı,
+alttaki hatayı ve onun ipuçlarını anan çok satırlı bir uyarı, artı bir
+`approval_gateway_unavailable` teşhisi. Aynı muamele eksik `secret_env`'e ve
+eksik `approvals.webhook` bloğuna da uygulanıyor.
+
+### Karar tablosu (uygulanan tam hali)
+
+| Yapılandırma | Sonuç |
+| --- | --- |
+| `mode: warn` | **kapalı, sessizce.** Motor onayları yalnız `enforce`'ta çözüyor. |
+| politika hiç onay istemiyor | **kapalı, sessizce.** |
+| `enforce` + `gateways: []` | **kapalı, uyarıyla.** |
+| `enforce` + `[cli]` | unix socket. |
+| `enforce` + `[webhook]` | imzalı POST. |
+| `enforce` + ikisi | ikisi, `compose.ts`'in kuralıyla. |
+| `enforce` + açılamayan kanal | **o kanal kapalı, uyarıyla** (yukarıdaki gerekçe). |
+
+`on_timeout: allow` gateway açılan her yerde kendi uyarısını alıyor: dosyadaki
+tek **fail open** ayarı bu, ve işi zorlamak olan bir aracın bunu her açılışta
+yüksek sesle söylemesi gerekir.
+
+**`onDecision` hook'u bilinçle sayılmıyor.** Motor onayı *guard'ların*
+action'ından çözüyor ve hook'lar ondan sonra koşuyor; yani action'ı
+`require_approval`'a yükselten bir hook ajana `POLICY_APPROVAL` olarak
+bildiriliyor ve hiçbir gateway'e varmıyor. Donmuş davranış bu; onun için socket
+açmak aksini ima ederdi.
+
+### Runtime'a bağlanma — `wrap` ve `serve` değişmedi
+
+Motor gateway'i **constructor port'u** olarak alıyor, yani kanal motordan önce
+var olmak zorunda; bu da servis eden bir komutun onu açıp devretmesini eliyor.
+Kanal ayrıca politikadan türüyor (`approvals.gateways`, timeout, webhook bloğu)
+ve o çözümleme zaten `runtime.ts`'te. Sonuç: socket `createRuntime` içinde
+bağlanıyor, `runtime.close()` ile bırakılıyor, ve `wrap` ile `serve` onay
+hakkında tek satır içermiyor — Faz 6b'nin öngördüğü gibi.
+
+- `RuntimeOptions.approvals` tabloyu tümüyle atlayan enjeksiyon dikişi;
+  testler socket'e hiç dokunmadan bloke bir çağrıyı sürebiliyor.
+- `Runtime.approvals` ve `Runtime.approvalSocket` yüzeye çıktı.
+- `wantsApproval` `approvals/index.ts`'e taşındı ve `runtime.ts`'ten yeniden
+  export ediliyor (eski import yolu çalışmaya devam ediyor).
+- `createRuntime`'ın "approvals fail closed" uyarısı **silindi**; yerine
+  yalnızca gerçekten kanal olmayan satırlar uyarıyor.
+- `--reset`'in motora ulaşması için geç bağlanan bir kanca var
+  (`ApprovalResolution.bindHost`): socket motordan önce dinliyor, o yüzden host
+  sonradan veriliyor ve aradaki mikrosaniyelerde gelen bir reset "hâlâ
+  başlıyor" cevabı alıyor.
+- `resetBreaker` **oturumun varlığını önce kontrol ediyor** ve sonraki phase'i
+  döndürüyor; komutu yazan kişi "bu wrap'te öyle bir session yok" ile
+  "kapattım" arasındaki farkı görüyor. Yoksa bir devre, birileri kapattığını
+  sanırken açık kalırdı.
+
+**Bilinen ödünç:** `serve` de politikası onay istiyorsa socket'i açıyor, ama
+hiçbir zaman onay sormuyor (ADR-008: `serve` P0'da araç çağrısı iletmiyor).
+Zararsız — hiçbir wrap'in socket'i çalınmıyor, yeni gelen fallback yola
+bağlanıyor ve prompt'unda onu yazıyor — ama `agentfuse serve` uzun süre
+koşuyorsa bilinen yolu tutuyor olabilir.
+
+### `report`'un stdout'u temizlendi
+
+Faz 6a'nın açık bıraktığı nokta kapandı: `agentfuse report last` artık
+render edilmiş raporu doğrudan stdout'a yazıyor, `Diagnostics.block()`
+üzerinden değil. İşaret satırı (`[agentfuse] {"event":"trip_report",…}`)
+proxy'de hak ettiği yerde duruyor — orada rapor, önekli teşhis satırlarından
+oluşan bir akışın içinde bir blok ve işaret satırı bir okuyucuya (ya da bir log
+shipper'a) bloğun nerede başladığını söylüyor. `report` proxy yolunda değil,
+yani onun stdout'u soruyu soran insana ait. `Diagnostics` hiç değişmedi ve
+proxy yolundaki garantilerinin hepsi yerinde. İki mod da pinli: varsayılan mod
+kutu çizgili tabloyu ve başka hiçbir şeyi taşıyor, `--json` modu core'un
+yazdığı dokümanın aynısı olarak parse ediliyor.
+
+### Testler — iki process gerçekten koşuyor
+
+`commands/approve-process.test.ts` `dist/main.js`'i **iki ayrı process olarak**
+doğuruyor: biri wrap, öteki `agentfuse approve` / `agentfuse deny`. Dokuz test:
+onaylanan çağrı sunucunun gerçek cevabıyla dönüyor, reddedilen çağrı ajanın
+okuyabileceği bir ret alıyor, `APPROVAL_TIMEOUT` metni ajana varıyor,
+`on_timeout: allow` çağrıyı iletiyor ve açılışta fail-open uyarısı yazıyor,
+half_open'da insanın "hayır"ı devreyi `open`'a alıyor, `--reset` devreyi
+kapatıyor ve sonraki çağrı yeniden insana soruluyor, ikinci wrap birincinin
+socket'ini çalmıyor, bozuk frame proxy'yi düşürmüyor, ve webhook kanalı gerçek
+bir HTTP alıcısına karşı imzalanıp doğrulanıyor. Bir test ayrıca tüm bu akış
+boyunca stdout'un yalnız protokol frame'i taşıdığını ham baytlar üzerinde
+ölçüyor.
+
+Her koşum kendi socket'ini `AGENTFUSE_APPROVAL_SOCKET` ile alıyor; **hiçbir
+test geliştiricinin gerçek `~/.agentfuse`'una dokunmuyor.** Bayat socket
+üretmek için testler bir child process doğurup SIGKILL'liyor — Node temiz bir
+`close()`'ta yolu zaten siliyor, yani bayat socket tanım gereği kapanmaya
+fırsat bulamamış bir process'in bıraktığı şey.
+
+### Faz 7'nin çelişki kaydı
+
+1. **`approve --reset` devreyi `closed` yapıyor, `half_open` değil.** Faz
+   brifingi "open → half_open" diyordu. Core'un `resetBreaker`'ı `closed`'a
+   götürüyor ve **kendi TSDoc'u tam olarak bu komutu adıyla anıyor**
+   ("what `agentfuse approve --reset` calls"); `applyBreakerEvent`'in
+   `'reset'` olayı `phase = 'closed'` yazıyor. Core donmuş, yani uygulanabilir
+   tek davranış buydu. Test de gerçek davranışı (`open` → `closed`) pinliyor ve
+   komut sonucu yazıyor ("The breaker is now closed."). **Karar hak eden nokta:**
+   `--reset` gerçekten `half_open`'a mı götürmeli (yani operatör devreyi açar
+   ama sonraki her çağrı yine onay ister), yoksa `closed` mu? İkincisi
+   uygulanmış ve belgelenmiş durumda; birincisi motora yeni bir giriş noktası
+   ister (`resetBreaker(sessionId, { to: 'half_open' })` ya da
+   `cooldownElapsed(sessionId)`).
+2. **İnsanın `--reason`'ı rapora ve ajana ulaşmıyor** (yukarıda). Port çıplak
+   string döndürüyor. Dikiş: `{ verdict, reason? }`.
+3. **Açılamayan kanal sert hata değil** (yukarıda). Brifing bunu belirtmiyordu;
+   embeddings tablosunun precedent'inden bilinçli olarak ayrıldı ve gerekçesi
+   yazıldı.
+4. **Prompt `--quiet`'i yok sayıyor** (yukarıda). Brifingde yoktu.
+5. **`core` ve `proxy` değiştirilmedi.** Tek satır bile. `APPROVAL_TIMEOUT` ve
+   `APPROVAL_DENIED` metinleri Faz 5'ten beri `trip-result.ts`'te hazırdı ve
+   olduğu gibi yeterliydi; Faz 7 onları yalnız gerçek bir akışla doğruladı.
+   Faz 6b'nin bıraktığı iki kanca (`onChildExit`, `onConnect`) yine eklenmedi —
+   Faz 7 proxy'ye hiç dokunmadı.
+
+### Faz 8 ve Faz 10 için bırakılanlar
+
+**Faz 8 (OTLP telemetri):**
+
+- Onay akışının yazdığı olay adları sabit ve hepsi tek bir `Diagnostics`
+  üzerinden geçiyor: `approval_socket_open`, `approval_socket_stale_removed`,
+  `approval_socket_unavailable`, `approval_socket_bind_failed`,
+  `approval_socket_rejected`, `approval_socket_error`,
+  `approval_socket_handler_failed`, `approval_socket_idle`, `approval_gateway`,
+  `approval_gateway_off`, `approval_gateway_unavailable`, `approval_pending`,
+  `approval_posted`, `approval_resolved`, `approval_decided_by`,
+  `approval_discarded`, `approval_gateway_failed`, `breaker_reset`.
+- **`approval_resolved` merkezi olan.** `{ approvalId, sessionId, verdict,
+  source, reason? }` taşıyor; `source` `cli` | `webhook` | `timeout` | `abort`.
+  Bir onayın ne kadar beklediğini ölçmek isteyen telemetri `approval_pending`
+  ile `approval_resolved` arasını alır.
+- **Secret asla bir olayda görünmüyor** — yalnız değişkenin adı
+  (`secretEnv`). Bu, OTLP export'una da aynen taşınmalı.
+- Umbrella ADR-003'ün dört olay tipi hâlâ bağlayıcı: bunların hiçbiri
+  `TelemetrySink`'e yazılmıyor, host'un teşhis akışında duruyorlar. İkinci bir
+  `Diagnostics` kurulmamalı (rate-limit pencereleri ayrışır).
+
+**Faz 10 (dokümanlar + v0.1.0):**
+
+- Kurulum anlatısı `wrap` üzerinden (ADR-008: HTTP kullanıcısı v0.1.0'da koruma
+  almıyor). Onay akışı bölümünün anlatması gerekenler: prompt'un stderr'de
+  olduğu ve `--quiet` ile susmadığı, socket'in nerede durduğu ve
+  `AGENTFUSE_APPROVAL_SOCKET`'in onu taşıdığı, `approve`/`deny`'ın `--reason`
+  istediği, ve `--reset`'in devreyi **kapattığı**.
+- **`on_timeout: allow` belgelerde de "önerilmez" diye geçmeli.** Şemada
+  açıklama alanı yok; `agentfuse init`'in yazdığı dosyada ve `approve --help`'te
+  yazıyor, dokümanda da yazmalı.
+- Webhook alıcısı yazacaklar için üç zorunlu davranış (ham gövde üzerinde
+  doğrulama, sabit zamanlı karşılaştırma, imzalı `timestamp`'in yaşı)
+  `examples/approval-webhook.mjs`'in başındaki blokta duruyor; doküman oraya
+  işaret edebilir ya da onu kopyalayabilir.
+- `agentfuse init`'in yazdığı dosya artık gerçek bir `approvals:` bloğu
+  içeriyor (yorumlu değil) ve yayınlanmış JSON Schema'ya karşı doğrulanıyor.
+- Komut listesi büyüdü: `wrap serve init validate report approve deny models`.
+
+---
+
 ## Sırada ne var
 
-### Önce `.ssot`: HTTP gateway kendi kararını bekliyor
+### Önce `.ssot`: üç nokta kendi kararını bekliyor
 
-Çatı ADR-002 kapsam değiştiren koddan önce doküman güncellemesi şart koşuyor ve
-Faz 6b iki noktayı kapsam kararı olarak bıraktı:
+Çatı ADR-002 kapsam değiştiren koddan önce doküman güncellemesi şart koşuyor.
+Açık duran noktalar:
 
 1. **HTTP gateway hangi paketin işi ve upstream havuzunun anahtarı ne?**
-   Gerekçeler Faz 6b → çelişki kaydı #1'de. Kısaca: korumalı HTTP girişi
-   `createMcpHandler` + önceden bağlanmış bir `Client` istiyor, ikisi de
-   `@modelcontextprotocol/*` paketlerinde, ve CLI'nin bildirdiği bağımlılık
-   listesi bir testle dört pakete pinli. MCP tesisatının yeri `packages/proxy`;
-   `http-serve.ts` Faz 5'ten beri merdiveni tutuyor ve gateway girişinin
-   yanına gelmesi doğal. Havuz anahtarının ADR-006 merdiveninin çözdüğü session
-   olması gerekiyor, ve "katı bir `session.key` çözülemezse isteği reddet"
-   kararı servis giriş noktasının.
+   ADR-008 birinci yarısını kapattı (giriş noktası `packages/proxy`, `serve` P0'da
+   uç), havuz anahtarı hâlâ P1'e bırakılmış durumda.
 2. **ADR-006 merdiven sıralaması** (Faz 5 → çelişki kaydı #3) hâlâ
    açıklayıcı bir düzeltme bekliyor: ADR metni legacy HTTP'de
    `Mcp-Session-Id`'yi önce sayıyor, uygulama onu `baggage`'ın altına koyuyor,
    ve gerekçe aynı ADR'ın zincirleme sözleşmesi. Faz 6b bu sırayı `serve`'de
    uyguladı ve testle pinledi; metin hâlâ ötekini söylüyor.
+3. **`approve --reset` hangi phase'e götürmeli?** Faz 7 → çelişki kaydı #1.
+   Uygulanan davranış core'un donmuş `resetBreaker`'ı, yani `closed`; faz
+   brifingi `half_open` diyordu. Bir ADR satırı bunu bağlayıcı hale getirmeli,
+   çünkü ikisi operatöre farklı şeyler vaat ediyor. Aynı yerde kayda değer iki
+   şey daha var ve ikisi de Faz 7'de **uygulanmış ve belgelenmiş** durumda:
+   iki gateway'in kompozisyon kuralı, ve açılamayan bir onay kanalının sert hata
+   değil uyarı olması.
 
 ### Faz 4 — `@agentfuse/embeddings-local`
 
@@ -1419,28 +1780,25 @@ Not: Faz 1'de `embeddings-local` `@agentfuse/core`'a bağlanmadı, bu yüzden
 dondurulmuş `EmbeddingProvider`'ıyla değiştirmeli ve tsconfig `references`'ını
 düzeltmeli.
 
-### Faz 7–10
+### Faz 8–10
 
-Plan dosyasındaki brifingler geçerli. Kısaca: Faz 7 onay akışı (unix socket +
-webhook); Faz 8 OTLP telemetri (kapalıyken **sıfır** OTel modülü yüklenmeli);
-Faz 9 benchmark'lar ve eşik kalibrasyonu; Faz 10 dokümanlar ve v0.1.0.
+Plan dosyasındaki brifingler geçerli. Kısaca: Faz 8 OTLP telemetri (kapalıyken
+**sıfır** OTel modülü yüklenmeli); Faz 9 benchmark'lar ve eşik kalibrasyonu;
+Faz 10 dokümanlar ve v0.1.0.
 
-**Faz 7 ve Faz 8'in bağlanacağı dikişler tek tek yazılı:** Faz 6b →
-"Faz 7 ve Faz 8 için bırakılan dikişler". Oradaki iki madde özellikle taşıyıcı:
-gateway gelince `createRuntime`'ın yazdığı iki uyarı (onay gateway'i yok, OTLP
-export yok) **silinmek zorunda**, ve ikinci bir `Diagnostics` kurulmamalı —
-rate-limit pencereleri ayrışır.
+**Faz 8'in bağlanacağı dikişler iki yerde yazılı:** Faz 6b → "Faz 7 ve Faz 8
+için bırakılan dikişler" ve Faz 7 → "Faz 8 ve Faz 10 için bırakılanlar".
+Taşıyıcı maddeler: `createRuntime`'ın yazdığı "OTLP export yok" uyarısı
+**silinmek zorunda** (onay gateway'i uyarısı Faz 7'de silindi), ikinci bir
+`Diagnostics` kurulmamalı (rate-limit pencereleri ayrışır), ve onay akışının
+olay adları sabit — özellikle `approval_pending` → `approval_resolved` çifti,
+ki bir onayın ne kadar beklediğini ölçmenin tek yolu o.
 
-Faz 7 için proxy'nin bıraktığı iki not: `ApprovalGateway` portu core'da duruyor
-ve timeout'un sahibi gateway (Faz 2 kararı), yani proxy o yolda hiçbir şey
-yapmıyor — `beforeCall` enforce modunda onayı kendi çözüyor. Yazılı rapor
-`ToolCallGuardOptions.writeReport` kancasından geçiyor; **proxy hiç dosya I/O'su
-yapmıyor** ve ajana gösterdiği rapor yolu o kancanın döndürdüğüdür.
-
-Faz 7 ya da 8 proxy'ye dokunuyorsa birlikte alınacak iki kanca var, ikisi de
+Faz 8 ya da 9 proxy'ye dokunuyorsa birlikte alınacak iki kanca var, ikisi de
 Faz 6b'nin belgelenmiş ödünçleri: `StdioWrapOptions.onChildExit` (çocuğun exit
 code'u aynalanabilsin diye) ve `StdioWrapHandle.onConnect` (bağlantının
 açıldığı anı yakalamak için kurulan 25 ms'lik zamanlayıcı silinsin diye).
+Faz 7 proxy'ye dokunmadı, yani ikisi de hâlâ açık.
 
 **Faz 9 yalnız test değil, ürünün sayısal iddiasıdır.** PRD §6 eşikleri —
 recall ≥ 0.90, FP < 0.05, p95 eklenen < 50 ms — CI'da kapı olur. Corpus'un
