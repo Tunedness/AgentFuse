@@ -84,15 +84,18 @@ export async function probeSocket(
 ): Promise<boolean> {
   return await new Promise<boolean>((resolve) => {
     const socket = createConnection(path);
-    let settled = false;
+    // No once-only guard: `resolve` already is one, and `destroy` is
+    // idempotent, so a late event after the answer costs nothing.
     const finish = (alive: boolean): void => {
-      if (settled) return;
-      settled = true;
       socket.destroy();
       resolve(alive);
     };
-    socket.setTimeout(timeoutMs, () => finish(true));
-    socket.once('connect', () => finish(true));
+    // Connecting and running out of patience share a handler, because they
+    // answer the question the same way: something is there, or something might
+    // be, and either way this socket is not ours to delete.
+    const occupied = (): void => finish(true);
+    socket.setTimeout(timeoutMs, occupied);
+    socket.once('connect', occupied);
     socket.once('error', () => finish(false));
   });
 }
@@ -199,6 +202,18 @@ export interface ListenOptions {
 /** The listener signature, so tests can hand a fake to the gateway. */
 export type SocketListener = (options: ListenOptions) => Promise<ApprovalSocket>;
 
+/**
+ * Reports a socket-level failure without letting it reach the process.
+ *
+ * One function for both the listener and its connections. An unhandled `error`
+ * on either is a process-level throw, and this process is proxying an agent's
+ * tool calls — a client that hangs up mid-write, or a reply into a socket that
+ * has already gone, must cost that agent nothing.
+ */
+function errorReporter(onEvent: EventSink): (error: unknown) => void {
+  return (error) => onEvent('approval_socket_error', { message: messageOf(error) });
+}
+
 function replyTo(socket: Socket, frame: ReplyFrame): void {
   socket.end(encodeFrame(frame));
 }
@@ -220,12 +235,7 @@ function serveConnection(socket: Socket, options: ListenOptions, onEvent: EventS
     onEvent('approval_socket_idle', {});
     socket.destroy();
   });
-  // A client that hangs up mid-write, or a reply into a closed socket, is an
-  // ordinary event on this channel. An unhandled 'error' on a socket is a
-  // process-level throw.
-  socket.on('error', (error) => {
-    onEvent('approval_socket_error', { message: messageOf(error) });
-  });
+  socket.on('error', errorReporter(onEvent));
 
   let buffered = '';
   let answered = false;
@@ -273,9 +283,7 @@ async function bind(
     socket.once('close', () => connections.delete(socket));
     serveConnection(socket, options, onEvent);
   });
-  server.on('error', (error) => {
-    onEvent('approval_socket_error', { message: messageOf(error) });
-  });
+  server.on('error', errorReporter(onEvent));
 
   await new Promise<void>((resolve, reject) => {
     server.once('error', reject);
@@ -376,11 +384,10 @@ export async function sendCommand(
     const socket = createConnection(path);
     socket.setEncoding('utf8');
     let buffered = '';
-    let settled = false;
 
+    // Same as `probeSocket`: settling a promise twice is a no-op and `destroy`
+    // is idempotent, so the second of two racing events needs no guard.
     const finish = (outcome: { reply: ReplyFrame } | { error: CliError }): void => {
-      if (settled) return;
-      settled = true;
       socket.destroy();
       if ('reply' in outcome) resolve(outcome.reply);
       else reject(outcome.error);

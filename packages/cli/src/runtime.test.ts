@@ -5,12 +5,14 @@ import type { EmbeddingProvider } from '@agentfuse/core';
 import { HashingProvider, ScriptedApprovalGateway } from '@agentfuse/core/testing';
 import { DIAGNOSTIC_PREFIX } from '@agentfuse/proxy';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { sendCommand } from './approvals/socket.js';
 import { loadPolicy } from './config.js';
 import type { EmbeddingsLoader } from './embeddings.js';
 import type { CliError } from './errors.js';
 import { type CliContext, StringWriter } from './io.js';
 import {
   createRuntime,
+  currentUid,
   DEFAULT_CLOSE_TIMEOUT_MS,
   wantsApproval,
   withMode,
@@ -81,6 +83,27 @@ function events(): string[] {
       }
     });
 }
+
+describe('currentUid', () => {
+  it('reports the id when the platform has one', () => {
+    expect(currentUid(() => ({ uid: 501 }))).toBe(501);
+  });
+
+  it('reports nothing on Windows, where uid is -1', () => {
+    expect(currentUid(() => ({ uid: -1 }))).toBeUndefined();
+  });
+
+  it('reports nothing when there is no passwd entry, as in a container', () => {
+    // `--user 1234:1234` with no matching entry: `userInfo` throws. Refusing to
+    // start over it would be the wrong call — the ownership check simply cannot
+    // be made, and the socket layer skips it.
+    expect(
+      currentUid(() => {
+        throw new Error('uid not found');
+      }),
+    ).toBeUndefined();
+  });
+});
 
 describe('withMode', () => {
   it('leaves the policy alone when there is nothing to change', () => {
@@ -282,6 +305,39 @@ describe('the warnings a runtime gives at startup', () => {
 
     expect(runtime.approvals).toBeUndefined();
     expect(existsSync(socket)).toBe(false);
+
+    await runtime.close();
+  });
+
+  it('answers `approve --reset` out of the engine it built', async () => {
+    const socket = join(root, 'a.sock');
+    const runtime = await createRuntime({
+      loaded: policyFile(APPROVAL_POLICY),
+      context: context({ AGENTFUSE_APPROVAL_SOCKET: socket }),
+    });
+
+    // A session the engine knows about, and one it does not. The difference is
+    // the whole value of the answer: a reset that reports success for a session
+    // this wrap never had leaves a circuit open while somebody believes they
+    // closed it.
+    runtime.engine.ports.sessions.create('01SESSION', Date.now());
+
+    const known = await sendCommand(socket, {
+      v: 1,
+      type: 'reset',
+      sessionId: '01SESSION',
+      reason: 'false positive',
+    });
+    expect(known).toMatchObject({ ok: true, phase: 'closed' });
+
+    const unknown = await sendCommand(socket, {
+      v: 1,
+      type: 'reset',
+      sessionId: '01NOPE',
+      reason: 'x',
+    });
+    expect(unknown.ok).toBe(false);
+    expect(unknown.message).toContain('no session 01NOPE');
 
     await runtime.close();
   });

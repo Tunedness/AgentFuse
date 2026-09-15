@@ -1,6 +1,6 @@
 import { spawn } from 'node:child_process';
 import { chmodSync, mkdirSync, mkdtempSync, rmSync, statSync, writeFileSync } from 'node:fs';
-import { createServer, type Socket } from 'node:net';
+import { createConnection, createServer, type Socket } from 'node:net';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
@@ -139,6 +139,22 @@ describe('the directory the socket lives in', () => {
     expect(mode(dir)).toBe('700');
   });
 
+  it('reports a directory it cannot create at all', () => {
+    // A regular file where a directory has to go: `mkdir` fails with ENOTDIR,
+    // and the operator gets the path and the variable that moves it rather than
+    // a bare errno.
+    writeFileSync(join(root, 'file'), '', 'utf8');
+
+    try {
+      ensureSocketDir(join(root, 'file', 'nested', 'a.sock'), undefined);
+      expect.unreachable('a directory under a file cannot be created');
+    } catch (error) {
+      const cli = error as CliError;
+      expect(cli.message).toContain('cannot prepare the approval socket directory');
+      expect(cli.hints.join(' ')).toContain(SOCKET_ENV_VAR);
+    }
+  });
+
   it('refuses a directory that belongs to somebody else', () => {
     // The uid is injected precisely so this is testable: a test cannot own a
     // directory as another user, and "AgentFuse will not put this socket in a
@@ -223,6 +239,23 @@ describe('prepareSocketPath', () => {
       kind: 'refused',
       why: 'live',
     });
+  });
+
+  it('reports a stale socket it is not allowed to remove', async () => {
+    // Ours, dead, and in a directory we have taken the write bit off. Unlinking
+    // is the one destructive thing this code does, so failing to do it has to
+    // end in a refusal rather than in a bind over the top of it.
+    const path = join(root, 'a.sock');
+    await staleSocket(path);
+    chmodSync(root, 0o500);
+    try {
+      expect(await prepareSocketPath(path, undefined)).toMatchObject({
+        kind: 'refused',
+        why: 'unreadable',
+      });
+    } finally {
+      chmodSync(root, 0o700);
+    }
   });
 
   it('reports a path it cannot even read', async () => {
@@ -333,6 +366,38 @@ describe('listenApprovalSocket', () => {
     }
   });
 
+  it('works without an event sink at all', async () => {
+    const path = join(root, 'a.sock');
+    // With a stale socket in the way, so the no-op sink is used and not merely
+    // created: this is the path where a caller wants a listener and no log.
+    await staleSocket(path);
+    const socket = await listenApprovalSocket({
+      path,
+      handle: () => ({ v: 1, ok: true, message: 'noted' }),
+    });
+    open.push(socket);
+
+    await expect(
+      sendCommand(path, { v: 1, type: 'reset', sessionId: '01S', reason: 'x' }),
+    ).resolves.toMatchObject({ ok: true });
+  });
+
+  it('reports a path the kernel will not bind, rather than throwing an errno', async () => {
+    // Longer than `sun_path`. `resolveApprovalSocketPath` catches this before it
+    // gets here, but the listener is a public function and the failure has to
+    // arrive as a CliError either way.
+    const path = join(root, `${'x'.repeat(200)}.sock`);
+
+    try {
+      await listen(path);
+      expect.unreachable('the kernel refuses a path that long');
+    } catch (error) {
+      expect((error as CliError).message).toContain('cannot open the approval socket');
+      expect(events.map(([event]) => event)).toContain('approval_socket_bind_failed');
+      expect(events.map(([event]) => event)).toContain('approval_socket_error');
+    }
+  });
+
   it('reports a stale socket it removed, so the log says what happened', async () => {
     const path = join(root, 'a.sock');
     await staleSocket(path);
@@ -346,7 +411,6 @@ describe('listenApprovalSocket', () => {
 describe('a client that misbehaves', () => {
   /** Writes raw bytes and reads whatever comes back, bypassing the client. */
   async function raw(path: string, payload: string): Promise<string> {
-    const { createConnection } = await import('node:net');
     return await new Promise<string>((resolve) => {
       const socket = createConnection(path);
       let out = '';
@@ -383,6 +447,22 @@ describe('a client that misbehaves', () => {
 
     expect(answer).toContain('at most');
     expect(events.map(([event]) => event)).toContain('approval_socket_rejected');
+  });
+
+  it('ignores a second frame that arrives in its own packet', async () => {
+    const path = join(root, 'a.sock');
+    const { seen } = await listen(path);
+
+    const socket = createConnection(path);
+    socket.on('error', () => undefined);
+    await new Promise<void>((resolve) => socket.on('connect', () => resolve()));
+    socket.write(encodeFrame({ v: 1, type: 'reset', sessionId: '01A', reason: 'x' }));
+    await new Promise((resolve) => setTimeout(resolve, 40));
+    socket.write(encodeFrame({ v: 1, type: 'reset', sessionId: '01B', reason: 'x' }));
+    await new Promise((resolve) => setTimeout(resolve, 40));
+    socket.destroy();
+
+    expect(seen).toEqual([{ v: 1, type: 'reset', sessionId: '01A', reason: 'x' }]);
   });
 
   it('ignores everything after the first frame on one connection', async () => {
@@ -448,6 +528,22 @@ describe('sendCommand', () => {
       const cli = error as CliError;
       expect(cli.message).toContain('nothing is waiting for an approval');
       expect(cli.hints.join(' ')).toContain('mode: enforce');
+    }
+  });
+
+  it('reports a path that is not a socket at all', async () => {
+    // Neither ENOENT nor ECONNREFUSED: a different error, and a different
+    // sentence — "nothing is waiting here" would be a lie.
+    const path = join(root, 'regular-file');
+    writeFileSync(path, 'not a socket', 'utf8');
+
+    try {
+      await sendCommand(path, { v: 1, type: 'reset', sessionId: '01S', reason: 'x' });
+      expect.unreachable('a regular file is not a socket');
+    } catch (error) {
+      const cli = error as CliError;
+      expect(cli.message).toContain('cannot reach the approval socket');
+      expect(cli.message).not.toContain('nothing is waiting');
     }
   });
 

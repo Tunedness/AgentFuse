@@ -181,18 +181,20 @@ export { wantsApproval } from './approvals/index.js';
 /**
  * This user's numeric id, where the platform has one.
  *
- * Used to prove the approval socket and its directory belong to us. `undefined`
- * on Windows, where `uid` is reported as `-1` and there is no such thing to
- * compare — the ownership check is skipped there and the socket layer says so.
+ * Used to prove the approval socket and its directory belong to us.
+ * `undefined` twice over: on Windows, where `uid` is reported as `-1` and there
+ * is nothing of the sort to compare; and inside a container run with an
+ * arbitrary `--user`, where `userInfo` throws because the uid has no passwd
+ * entry. Neither is a reason to refuse to start — they are reasons the
+ * ownership check cannot be made, and the socket layer skips it.
+ *
+ * The reader is a parameter so both of those are a test rather than a comment.
  */
-function currentUid(): number | undefined {
+export function currentUid(read: () => { readonly uid: number } = userInfo): number | undefined {
   try {
-    const uid = userInfo().uid;
+    const uid = read().uid;
     return uid >= 0 ? uid : undefined;
   } catch {
-    // `userInfo` throws when the uid has no passwd entry, which happens inside
-    // containers run with an arbitrary `--user`. Nothing to compare against
-    // then, and refusing to start over it would be the wrong call.
     return undefined;
   }
 }

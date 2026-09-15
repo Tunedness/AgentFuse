@@ -1,6 +1,8 @@
 import { execFile } from 'node:child_process';
+import { createHmac } from 'node:crypto';
 import { existsSync, mkdtempSync, rmSync, statSync, writeFileSync } from 'node:fs';
-import { createConnection } from 'node:net';
+import { createServer, type Server } from 'node:http';
+import { type AddressInfo, createConnection } from 'node:net';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -65,6 +67,7 @@ function writePolicy(lines: readonly string[], name = 'fusepolicy.yaml'): string
 interface StartOptions {
   readonly policyPath?: string;
   readonly socket?: string;
+  readonly env?: Readonly<Record<string, string>>;
 }
 
 function startWrap(options: StartOptions = {}): WireClient {
@@ -82,6 +85,7 @@ function startWrap(options: StartOptions = {}): WireClient {
     env: {
       PATH: process.env['PATH'] ?? '',
       AGENTFUSE_APPROVAL_SOCKET: options.socket ?? socketPath,
+      ...options.env,
     },
     cwd: root,
   });
@@ -157,7 +161,13 @@ beforeEach(() => {
   writePolicy(approvalPolicy(['  timeout: 30s']));
 });
 
-afterEach(() => {
+const servers: Server[] = [];
+
+afterEach(async () => {
+  for (const server of servers.splice(0)) {
+    server.closeAllConnections();
+    await new Promise<void>((resolve) => server.close(() => resolve()));
+  }
   rmSync(root, { recursive: true, force: true });
 });
 
@@ -502,6 +512,82 @@ describe.runIf(built)('socket hygiene, with real processes', () => {
       const approval = await agentfuse(['approve', pendingId(prompt), '--reason', 'fine']);
       expect(approval.code).toBe(0);
       expect(textOf((await call).result)).toBe('{"a":1}');
+
+      agent.endInput();
+      expect((await agent.exit()).code).toBe(0);
+    } finally {
+      await agent.dispose();
+    }
+  });
+});
+
+describe.runIf(built)('the webhook channel, against a real endpoint', () => {
+  /** A receiver that verifies the HMAC with its own crypto and then approves. */
+  async function endpoint(secret: string): Promise<{ url: string; verified: boolean[] }> {
+    const verified: boolean[] = [];
+    const server = createServer((req, res) => {
+      const chunks: Buffer[] = [];
+      req.on('data', (chunk: Buffer) => chunks.push(chunk));
+      req.on('end', () => {
+        const body = Buffer.concat(chunks).toString('utf8');
+        const expected = `v1=${createHmac('sha256', secret).update(body, 'utf8').digest('hex')}`;
+        const ok = req.headers['x-agentfuse-signature'] === expected;
+        verified.push(ok);
+        res.writeHead(ok ? 200 : 401, { 'content-type': 'application/json' });
+        res.end(
+          ok
+            ? '{"verdict":"approved","reason":"on-call approved it"}'
+            : '{"error":"bad signature"}',
+        );
+      });
+    });
+    servers.push(server);
+    await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', () => resolve()));
+    const { port } = server.address() as AddressInfo;
+    return { url: `http://127.0.0.1:${port}/approvals`, verified };
+  }
+
+  it('signs a request a receiver can verify, and forwards the call it approves', async () => {
+    const receiver = await endpoint('the-shared-secret');
+    writePolicy([
+      'version: 1',
+      'mode: enforce',
+      'report:',
+      '  dir: reports',
+      'budgets:',
+      '  on_exceeded: halt',
+      'loop_detection:',
+      '  on_trip: halt',
+      '  semantic:',
+      '    enabled: false',
+      'approvals:',
+      '  timeout: 30s',
+      '  gateways: [webhook]',
+      '  webhook:',
+      `    url: ${receiver.url}`,
+      '    secret_env: AF_WEBHOOK_SECRET',
+      'tools:',
+      '  - match: "raw-server__echo"',
+      '    action: require_approval',
+    ]);
+
+    const agent = startWrap({ env: { AF_WEBHOOK_SECRET: 'the-shared-secret' } });
+    try {
+      await agent.initialize();
+      const answered = await agent.request('tools/call', { name: 'echo', arguments: { a: 1 } });
+
+      expect(receiver.verified).toEqual([true]);
+      expect(textOf(answered.result)).toBe('{"a":1}');
+
+      const stderr = agent.stderr.toString('utf8');
+      expect(stderr).toContain('"source":"webhook"');
+      expect(stderr).toContain('on-call approved it');
+      // No socket for this policy: it named one channel and it was not the
+      // terminal one.
+      expect(existsSync(socketPath)).toBe(false);
+      // And the secret is nowhere in the wrap's own output.
+      expect(stderr).not.toContain('the-shared-secret');
+      expect(stderr).toContain('AF_WEBHOOK_SECRET');
 
       agent.endInput();
       expect((await agent.exit()).code).toBe(0);

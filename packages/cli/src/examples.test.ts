@@ -1,6 +1,7 @@
 import { readFileSync } from 'node:fs';
-import { fileURLToPath } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 import { describe, expect, it } from 'vitest';
+import { signatureHeaderValue } from './approvals/webhook-gateway.js';
 import { parseArgs } from './args.js';
 import { COMMANDS } from './cli.js';
 import { MODE_VALUES } from './commands/shared.js';
@@ -126,5 +127,67 @@ describe('examples/claude-desktop.json', () => {
     // And at least one without the flag, which is the policy's own mode and
     // starts at `warn`.
     expect(modes).toContain(undefined);
+  });
+});
+
+/**
+ * The shipped approval receiver, checked against the signer that will call it.
+ *
+ * An example of a security-relevant protocol is worse than no example if it is
+ * subtly wrong, and the way it goes wrong — signing a re-serialised body,
+ * comparing with `===`, trusting an unsigned timestamp — is invisible on a
+ * reading. So the file is imported and run against `WebhookApprovalGateway`
+ * itself, which is the only party whose agreement matters.
+ */
+
+const RECEIVER = fileURLToPath(new URL('../../../examples/approval-webhook.mjs', import.meta.url));
+
+interface Receiver {
+  verify(secret: string, body: string, header: string | undefined): boolean;
+}
+
+async function receiver(): Promise<Receiver> {
+  return (await import(pathToFileURL(RECEIVER).href)) as Receiver;
+}
+
+describe('examples/approval-webhook.mjs', () => {
+  it('verifies exactly what the gateway signs', async () => {
+    const { verify } = await receiver();
+    const body = JSON.stringify({ hello: 'world', timestamp: 1 });
+
+    expect(verify('shhh', body, signatureHeaderValue('shhh', body))).toBe(true);
+  });
+
+  it.each([
+    ['a body changed by one byte', (body: string) => `${body} `],
+    ['a body with the same fields in another order', () => '{"timestamp":1,"hello":"world"}'],
+  ])('rejects %s', async (_label, mangle) => {
+    const { verify } = await receiver();
+    const body = JSON.stringify({ hello: 'world', timestamp: 1 });
+
+    expect(verify('shhh', mangle(body), signatureHeaderValue('shhh', body))).toBe(false);
+  });
+
+  it('rejects a missing header and the wrong secret', async () => {
+    const { verify } = await receiver();
+    const body = '{"a":1}';
+
+    expect(verify('shhh', body, undefined)).toBe(false);
+    expect(verify('shhh', body, signatureHeaderValue('other', body))).toBe(false);
+  });
+
+  it('never contains a secret of its own', () => {
+    const source = readFileSync(RECEIVER, 'utf8');
+
+    // The whole point of `secret_env`: an example people copy must not teach
+    // them to paste a secret into a file they will commit.
+    expect(source).toContain('process.env.AGENTFUSE_WEBHOOK_SECRET');
+    expect(source).toContain('secret_env');
+  });
+
+  it('says what an unparseable answer means, because none of them fail open', () => {
+    const source = readFileSync(RECEIVER, 'utf8');
+
+    expect(source).toContain('There is no response shape that fails open');
   });
 });

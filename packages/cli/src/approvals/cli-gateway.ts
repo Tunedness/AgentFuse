@@ -128,10 +128,19 @@ export function approvalPrompt(
   ];
 }
 
+/** How one pending approval was resolved, and by which route. */
+interface Answer {
+  readonly verdict: ApprovalVerdict;
+  /** The human's words, where there are any. Empty for a timeout. */
+  readonly reason: string;
+  /** `cli`, `timeout` or `abort`, for the log. */
+  readonly source: string;
+}
+
 /** One call waiting for a human. */
 interface Pending {
   readonly request: ApprovalRequest;
-  readonly settle: (verdict: ApprovalVerdict, reason: string, source: string) => void;
+  readonly settle: (answer: Answer) => void;
 }
 
 /** Asks the human at the other end of the socket. */
@@ -223,43 +232,48 @@ export class CliApprovalGateway implements ApprovalGateway {
       socket: this.path,
     });
 
-    return await new Promise<ApprovalVerdict>((resolve) => {
-      let settled = false;
-      const settle = (verdict: ApprovalVerdict, reason: string, source: string): void => {
-        if (settled) return;
-        settled = true;
-        clearTimeout(timer);
-        signal.removeEventListener('abort', onAbort);
-        this.#pending.delete(request.approvalId);
-        this.#diagnostics.emit('approval_resolved', {
-          approvalId: request.approvalId,
-          sessionId: request.sessionId,
-          verdict,
-          source,
-          ...(reason === '' ? undefined : { reason }),
-        });
-        resolve(verdict);
-      };
-
-      const onAbort = (): void => {
+    // The tidying up lives after the `await`, not inside the handlers: a
+    // promise settles once, so everything below runs exactly once however many
+    // of the three routes — a verdict, the clock, an abort — got there first,
+    // and none of them needs a guard against the others.
+    let onAbort!: () => void;
+    let timer: NodeJS.Timeout | undefined;
+    const answer = await new Promise<Answer>((resolve) => {
+      onAbort = (): void => {
         // See the module doc: an abandoned prompt is a denial, never a timeout.
-        settle('denied', 'the session ended or the breaker was reset', 'abort');
+        resolve({
+          verdict: 'denied',
+          reason: 'the session ended or the breaker was reset',
+          source: 'abort',
+        });
       };
 
-      const timer = setTimeout(() => {
-        settle('timeout', '', 'timeout');
+      timer = setTimeout(() => {
+        resolve({ verdict: 'timeout', reason: '', source: 'timeout' });
       }, request.timeoutMs);
       // The wrap is held open by the agent's pipe, not by a prompt nobody is
       // going to answer.
       timer.unref?.();
 
       signal.addEventListener('abort', onAbort, { once: true });
-      this.#pending.set(request.approvalId, { request, settle });
+      this.#pending.set(request.approvalId, { request, settle: resolve });
 
       // The engine aborts on `endSession` before it ever calls this, but a
       // signal that is *already* aborted would otherwise never fire an event.
       if (signal.aborted) onAbort();
     });
+
+    clearTimeout(timer);
+    signal.removeEventListener('abort', onAbort);
+    this.#pending.delete(request.approvalId);
+    this.#diagnostics.emit('approval_resolved', {
+      approvalId: request.approvalId,
+      sessionId: request.sessionId,
+      verdict: answer.verdict,
+      source: answer.source,
+      ...(answer.reason === '' ? undefined : { reason: answer.reason }),
+    });
+    return answer.verdict;
   }
 
   /** Stops listening. Pending prompts are the engine's to abort. */
@@ -282,7 +296,11 @@ export class CliApprovalGateway implements ApprovalGateway {
       };
     }
 
-    waiting.settle(frame.verdict === 'approved' ? 'approved' : 'denied', frame.reason, 'cli');
+    waiting.settle({
+      verdict: frame.verdict === 'approved' ? 'approved' : 'denied',
+      reason: frame.reason,
+      source: 'cli',
+    });
     return {
       v: 1,
       ok: true,

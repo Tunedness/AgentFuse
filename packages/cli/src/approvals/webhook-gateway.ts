@@ -193,7 +193,6 @@ export async function readCapped(response: Response, limit: number): Promise<str
     for (;;) {
       const { done, value } = await reader.read();
       if (done) break;
-      if (value === undefined) continue;
       size += value.byteLength;
       if (size > limit) {
         await reader.cancel();
