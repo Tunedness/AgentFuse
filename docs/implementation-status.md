@@ -1,8 +1,8 @@
 # AgentFuse — uygulama durumu ve devir notu
 
-**Son güncelleme:** 2026-09-15 · **`main`'deki son kod commit'i:** `c80c4db`
-(`main` HEAD bunu izleyen bu doküman commit'i) · **Durum:** Faz 6 kısmen bitti
-(6a); kritik yol `wrap`/`serve` için Faz 6b'ye geçti
+**Son güncelleme:** 2026-09-16 · **`main`'deki son kod commit'i:** `7447c48`
+(`main` HEAD bunu izleyen bu doküman commit'i) · **Durum:** Faz 6 bitti (6a +
+6b); kritik yolda sırada Faz 9, paralelde Faz 4/7/8
 
 Bu dosya, işi başka bir oturumda kaldığı yerden sürdürebilmek için tutulur.
 Ürün tanımı burada değil — tek doğruluk kaynağı `../.ssot/PRD.md` ve
@@ -22,7 +22,7 @@ dosyasındadır.
 | 3 | Asenkron semantik döngü katmanı | **Bitti** — `abd96d8` |
 | 4 | `@agentfuse/embeddings-local` | Başlanmadı |
 | 5 | `@agentfuse/proxy` (MCP adaptörü) | **Bitti** — `ebce8f0` |
-| 6 | CLI (`agentfuse`) | **Kısmen bitti (6a)** — `373c240` `f503322` `58741ba` `c80c4db`; `wrap`/`serve` = 6b |
+| 6 | CLI (`agentfuse`) | **Bitti** — 6a: `373c240` `f503322` `58741ba` `c80c4db` · 6b: `54d858e` `19c96f8` `7447c48` |
 | 7 | Onay akışı + rapor UX | Başlanmadı |
 | 8 | Telemetri (OTLP) | Başlanmadı |
 | 9 | Benchmark'lar (tespit + gecikme) | Başlanmadı |
@@ -35,35 +35,41 @@ Bağımlılık grafiği ve kritik yol:
 kritik yol: 0-1-2-5-6-9-10
 ```
 
-### `main` yeşil — 2026-09-15'te bizzat koşuldu
+### `main` yeşil — 2026-09-16'da bizzat koşuldu
 
 ```
-npm run lint          → Checked 140 files. No fixes applied.
+npm run lint          → Checked 153 files. No fixes applied. (exit 0)
 npm run typecheck     → temiz (tsc -b && tsc -p tsconfig.test.json)
 npm run build         → temiz
-npm test              → Test Files 43 passed · Tests 951 passed (2.53 s)
+npm test              → Test Files 50 passed · Tests 1143 passed (~2.7 s)
 npm run schema:check  → schema up to date
 ```
 
-Faz 6a öncesindeki sayılar 28 dosya / 633 test idi; eklenen 15 dosya ve 318
-test tümüyle `packages/cli`'ye ait ve mevcut 633 testin hiçbiri değişmedi.
+Faz 6b öncesindeki sayılar 43 dosya / 951 test idi; eklenen 7 dosya ve 192 test
+tümüyle `packages/cli`'ye ait. Mevcut testlerden yalnız `cli.test.ts`'in
+"Faz 6b'nin komutları" bloğu (dört test) yeniden yazıldı; gerekçesi aşağıda
+(Faz 6b → "6a'nın modüllerinde değişen şey"). Başka hiçbir test dosyasına
+dokunulmadı.
 
 Coverage kapısı `vitest.config.ts` içinde `packages/core/src/**` için %90'da ve
 **gerçekten zorluyor** (Faz 2'de 100'e çekilip kasten kırılarak doğrulandı).
-Faz 6a sonundaki ölçümler (`coverage/lcov.info` üzerinden, glob bazında):
+Faz 6b sonundaki ölçümler (`coverage/lcov.info` üzerinden, glob bazında):
 
 | Paket | lines | functions | branches |
 | --- | --- | --- | --- |
 | `packages/core/src/**` (kapılı) | %99.89 | %100 | %95.45 |
 | `packages/proxy/src/**` (kapısız) | %98.88 | %100 | %91.18 |
-| `packages/cli/src/**` (kapısız) | %99.79 | %100 | %98.86 |
+| `packages/cli/src/**` (kapısız) | %99.87 | %100 | %99.09 |
 
-Kapı yalnız core'da, ama proxy ve CLI de bilinçli olarak aynı çubuğun üstünde
-tutuldu; sayıyı şişirmemek için yazılmamış tek test yok. Metin reporter'ının
-satırları: `proxy/src` %98.46 / %91.17 / %100 / %98.87, `cli/src` %99.27 /
-%98.86 / %100 / %99.72, `cli/src/commands` %100 / %98.82 / %100 / %100.
-Karşılaştırma için Faz 5 sonunda "All files" %99.03 / %93.95 / %100 / %99.53
-idi; artık %99.19 / %95.35 / %100 / %99.66.
+Core ve proxy rakamları Faz 6a'dakinin aynısı — iki pakete de dokunulmadı.
+CLI üç metrikte de yükseldi (%99.79 → %99.87 lines, %98.86 → %99.09 branches);
+6b'nin eklediği kod bilinçli olarak core'un çubuğunun üstünde tutuldu ve
+ölçülemez kalan dallar tek tek ya silindi ya yorumla gerekçelendi.
+
+Metin reporter'ının satırları: `core/src` %98.31 / %96.46 / %100 / %99.36,
+`proxy/src` %98.46 / %91.17 / %100 / %98.87, `cli/src` %99.44 / %98.78 / %100 /
+%99.79, `cli/src/commands` %100 / %99.54 / %100 / %100. "All files" %99.30 /
+%95.93 / %100 / %99.71 (Faz 6a sonunda %99.19 / %95.35 / %100 / %99.66).
 
 **`main.ts` metin reporter'ında %0 görünür ve bu beklenen.** Dosya tek bir
 top-level `await run(...)` ifadesidir ve gerçek stream'leri bağlar; yalnızca
@@ -1044,28 +1050,356 @@ ediyor (Faz 5 §çelişki kaydı #4).
 
 ---
 
+## Faz 6b — `wrap` ve `serve` (bitti)
+
+Üç commit: `54d858e` `wrap` + host seam + `tools/list` önbelleği, `19c96f8`
+Node→Fetch köprüsü + `serve`, `7447c48` örnek istemci yapılandırması.
+`packages/cli/src` ağacına eklenenler:
+
+```
+host.ts                    ← process'e dokunan İKİNCİ (ve son) dosya
+annotations.ts             ← tools/list önbelleği → annotationsFor
+http.ts                    ← node:http → Fetch köprüsü
+commands/wrap.ts           ← MVP'nin birincil modu
+commands/serve.ts          ← HTTP ucu + ADR-006 merdiveni
+testing/wire.ts            ← ham JSON-RPC istemcisi (build ve coverage dışı)
+testing/fixtures/raw-server.mjs  ← SDK'sız stdio MCP sunucusu
+examples/claude-desktop.json
+```
+
+### `wrap` — dört bitiş, dört exit code
+
+`agentfuse wrap` neredeyse tümüyle yaşam döngüsüdür; motor, portlar, rapor
+dizini ve semantik katman `createRuntime`'dan, transport'lar ve korumalı
+`tools/call` yolu `wrapStdioServer`'dan geliyor. Kalan iş "bir wrap ne zaman
+biter" sorusu:
+
+| Tetikleyici | Nasıl görülüyor | exit |
+| --- | --- | --- |
+| ajan gitti | `stdin` `end` ya da `close` yayıyor | 0 |
+| SIGINT / SIGTERM | sinyal çocuğa iletilir, sonra durulur | 0 |
+| sarılan sunucu öldü | upstream bağlantısı kapandı | 70 |
+| çocuk hiç başlamadı | bağlantıdan önce gelen spawn hatası | 70 |
+
+Üçüncü satır kasıtlı ve açıkça yazılmalı: **çocuk ölünce downstream bağlantı
+açık kalıyor.** `wrapStdioServer` upstream kapanışını downstream'e
+yaymıyor — yaymasını beklemek de yanlış olurdu, topolojiyi bilen taraf servis
+giriş noktası değil host. Bu ele alınmazsa wrap ayakta kalır ve sonraki her
+`tools/call`'a hata döner; bir MCP istemcisi de "çalışan ama her çağrıda
+patlayan sunucu" görür, yeniden başlatabileceği ölü bir sunucu değil.
+
+**Çocuğun kendi exit status'ü iletilmiyor** ve bunun sebebi kayda geçmeli:
+kurulu SDK'nın `StdioClientTransport`'u kodu düşürüyor
+(`_process.on("close", (_code) => …)`, kod hiç okunmuyor) ve `_process` alanı
+`private`. Proxy de `ChildProcess`'i yüzeye çıkarmıyor. Dolayısıyla dürüst
+seçenekler yukarıdaki tablo ya da bir dependency'nin private alanını okumaktı;
+ikincisi bir SDK yükseltmesinde **sessizce** yanlış exit code üretirdi. Tablo
+seçildi. **Bunu kapatacak dikiş tek bir opsiyonel callback:**
+`StdioWrapOptions.onChildExit?: (code: number | null, signal: NodeJS.Signals |
+null) => void`, `stdio-wrap.ts` içinde transport'un `pid`'inin yanında. Proxy
+donmuş olduğu için 6b eklemedi.
+
+**Sinyal adıyla iletiliyor,** pipe kapatılarak değil: SIGINT'i özel işleyen
+(flush eden, kilit bırakan) bir sunucu operatörün gönderdiği sinyali almalı,
+SDK'nın kapanışta yükselttiği SIGTERM'i değil. Çocuğun pid'i
+`bridge.client.transport` üzerinden **public** `pid` getter'ından yapısal bir
+okumayla alınıyor (`Transport` tipi `pid` beyan etmiyor, `StdioClientTransport`
+ekliyor). `undefined` dönerse sinyal iletilmez ve teardown transport'u
+kapatmaya düşer — SDK onu kendisi SIGTERM, sonra SIGKILL'e yükseltiyor.
+
+### Akış sadakati — nasıl test edildi
+
+Wrap modunun stream'ler hakkındaki üç iddiası process içinden test edilemez,
+çünkü üçü de dosya tanıtıcılarının özelliği. `wrap-process.test.ts` bu yüzden
+**inşa edilmiş `dist/main.js`'i** gerçek bir process olarak doğuruyor ve
+stdio'sunu kendisi tutuyor:
+
+1. **stdout yalnız protokol frame'i taşır** — iddia **ham baytlar** üzerinde,
+   ayrıştırılmış mesajlar üzerinde değil: tesadüfen geçerli JSON olan bir
+   diagnostic de akışı bozar. `testing/wire.ts` içindeki `nonProtocolLines`
+   boş olmak zorunda, ve akışın gerçekten dolu olduğu ayrıca kontrol ediliyor
+   ki boş bir stream testi geçemesin.
+2. **Çocuğun stderr'i byte-for-byte geçer** — fixture kasten
+   `0xff 0xfe 0x80` (hiçbir yerde geçerli UTF-8 değil) ve **sonunda newline
+   olmayan** bir satır yazıyor; ilki decode/encode eden bir iletici tarafından
+   U+FFFD'ye çevrilir, ikincisi satır tamponlayan bir iletici tarafından ya
+   sonsuza tutulur ya uydurma bir newline ile flush edilir. Karşılaştırma
+   `Buffer.equals` ile tam eşitlik. Bu mümkün, çünkü `--quiet` altında
+   stderr'de AgentFuse'un tek satırı yok.
+3. **exit code ne olduğunu söyler** — gerçek bir çıkış gerektiriyor.
+
+Test istemcisi de fixture sunucusu da **ham JSON-RPC**, SDK'sız. İki sebep:
+bu paket MCP SDK'sına bağımlı değil ve `discipline.test.ts` bunu dört pakete
+pinliyor (o liste `npx agentfuse`'un indirdiği şey); ve iddialar tam baytlar
+hakkında, ki ayrıştıran bir istemcinin gösteremeyeceği şey bu.
+
+### `annotationsFor` ve önbelleğin güvenli olmasının sebebi
+
+`ToolCatalogue` bağlantı başına, `trust_hints` açıkken **bir kez** upstream'e
+`tools/list` atıyor. Üç özellik taşıyor:
+
+1. **Politika istemedikçe hiçbir şey çekilmiyor.** `trust_hints` varsayılanı
+   `false` ve kapalıyken istek hiç gitmez — başkasının sunucusuna
+   istenmeyen bir `tools/list` bedava bir eylem değil.
+2. **Boş önbellek AgentFuse'u daha katı yapar, daha gevşek değil.** Core bu
+   ipuçlarıyla tek bir şey yapıyor: `idempotentHint` doğruysa exact-repeat
+   eşiğini ikiye katlıyor (`guards/rule-loop.ts`). Henüz gelmemiş bir ipucu
+   demek ki daha sıkı eşik; ilk araç çağrısı ile katalogun gelmesi arasındaki
+   yarış, bloke edilmesi gereken bir çağrıyı geçirtemez. Bu, katalogu
+   asenkron doldurmayı savunulabilir kılan şeydir.
+3. **İpuçları doğrulanıyor, inanılmıyor.** `readOnlyHint: "yes"` coerce
+   edilmeden düşürülüyor, adı olmayan tool girdisi yok sayılıyor. Core'un
+   `ToolAnnotations`'ı tel şeklinin alt kümesi; alan alan kopyalamak ileride
+   tele eklenecek bir alanın motora habersiz varmasını da engelliyor.
+
+### Bağlantının açıldığı an — bilinen ödünç
+
+`wrapStdioServer` çocuğu bağlantı açılınca doğuruyor ve ortaya çıkan bridge'i
+**callback'i olmayan bir getter** olarak veriyor. CLI'nin o ana ihtiyacı olan
+iki işi var: `tools/list` katalogu ve upstream'in gittiğini öğrenmek. Bu yüzden
+`watchForConnection` **unref'li 25 ms'lik tek bir interval** kuruyor ve ilk
+bağlantıda kendini durduruyor.
+
+Alternatifi proxy'nin factory'sini CLI içinde yeniden kurmaktı, ki bu MCP
+istemcisini bu pakette inşa etmek demek — paketin bilinçle sahip olmadığı bir
+katman. Zamanlayıcı hiçbir şeyi açık tutmuyor (pipe tutuyor) ve tick başına bir
+property okuması. **`StdioWrapHandle` üzerinde bir `onConnect` bu dikişi
+tümüyle silerdi;** Faz 7 proxy'ye dokunuyorsa birlikte alınacak iki kancadan
+biri bu, diğeri yukarıdaki `onChildExit`.
+
+`client.onclose` sahipsiz olduğu için kullanıldı: bridge fallback handler'ları,
+`wrapStdioServer` `onerror`'u alıyor. Hem çocuk kendi ölünce hem teardown
+transport'u kapatınca ateşliyor; `finish` tek seferlik olduğu için teardown
+durumu zaten karara bağlanmış oluyor.
+
+### `--relay` — Faz 5'in çelişki kaydı #5'in tüketimi
+
+Proxy varsayılan olarak `RELAYABLE_CLIENT_CAPABILITIES` (sampling, elicitation,
+roots) beyan ediyor, çünkü downstream `initialize`'ı upstream'in
+capability'leriyle cevaplamak zorunda ve bu yüzden upstream bağlantısı gerçek
+istemci ne desteklediğini söylemeden önce kurulmak zorunda. `--relay
+<liste|none>` operatörün bunu daraltmasını sağlıyor; istemcisinin sampling'i
+olmadığını bilen operatör söyleyince sarılan sunucu kimsenin karşılayamayacağı
+push'ları denemeyi bırakıyor.
+
+### `serve` — ne garanti ediyor, ne etmiyor
+
+**Garanti ettiği:** gerçek bir HTTP ucu bağlar (`--port`, `--host`, `--path`,
+varsayılan `127.0.0.1:8765/mcp` — loopback, `0.0.0.0` değil), politikayı
+`wrap` ile birebir aynı şekilde yükler ve raporlar, ve gelen **her** isteğe
+ADR-006 merdivenini uygular: `_meta`'daki `traceparent` → `baggage`'daki
+`tunedness.session-id` → yalnız legacy era'da `Mcp-Session-Id` → `clientInfo`
++ uzak adres hash'i (`session.idle_timeout` ile sınırlı). Hangi basamağın
+cevapladığı hem yanıtta (`error.data.session` + `regime`) hem
+`http_request` diagnostic'inde yazıyor; metin proxy'nin kendi
+`describeSessionRegime`'inden geliyor. `GET /healthz` yürürlükteki politikayı
+bildiriyor. `SIGINT`/`SIGTERM` ile kapanıyor ve `resolver.clear()` +
+`runtime.close()` çağırıyor.
+
+**Garanti ETMEDİĞİ, ve `--help`'te büyük harfle yazılı olan:** araç
+çağrılarını **iletmiyor.** Her MCP methodu, çözülen session'ı adıyla anan ve
+`agentfuse wrap`'i işaret eden bir JSON-RPC hatasıyla (`-32601`, HTTP 200)
+cevaplanıyor; `id`'siz bir mesaj `202` alıyor; `GET`/`DELETE` `405` alıyor
+(spec, server-initiated stream sunmayan bir sunucuya bunu açıkça izin
+veriyor).
+
+Sebep yapısal ve Faz 5'in çelişki kaydı #4'ün devamı:
+
+- Trafiği korumak **downstream bağlantı başına bir upstream bağlantı**
+  istiyor (`bridge.ts`'in ilk paragrafı). Birden çok downstream'i tek
+  upstream'e çoğullamak sampling/elicitation/roots/MRTR'ı bozar, çünkü legacy
+  era'da sunucu bunları **çağıranı adlandırmadan** push ediyor.
+- `createMcpHandler` **HTTP isteği başına** bir server instance kuruyor
+  (SDK'nın kendi tipinde yazılı: "once per HTTP request"). Yani doğru bir
+  gateway, bu merdivenin çözdüğü session'a göre anahtarlanmış bir upstream
+  bağlantı havuzu istiyor; factory context'i HTTP `Request`'i taşıyor ama
+  ayrıştırılmış `_meta`'yı taşımıyor, dolayısıyla merdivenin `_meta`'da yaşayan
+  basamakları ancak istek *işlenirken* okunabiliyor. Bu kendi ADR'ını hak eden
+  bir tasarım (P1).
+- **Ve CLI bunu bugün yazamaz:** `createBridge` önceden bağlanmış bir `Client`
+  istiyor ve `createMcpHandler` `@modelcontextprotocol/server`'da. CLI'nin
+  bildirdiği bağımlılık listesi `discipline.test.ts` tarafından dört pakete
+  pinli (`@agentfuse/core`, `@agentfuse/proxy`, `gpt-tokenizer`, `yaml`) ve o
+  liste `npx agentfuse`'un indirdiği şeydir. Ayrıca korumalı HTTP girişinin
+  doğru yeri `packages/proxy/src/http-serve.ts` — MCP tesisatı proxy'nin
+  katmanı. Faz 6b'nin brifingi köprüyü `createMcpHandler` üzerine yazmayı
+  istiyordu; **bu iki kısıt altında yapılamadı ve kayda geçirildi**, brifingin
+  kendi talimatı da buydu ("genuinely infeasible → stop and report").
+
+`serve`'ün bugün işe yaradığı yer: ucun önündeki proxy ya da yük dengeleyici
+üzerinden erişilebilirliği kanıtlamak, ve **bir bütçe ona bağlanmadan önce**
+ajanın isteklerinin hangi session key'e çözüldüğünü görmek. Komut satırı
+gateway'in alacağı komut satırının aynısı, yani bugün yazılan bir yapılandırma
+P1'de çalışmaya devam ediyor.
+
+**HTTP `traceparent`/`baggage` header'ları bilinçle okunmuyor.** ADR-006 o
+basamakları `_meta`'ya (SEP-414) koyuyor ve McpGuard ile zincirleme sözleşmesi
+dıştaki proxy'nin girdiyi oraya enjekte etmesi. İkinci bir kaynak "bu istek
+hangi session" sorusuna iki cevap ve hangisinin kazandığına dair kural yokluğu
+demek olurdu. Bir test bunu pinliyor.
+
+### Node→Fetch köprüsü — P1'in koruyacağı parça
+
+`http.ts` bir dependency değil çünkü `@modelcontextprotocol/node` kurulu değil
+ve kurulması yayınlanan CLI'nin ağacına transitif olarak `@hono/node-server`
+sokardı; Node 20 zaten global `Request`/`Response`/`Headers`/`ReadableStream`
+taşıyor. Handler şekli kasten `createMcpHandler().fetch`'in şekli
+(`(Request, RequestContext) => Promise<Response>`), yani **P1 aynı ucun
+arkasına farklı bir handler koyar** — aynı bayraklar, aynı politika yüklemesi,
+aynı merdiven. Tek ekleme `RequestContext.remoteAddress`: web standardı bir
+`Request`'in uzak adres kavramı yok ve merdivenin en alt basamağı onu istiyor.
+
+Kolay yanlış yapılan dört şeyin her biri ayrıca test edilmiş:
+
+- **Gövdeler sınırlı** (varsayılan 4 MiB). Sınırsız okuma, tetikleyicisi ağ
+  olan bir bellek hatasıdır. Aşımda `413` ve handler hiç çağrılmıyor.
+- **Yanıtlar stream ediliyor**, backpressure gözetilerek (`write`'ın
+  callback'i bekleniyor). SSE gövdesi hiç bitmez; tamponlayan bir köprü modern
+  era'nın progress bildirdiği çağrıyı asardı. Çağıran gövde ortasında giderse
+  `reader.cancel()` çağrılıyor — okuyucusu olmayan sonsuz bir üretici, hiçbir
+  şeye benzeyen bir sızıntıdır.
+- **Bağlantı kopunca handler abort ediliyor:** `Request` bir `AbortSignal`
+  taşıyor. Modern era'da per-request stream'i kapatmak *iptal sinyalinin
+  kendisi*, yani iptal edilen bir araç çağrısı tam olarak bu telden geçiyor.
+- **Fırlatan handler yine cevap veriyor:** `500` ve bir diagnostic, asla
+  asılı bir socket.
+
+Header'lar `rawHeaders`'tan (telden gelen düz ad/değer listesi) kuruluyor,
+ayrıştırılmış çantadan değil: çanta tekrarların çoğunu tek string'e birleştirip
+`set-cookie`'yi dizi olarak bırakıyor, yani iki şekil ve olamayacak bir
+`undefined` demek. Ham çiftleri `append` etmek her header'ın her değerini
+korurken bunların hiçbirini istemiyor.
+
+### `host.ts` — process'e dokunan ikinci ve son dosya
+
+Faz 6a `main.ts`'i process'in **stream**'lerine dokunan tek dosya yaptı.
+Servis eden bir komut üç şey daha istiyor: ajanın pipe'ının okuma ucu, bir
+supervisor'ın gönderdiği iki sinyal, ve bunlardan birini çocuğa geçirme
+yeteneği. Bunlar tek bir enjekte edilebilir arayüzde (`ProcessHost`) ve
+`host.test.ts` `main.ts` + `host.ts` dışında hiçbir kaynak dosyanın
+`process.stdin`, `process.on`, `process.off`, `process.kill` adını anmamasını
+zorluyor — `discipline.test.ts` ve core'un `purity.test.ts`'i ile aynı fikir.
+`process.env` listede yok: salt okunur ortam yapılandırması ve komutlar onu
+zaten `CliContext`'ten alıyor.
+
+`process.stdin`'in `CliContext`'te olmamasının sebebi: başka hiçbir komut onu
+okumuyor, ve wrap modunda o "girdi" değil — SDK'nın transport'unun sahip
+olduğu, ajanın JSON-RPC pipe'ının yarısı. CLI'nin ondan istediği tek şey
+kapandığı an, ki o an wrap'in bittiği andır.
+
+### 6a'nın modüllerinde değişen şey
+
+- **`cli.ts`** — `wrap`/`serve` dispatch'i gerçek komutlara bağlandı,
+  `notImplemented` silindi, `PHASE_6B_COMMANDS` boşaldı ve usage satırları
+  güncellendi. Sabit **kaldı**: zorladığı şekil korunmaya değer — tablodaki bir
+  komut ya uygulanmıştır ya orada listelenip exit code'la reddedilir, asla
+  sessizce eksik olmaz.
+- **`cli.test.ts`** — "Faz 6b'nin komutları" bloğu yeniden yazıldı (dört test).
+  `it.each(PHASE_6B_COMMANDS)` boş dizide **sessizce sıfır test** üretiyordu;
+  yerine listenin boş olduğunu iddia eden bir test, geri eklenirse yakalayacak
+  taramanın kendisi, ve iki komutun da adlarında değil eksik politikada
+  durduğunu gösteren iki test var.
+- **`commands/serve.ts`** `defaultServerName`'i `commands/wrap.ts`'ten
+  alıyor — takma ad her fingerprint'in parçası ve `npx` bir sunucu değil.
+- **`core` ve `proxy` değiştirilmedi.** Tek satır bile. Yukarıda adı geçen iki
+  dikiş (`onChildExit`, `onConnect`) eklenmedi; ikisi de olmadan iş yapıldı ve
+  eksiklikleri yorumlarla kayda geçti.
+
+### Faz 6b'nin çelişki kaydı
+
+1. **`serve` korumalı HTTP gateway'i olmadan geldi** (yukarıda, gerekçe
+   yapısal + bağımlılık yönü). Brifing "`createMcpHandler` üzerine ~60 satırlık
+   köprüyü kendin yaz" diyordu; köprü yazıldı ve testli, ama `createMcpHandler`
+   CLI'den erişilemiyor. **`.ssot`'ta bir karar hak eden nokta:** HTTP gateway
+   `packages/proxy`'ye mi girecek (muhtemelen — MCP tesisatı orada), ve
+   upstream havuzunun anahtarı ne olacak.
+2. **Çocuğun exit code'u aynalanmıyor** (yukarıda). Kurulu SDK onu düşürüyor.
+3. **`wrap` bir `--request-timeout` bayrağı kazandı,** brifingde yoktu.
+   Gerekçe: SDK'nın 60 s varsayılanı, progress bildirmeyen ve gerçekten on
+   dakika süren bir aracı ajanın hiç istemediği bir timeout'la öldürür, ve
+   AgentFuse onu kıran şey gibi görünür. `resetTimeoutOnProgress` zaten açık,
+   ama progress bildirmeyen araç için yetmiyor.
+4. **Bağlantının açıldığı anı yakalamak için bir zamanlayıcı var** (yukarıda).
+   Bir `onConnect` dikişiyle silinir; bilinçli bir ödünç, gizlenmiş bir şey
+   değil.
+
+### Faz 7 ve Faz 8 için bırakılan dikişler
+
+**Faz 7 (onay akışı: unix socket + webhook, rapor UX):**
+
+- Onay bekleyen çağrı `beforeCall` içinde `ApprovalGateway` portundan çözülüyor
+  ve timeout'un sahibi gateway (Faz 2 kararı). `createRuntime` şu anda
+  `enforce` + onay isteyen politika için bir uyarı yazıyor
+  (`runtime.ts`, `wantsApproval`); gateway gelince **o uyarı kaldırılmalı** ve
+  `RuntimeOptions`'a bir gateway alanı eklenmelidir — `wrap` ve `serve`
+  tarafında başka bir değişiklik gerekmez.
+- Unix socket'i dinleyecek yer `host.ts`'in yanı: servis eden bir komutun
+  yaşam döngüsü zaten orada ve kapanışta temizlenen listener deseni kurulu.
+  `wrap`'in `serveWrap` fonksiyonu tek bir `ended` promise'i bekliyor; onay
+  soketi beşinci bir bitiş sebebi **değil**, paralel bir kaynak — açılışı
+  `wrapWiring`'in yanına, kapanışı `stopWatching` ile aynı bloğa.
+- Webhook için HTTP **istemcisi** gerekiyor, `http.ts` sunucu tarafı. Node 20
+  global `fetch` taşıyor, yeni bağımlılık gerekmez.
+- Rapor UX'i için 6a'nın bıraktığı karar noktası duruyor: `agentfuse report`
+  stdout'a bir `[agentfuse] {"event":"trip_report",…}` işaret satırı da
+  koyuyor (`Diagnostics.block()`'un ayrılmaz parçası). `--json` yolu temiz.
+- `serve` şu anda `-32601` ile reddediyor; onay akışının HTTP yüzeyi (P1
+  gateway'den bağımsız olarak) `createServeHandler` içine yeni bir route
+  olarak girebilir — `/healthz` deseni hazır.
+
+**Faz 8 (OTLP telemetri, kapalıyken sıfır OTel modülü):**
+
+- `createRuntime` şu anda `telemetry.enabled: true` için "bu build'de export
+  yok" uyarısı yazıyor; o uyarı Faz 8'in silmesi gereken şey.
+- Dinamik `import()` deseni `embeddings.ts`'te kurulu ve testli: kapalıyken
+  modül yüklenmemesi tam olarak o dosyanın çözdüğü problem. Aynı kalıp
+  (`resolveEmbeddingProvider`'ın karar tablosu) telemetri için kopyalanabilir.
+- Enstrümante edilecek noktalar zaten tek yerde: `Diagnostics.emit` çağrıları
+  `wrap` ve `serve` içinde olay adı + alanlarla geçiyor
+  (`session_start`, `session_end`, `blocked`, `would_trip`, `wrap_end`,
+  `http_request`, `http_listening`, `http_closing`, `semantic_stats`, …).
+  `Diagnostics` bir `sink` alıyor; ikinci bir tüketici eklemenin yeri
+  `runtime.ts`'teki tek `new Diagnostics(...)` çağrısı. **İki ayrı
+  `Diagnostics` kurulmamalı** — rate-limit pencereleri ayrışır.
+- `http.ts`'in `RequestContext`'i şu an yalnız `remoteAddress` taşıyor; OTLP
+  bağlamı (`traceparent` header'ı) gerekirse eklenecek yer orası, ve ADR-006
+  merdiveni onu **okumaya devam etmemeli** (yukarıdaki header kararı).
+- ADR-007 hatırlatması: telemetriye giden her token/USD rakamı `_estimated`
+  soneki taşıyor. `session_end` diagnostic'i `tokensEstimated` /
+  `usdEstimated` yazıyor ve bu isimler bağlayıcı.
+
+### `wip/phase-6-partial` artık tamamen aşıldı
+
+6a branch'teki 14 dosyanın hepsini tek tek değerlendirdi ve kararları yukarıdaki
+tabloda. Tek ertelenen parça `commands/shared.ts`'ten atılan `asPort`'du;
+6b onu `commands/serve.ts` içinde `--port`'un yanına, kendi testleriyle ve
+`Number('') === 0` tuzağına karşı korumalı olarak yazdı (`--port=` sessizce
+"işletim sistemine sor" demesin diye). **Branch'te `main`'e girmemiş hiçbir şey
+kalmadı; silinebilir.**
+
+---
+
 ## Sırada ne var
 
-### Faz 6b — `wrap` ve `serve`, kritik yol buradan geçiyor
+### Önce `.ssot`: HTTP gateway kendi kararını bekliyor
 
-Faz 6a'nın bıraktığı her şey hazır ve testli; kalan iş transport ve child
-process. Ne alınacağı yukarıdaki "Faz 6b'nin `runtime.ts`'ten alacağı şey"
-başlığında alan alan yazılı, örnek çağrı dahil. Üç kısa madde:
+Çatı ADR-002 kapsam değiştiren koddan önce doküman güncellemesi şart koşuyor ve
+Faz 6b iki noktayı kapsam kararı olarak bıraktı:
 
-- `agentfuse wrap` neredeyse tümüyle `wrapStdioServer()` çağrısıdır; politika
-  yükleme, `Tokenizer`/`CostModel` portları, `writeReport`, `onSessionEnd`,
-  `--quiet`/`--mode`/`--hook` ve semantik katman **6a'da bitti** —
-  `createRuntime()` hepsini kuruyor.
-- `cli.ts` ikisini de tabloda tutuyor ve `CliError` ile reddediyor;
-  `PHASE_6B_COMMANDS` listesi boşalınca `cli.test.ts`'teki "is the only part of
-  the table that is not wired up" testi de doğal olarak boş listeyi bekler hale
-  gelmeli. `--` ayıracı `args.ts`'te hazır ve testli: `wrap -- node server.mjs
-  --verbose` çocuğun `--verbose`'una dokunmuyor.
-- **Modern era'yı elle `new Server()` ile servis etmek mümkün değil** —
-  `serveStdio` / `createMcpHandler` zorunlu, gerekçe Faz 5 bölümünde.
-  `@modelcontextprotocol/node` kurulu değil, yani `serve` komutunun Node HTTP
-  köprüsü ya yazılacak ya o paket eklenecek; HTTP gateway'in kendisi P1 ve
-  kendi ADR'ını hak ediyor (Faz 5 §çelişki kaydı #4).
+1. **HTTP gateway hangi paketin işi ve upstream havuzunun anahtarı ne?**
+   Gerekçeler Faz 6b → çelişki kaydı #1'de. Kısaca: korumalı HTTP girişi
+   `createMcpHandler` + önceden bağlanmış bir `Client` istiyor, ikisi de
+   `@modelcontextprotocol/*` paketlerinde, ve CLI'nin bildirdiği bağımlılık
+   listesi bir testle dört pakete pinli. MCP tesisatının yeri `packages/proxy`;
+   `http-serve.ts` Faz 5'ten beri merdiveni tutuyor ve gateway girişinin
+   yanına gelmesi doğal. Havuz anahtarının ADR-006 merdiveninin çözdüğü session
+   olması gerekiyor, ve "katı bir `session.key` çözülemezse isteği reddet"
+   kararı servis giriş noktasının.
+2. **ADR-006 merdiven sıralaması** (Faz 5 → çelişki kaydı #3) hâlâ
+   açıklayıcı bir düzeltme bekliyor: ADR metni legacy HTTP'de
+   `Mcp-Session-Id`'yi önce sayıyor, uygulama onu `baggage`'ın altına koyuyor,
+   ve gerekçe aynı ADR'ın zincirleme sözleşmesi. Faz 6b bu sırayı `serve`'de
+   uyguladı ve testle pinledi; metin hâlâ ötekini söylüyor.
 
 ### Faz 4 — `@agentfuse/embeddings-local`
 
@@ -1091,11 +1425,22 @@ Plan dosyasındaki brifingler geçerli. Kısaca: Faz 7 onay akışı (unix socke
 webhook); Faz 8 OTLP telemetri (kapalıyken **sıfır** OTel modülü yüklenmeli);
 Faz 9 benchmark'lar ve eşik kalibrasyonu; Faz 10 dokümanlar ve v0.1.0.
 
+**Faz 7 ve Faz 8'in bağlanacağı dikişler tek tek yazılı:** Faz 6b →
+"Faz 7 ve Faz 8 için bırakılan dikişler". Oradaki iki madde özellikle taşıyıcı:
+gateway gelince `createRuntime`'ın yazdığı iki uyarı (onay gateway'i yok, OTLP
+export yok) **silinmek zorunda**, ve ikinci bir `Diagnostics` kurulmamalı —
+rate-limit pencereleri ayrışır.
+
 Faz 7 için proxy'nin bıraktığı iki not: `ApprovalGateway` portu core'da duruyor
 ve timeout'un sahibi gateway (Faz 2 kararı), yani proxy o yolda hiçbir şey
 yapmıyor — `beforeCall` enforce modunda onayı kendi çözüyor. Yazılı rapor
 `ToolCallGuardOptions.writeReport` kancasından geçiyor; **proxy hiç dosya I/O'su
 yapmıyor** ve ajana gösterdiği rapor yolu o kancanın döndürdüğüdür.
+
+Faz 7 ya da 8 proxy'ye dokunuyorsa birlikte alınacak iki kanca var, ikisi de
+Faz 6b'nin belgelenmiş ödünçleri: `StdioWrapOptions.onChildExit` (çocuğun exit
+code'u aynalanabilsin diye) ve `StdioWrapHandle.onConnect` (bağlantının
+açıldığı anı yakalamak için kurulan 25 ms'lik zamanlayıcı silinsin diye).
 
 **Faz 9 yalnız test değil, ürünün sayısal iddiasıdır.** PRD §6 eşikleri —
 recall ≥ 0.90, FP < 0.05, p95 eklenen < 50 ms — CI'da kapı olur. Corpus'un
