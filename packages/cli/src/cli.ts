@@ -13,6 +13,7 @@
  * the product is a second thing to keep in step with the first.
  */
 
+import { runApprove, runDeny } from './commands/approve.js';
 import { runInit } from './commands/init.js';
 import { runModels } from './commands/models.js';
 import { runReport } from './commands/report.js';
@@ -24,7 +25,16 @@ import { versionBanner } from './index.js';
 import { type CliContext, writeLines } from './io.js';
 
 /** The commands this build answers to. */
-export const COMMANDS = ['wrap', 'serve', 'init', 'validate', 'report', 'models'] as const;
+export const COMMANDS = [
+  'wrap',
+  'serve',
+  'init',
+  'validate',
+  'report',
+  'approve',
+  'deny',
+  'models',
+] as const;
 
 /** One of {@link COMMANDS}. */
 export type Command = (typeof COMMANDS)[number];
@@ -56,6 +66,8 @@ export function usage(): string[] {
     '  init             Write a starter fusepolicy.yaml.',
     '  validate         Check a policy file and print what it resolves to.',
     '  report           Read the trip reports written when a circuit broke.',
+    '  approve <id>     Let through a call a policy stopped for a human.',
+    '  deny <id>        Refuse one.',
     '  models install   Download the local embedding model.',
     '',
     '  --version, -v    Print the versions of the packages that shipped together.',
@@ -130,6 +142,10 @@ async function dispatch(context: CliContext): Promise<number> {
       return runValidate(context, rest);
     case 'report':
       return runReport(context, rest);
+    case 'approve':
+      return await runApprove(context, rest);
+    case 'deny':
+      return await runDeny(context, rest);
     case 'models':
       return await runModels(context, rest);
     case 'wrap':

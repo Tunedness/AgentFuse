@@ -2,7 +2,7 @@ import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import type { EmbeddingProvider } from '@agentfuse/core';
-import { HashingProvider } from '@agentfuse/core/testing';
+import { HashingProvider, ScriptedApprovalGateway } from '@agentfuse/core/testing';
 import { DIAGNOSTIC_PREFIX } from '@agentfuse/proxy';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { loadPolicy } from './config.js';
@@ -38,9 +38,18 @@ function write(relative: string, contents: string): string {
   return path;
 }
 
-function context(): CliContext {
-  return { argv: [], stdout, stderr, env: {}, cwd: root };
+function context(env: Readonly<Record<string, string>> = {}): CliContext {
+  return { argv: [], stdout, stderr, env, cwd: root };
 }
+
+/**
+ * A policy that asks for approval on a tool, with the semantic layer off.
+ *
+ * `mode: enforce` is what makes the engine resolve approvals at all, and the
+ * gateway table in `approvals/index.ts` is only consulted under it.
+ */
+const APPROVAL_POLICY =
+  'version: 1\nmode: enforce\nloop_detection:\n  semantic:\n    provider: none\ntools:\n  - match: "shell__*"\n    action: require_approval\n';
 
 /** A policy file plus the loaded form of it. */
 function policyFile(contents: string) {
@@ -206,29 +215,89 @@ describe('createRuntime', () => {
 });
 
 describe('the warnings a runtime gives at startup', () => {
-  it('says approvals fail closed until phase 7 lands', async () => {
+  it('says so, and fails closed, when the approval channel cannot be opened', async () => {
+    // No HOME and no XDG_RUNTIME_DIR: there is nowhere to put the socket. The
+    // run continues — a broken approval channel is stricter than the policy
+    // asked for, and refusing to start would take the user's MCP server down
+    // rather than protect anything.
     const runtime = await createRuntime({
-      loaded: policyFile(
-        'version: 1\nmode: enforce\nloop_detection:\n  semantic:\n    provider: none\ntools:\n  - match: "shell__*"\n    action: require_approval\n',
-      ),
+      loaded: policyFile(APPROVAL_POLICY),
       context: context(),
     });
 
-    expect(stderr.text).toContain('asks for human approval');
+    expect(stderr.text).toContain('cli approval channel could not be opened');
     expect(stderr.text).toContain('fail closed');
+    expect(runtime.approvals).toBeUndefined();
+    expect(runtime.approvalSocket).toBeUndefined();
 
     await runtime.close();
   });
 
-  it('does not warn about approvals in warn mode, where none are asked', async () => {
+  it('binds the socket and reports it when there is somewhere to put it', async () => {
+    const socket = join(root, 'a.sock');
+    const runtime = await createRuntime({
+      loaded: policyFile(APPROVAL_POLICY),
+      context: context({ AGENTFUSE_APPROVAL_SOCKET: socket }),
+    });
+
+    expect(runtime.approvals).toBeDefined();
+    expect(runtime.approvalSocket).toBe(socket);
+    expect(existsSync(socket)).toBe(true);
+    expect(events()).toContain('approval_gateway');
+    expect(stderr.text).not.toContain('could not be opened');
+
+    // And the socket is gone again afterwards: a wrap that exits leaving one
+    // behind is the stale path the next one has to reason about.
+    await runtime.close();
+    expect(existsSync(socket)).toBe(false);
+  });
+
+  it('does not open a channel in warn mode, where nobody is ever asked', async () => {
+    const socket = join(root, 'a.sock');
     const runtime = await createRuntime({
       loaded: policyFile(
         'version: 1\nmode: warn\nloop_detection:\n  semantic:\n    provider: none\ntools:\n  - match: "*"\n    action: require_approval\n',
       ),
-      context: context(),
+      context: context({ AGENTFUSE_APPROVAL_SOCKET: socket }),
     });
 
-    expect(stderr.text).not.toContain('asks for human approval');
+    expect(runtime.approvals).toBeUndefined();
+    expect(existsSync(socket)).toBe(false);
+    // Silently: wanting approvals off and finding them off is not a shortfall.
+    // The machine line still says why, the way the semantic table's rows do.
+    expect(stderr.text).not.toContain('warning');
+    expect(events()).toContain('approval_gateway_off');
+
+    await runtime.close();
+  });
+
+  it('does not open a channel for a policy that never asks', async () => {
+    const socket = join(root, 'a.sock');
+    const runtime = await createRuntime({
+      loaded: policyFile(
+        'version: 1\nmode: enforce\nbudgets:\n  on_exceeded: halt\nloop_detection:\n  on_trip: halt\n  semantic:\n    provider: none\n',
+      ),
+      context: context({ AGENTFUSE_APPROVAL_SOCKET: socket }),
+    });
+
+    expect(runtime.approvals).toBeUndefined();
+    expect(existsSync(socket)).toBe(false);
+
+    await runtime.close();
+  });
+
+  it('leaves an injected gateway alone and binds nothing', async () => {
+    const socket = join(root, 'a.sock');
+    const injected = new ScriptedApprovalGateway('approved');
+    const runtime = await createRuntime({
+      loaded: policyFile(APPROVAL_POLICY),
+      context: context({ AGENTFUSE_APPROVAL_SOCKET: socket }),
+      approvals: injected,
+    });
+
+    expect(runtime.approvals).toBe(injected);
+    expect(runtime.engine.ports.approvals).toBe(injected);
+    expect(existsSync(socket)).toBe(false);
 
     await runtime.close();
   });

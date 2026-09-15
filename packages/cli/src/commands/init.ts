@@ -89,8 +89,11 @@ budgets:
   max_usd_estimated: 5
 
   # What to do when a budget runs out: halt | require_approval | warn.
-  # \`halt\` while the approval flow is still landing: an approval nobody can
-  # answer is a denial with extra steps.
+  #
+  # \`halt\`, unlike the schema's own default, and on purpose: a blown budget is
+  # not a transient fault. It never un-blows, so \`require_approval\` here means a
+  # prompt for every remaining call of the session rather than one decision.
+  # Approval is the right answer for a *tool* — see \`approvals\` at the bottom.
   on_exceeded: halt
 
 loop_detection:
@@ -186,12 +189,41 @@ pricing:
 #   key: auto            # auto | connection | traceparent | baggage:<name>
 #   idle_timeout: 10m
 
-# Human approval. Not in this build yet; see \`budgets.on_exceeded\` above.
-#
-# approvals:
-#   timeout: 120s
-#   on_timeout: deny
-#   gateways: [cli]
+# Human approval, for the rules whose \`action\` is \`require_approval\`. Only read
+# in \`mode: enforce\` — warn mode never asks anybody.
+approvals:
+  # How long a call waits for a person before the answer below applies.
+  timeout: 120s
+
+  # What an unanswered approval means: deny | allow.
+  #
+  # Keep \`deny\`. \`allow\` makes AgentFuse fail OPEN — the one call a policy
+  # singled out for a human goes through unattended, which is the opposite of
+  # what asking for approval was for. AgentFuse warns on every start if you set
+  # it. The agent is told either way, and told not to retry.
+  on_timeout: deny
+
+  # Where the question goes: cli | webhook. Both may be listed, and then the
+  # first channel to answer decides — a channel timing out does not end the
+  # request, and a channel that fails denies.
+  #
+  # \`cli\` prints the pending call on stderr with the exact command to answer it:
+  #
+  #     agentfuse approve <id> --reason "..."
+  #     agentfuse deny <id> --reason "..."
+  #
+  # It listens on a unix socket at \`$XDG_RUNTIME_DIR/agentfuse/approvals.sock\`,
+  # or \`~/.agentfuse/approvals.sock\` where that is unset (macOS), mode 0600
+  # inside a 0700 directory. \`AGENTFUSE_APPROVAL_SOCKET\` moves it.
+  gateways: [cli]
+
+  # \`webhook\` POSTs the request instead, signed with HMAC-SHA256 over the exact
+  # request body. The policy names the ENVIRONMENT VARIABLE holding the shared
+  # secret, never the secret: this file is meant to be committed and diffed.
+  #
+  # webhook:
+  #   url: https://example.internal/agentfuse/approvals
+  #   secret_env: AGENTFUSE_WEBHOOK_SECRET
 
 # OpenTelemetry export. Not in this build yet, and off unless asked for.
 #

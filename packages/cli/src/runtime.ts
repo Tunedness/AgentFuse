@@ -32,14 +32,28 @@
  * `writeReport` and `onSessionEnd`; the last two are the hooks the proxy left
  * open and they are fields here, already bound. A serving command's own job is
  * therefore the transport and the child process — the policy, the ports, the
- * hook, the report directory and the semantic layer are all decided before it
- * is called, and `close()` takes them down again.
+ * hook, the report directory, the approval channel and the semantic layer are
+ * all decided before it is called, and `close()` takes them down again.
  *
- * Nothing in this file touches a transport, spawns a process or opens a socket.
- * That boundary is what makes the runtime testable without either.
+ * ## Why the approval socket is opened here
+ *
+ * The engine takes its {@link ApprovalGateway} as a constructor port, so the
+ * channel has to exist before the engine does — which rules out a serving
+ * command opening it and handing it over. It is also derived from the policy in
+ * exactly the way the embedding provider is (`approvals.gateways`, the
+ * timeout, the webhook block), and that resolution already lives here. So the
+ * socket is bound in `createRuntime` and released by `close()`, and `wrap` and
+ * `serve` need no line about approvals at all.
+ *
+ * The consequence is that this file does touch the filesystem and does bind a
+ * listener. Both are injectable: `RuntimeOptions.approvals` replaces the whole
+ * channel, and `AGENTFUSE_APPROVAL_SOCKET` moves the path, so the runtime is
+ * still testable without going near a real `$HOME`.
  */
 
+import { userInfo } from 'node:os';
 import {
+  type ApprovalGateway,
   attachSemanticLoopDetector,
   type Decision,
   type DecisionHook,
@@ -50,6 +64,7 @@ import {
   type SessionSummary,
 } from '@agentfuse/core';
 import { Diagnostics } from '@agentfuse/proxy';
+import { type ApprovalResolution, resolveApprovalGateway } from './approvals/index.js';
 import { type LoadedPolicy, resolveFromPolicy } from './config.js';
 import {
   type EmbeddingsLoader,
@@ -82,6 +97,16 @@ export interface RuntimeOptions {
   readonly mode?: PolicyMode | undefined;
   /** `--hook`. */
   readonly hook?: string | undefined;
+  /**
+   * Replaces the approval channel outright.
+   *
+   * Production leaves this alone: the channel is derived from
+   * `approvals.gateways` by `approvals/index.ts`, which is where the decision
+   * table lives. This is how a test drives a blocked call without binding a
+   * socket, and how an embedder that already has a human in the loop supplies
+   * their own.
+   */
+  readonly approvals?: ApprovalGateway | undefined;
   /** Injected for tests. */
   readonly loadEmbeddings?: EmbeddingsLoader | undefined;
   /** Injected for tests. */
@@ -101,6 +126,16 @@ export interface Runtime {
   readonly quiet: boolean;
   /** `undefined` when the semantic layer is off or unavailable. */
   readonly detector: SemanticLoopDetector | undefined;
+  /**
+   * The approval channel in force.
+   *
+   * `undefined` means the engine keeps core's `DenyAllApprovalGateway`, which
+   * is the right direction and the normal state of a `warn`-mode run: see the
+   * table in `approvals/index.ts`.
+   */
+  readonly approvals: ApprovalGateway | undefined;
+  /** The bound approval socket, when there is one. Named in every prompt. */
+  readonly approvalSocket: string | undefined;
   readonly tokenizer: GptTokenizer;
   /**
    * `ToolCallGuardOptions.writeReport`, bound.
@@ -118,7 +153,7 @@ export interface Runtime {
    * bound pushed it out.
    */
   readonly onSessionEnd: (summary: SessionSummary) => void;
-  /** Shuts the semantic layer down. Safe to call twice. */
+  /** Releases the semantic layer and the approval socket. Safe to call twice. */
   close(options?: { readonly timeoutMs?: number }): Promise<void>;
 }
 
@@ -135,16 +170,31 @@ export function withMode(policy: FusePolicy, mode: PolicyMode | undefined): Fuse
   return { ...policy, mode };
 }
 
-/** Whether a policy asks for human approval anywhere. */
-export function wantsApproval(policy: FusePolicy): boolean {
-  return (
-    policy.budgets.on_exceeded === 'require_approval' ||
-    policy.loop_detection.on_trip === 'require_approval' ||
-    policy.tools.some(
-      (rule) =>
-        rule.action === 'require_approval' || rule.loop_detection?.on_trip === 'require_approval',
-    )
-  );
+/**
+ * Whether a policy asks for human approval anywhere.
+ *
+ * Defined next to the gateway decision table it feeds, and re-exported here
+ * because this is where it was first needed and where callers look for it.
+ */
+export { wantsApproval } from './approvals/index.js';
+
+/**
+ * This user's numeric id, where the platform has one.
+ *
+ * Used to prove the approval socket and its directory belong to us. `undefined`
+ * on Windows, where `uid` is reported as `-1` and there is no such thing to
+ * compare — the ownership check is skipped there and the socket layer says so.
+ */
+function currentUid(): number | undefined {
+  try {
+    const uid = userInfo().uid;
+    return uid >= 0 ? uid : undefined;
+  } catch {
+    // `userInfo` throws when the uid has no passwd entry, which happens inside
+    // containers run with an arbitrary `--user`. Nothing to compare against
+    // then, and refusing to start over it would be the wrong call.
+    return undefined;
+  }
 }
 
 /** Builds the engine, the report store and the semantic layer. */
@@ -164,11 +214,58 @@ export async function createRuntime(options: RuntimeOptions): Promise<Runtime> {
     onError: (error) => diagnostics.emit('report_write_failed', { message: messageOf(error) }),
   });
 
+  // Before the engine, because the engine takes the gateway as a port. An
+  // injected gateway skips the table entirely, so a test never binds a socket
+  // it did not ask for.
+  const approvals: ApprovalResolution =
+    options.approvals === undefined
+      ? await resolveApprovalGateway({
+          policy,
+          env: context.env,
+          diagnostics,
+          // Deliberately `context.stderr` and not the `warn` above: a pending
+          // prompt is the policy's own question and is not silenced by
+          // `--quiet`. See `approvals/cli-gateway.ts`.
+          stderr: context.stderr,
+          warn,
+          uid: currentUid(),
+          // Distinguishes this process's fallback socket from another wrap's,
+          // and is informative in `ls`. Read-only ambient state, like
+          // `process.env`, which is why it is not on `ProcessHost`.
+          suffix: String(process.pid),
+        })
+      : {
+          kind: 'ready',
+          gateway: options.approvals,
+          sources: ['injected'],
+          socketPath: undefined,
+          bindHost: () => undefined,
+          close: async () => undefined,
+        };
+
   const tokenizer = new GptTokenizer();
   const engine = new FuseEngine(policy, {
     tokenizer,
     cost: costModelFor(policy.pricing),
+    ...(approvals.kind === 'ready' ? { approvals: approvals.gateway } : undefined),
   });
+
+  if (approvals.kind === 'ready') {
+    // Late, and it has to be: the socket was listening before the engine
+    // existed. `resetBreaker` reports the resulting phase so the person who
+    // typed `approve --reset` is told what actually happened — and `undefined`
+    // for a session this wrap has never had, rather than a false success.
+    approvals.bindHost({
+      resetBreaker: (sessionId) => {
+        const session = engine.ports.sessions.get(sessionId);
+        if (session === undefined) return undefined;
+        engine.resetBreaker(sessionId);
+        return engine.ports.sessions.get(sessionId)?.breaker.phase;
+      },
+    });
+  } else {
+    diagnostics.emit('approval_gateway_off', { reason: approvals.reason });
+  }
 
   diagnostics.emit('policy_loaded', {
     path: loaded.path,
@@ -187,17 +284,6 @@ export async function createRuntime(options: RuntimeOptions): Promise<Runtime> {
     );
     engine.onDecision(hook);
     diagnostics.emit('hook_loaded', { hook: options.hook });
-  }
-
-  // Phase 7 owns the approval flow. Until it lands, core's default gateway
-  // denies — which is the right failure direction but a surprising one to
-  // discover from a blocked call rather than from a line at startup.
-  if (policy.mode === 'enforce' && wantsApproval(policy)) {
-    warn([
-      'This policy asks for human approval, and the approval gateway is not in this build yet.',
-      'Approvals therefore fail closed: a call that needs one is denied without anybody being asked.',
-      'Until then, use action: deny for what you want blocked and action: warn for what you want observed.',
-    ]);
   }
 
   if (policy.telemetry.enabled) {
@@ -242,6 +328,8 @@ export async function createRuntime(options: RuntimeOptions): Promise<Runtime> {
     diagnostics,
     quiet,
     detector,
+    approvals: approvals.kind === 'ready' ? approvals.gateway : undefined,
+    approvalSocket: approvals.kind === 'ready' ? approvals.socketPath : undefined,
     tokenizer,
     writeReport: reports.hook,
     onSessionEnd: (summary) => {
@@ -250,6 +338,10 @@ export async function createRuntime(options: RuntimeOptions): Promise<Runtime> {
     close: async (closeOptions) => {
       if (closed) return;
       closed = true;
+      // First, and unconditionally: the socket is a file on disk, and a wrap
+      // that exited without removing it leaves the next one a stale path to
+      // reason about.
+      if (approvals.kind === 'ready') await approvals.close();
       if (detector === undefined) return;
 
       const stats = detector.stats;

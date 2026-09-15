@@ -16,7 +16,7 @@ import {
  * the OS which port it got.
  */
 
-let endpoints: HttpEndpoint[] = [];
+const endpoints: HttpEndpoint[] = [];
 
 afterEach(async () => {
   for (const endpoint of endpoints.splice(0)) await endpoint.close();
