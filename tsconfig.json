@@ -1,0 +1,10 @@
+{
+  "files": [],
+  "references": [
+    { "path": "./packages/core" },
+    { "path": "./packages/embeddings-local" },
+    { "path": "./packages/proxy" },
+    { "path": "./packages/cli" },
+    { "path": "./bench" }
+  ]
+}

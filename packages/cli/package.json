@@ -1,0 +1,42 @@
+{
+  "name": "agentfuse",
+  "version": "0.0.0",
+  "description": "Put a fuse in front of your agent's tools. The AgentFuse command line entry point.",
+  "license": "Apache-2.0",
+  "type": "module",
+  "engines": {
+    "node": ">=20.19"
+  },
+  "bin": {
+    "agentfuse": "./dist/main.js"
+  },
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "keywords": [
+    "mcp",
+    "model-context-protocol",
+    "agent",
+    "proxy",
+    "circuit-breaker"
+  ],
+  "scripts": {
+    "build": "tsc -b",
+    "clean": "tsc -b --clean"
+  },
+  "dependencies": {
+    "@agentfuse/core": "*",
+    "@agentfuse/proxy": "*",
+    "gpt-tokenizer": "^4.0.0",
+    "yaml": "^2.9.1"
+  },
+  "publishConfig": {
+    "access": "public"
+  }
+}

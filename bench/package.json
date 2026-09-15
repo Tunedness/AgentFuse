@@ -1,0 +1,25 @@
+{
+  "name": "@agentfuse/bench",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Private benchmark harness for AgentFuse. Never published.",
+  "license": "Apache-2.0",
+  "type": "module",
+  "engines": {
+    "node": ">=20.19"
+  },
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "scripts": {
+    "build": "tsc -b",
+    "clean": "tsc -b --clean"
+  },
+  "dependencies": {
+    "@agentfuse/core": "*",
+    "@agentfuse/proxy": "*"
+  }
+}

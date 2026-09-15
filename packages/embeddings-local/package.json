@@ -1,0 +1,29 @@
+{
+  "name": "@agentfuse/embeddings-local",
+  "version": "0.0.0",
+  "description": "Optional local (on-device) embedding backend for AgentFuse semantic loop detection.",
+  "license": "Apache-2.0",
+  "type": "module",
+  "engines": {
+    "node": ">=20.19"
+  },
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "sideEffects": false,
+  "scripts": {
+    "build": "tsc -b",
+    "clean": "tsc -b --clean"
+  },
+  "//": "TODO(phase-4): this block stays empty until phase 4. It then gains onnxruntime-node (~301 MB of platform binaries — the reason this package is split out and loaded by dynamic import rather than being a dependency of the CLI), @huggingface/tokenizers for the WordPiece/BPE pass, and @agentfuse/core for the embedding port type. Nothing else: this package is a leaf and must never be imported statically from agentfuse or @agentfuse/proxy.",
+  "dependencies": {},
+  "publishConfig": {
+    "access": "public"
+  }
+}
