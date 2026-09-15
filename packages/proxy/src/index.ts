@@ -1,10 +1,23 @@
-import { parseToolCall, type ToolCall } from '@agentfuse/core';
 import type { Client } from '@modelcontextprotocol/client';
 import { CallToolRequestParamsSchema } from '@modelcontextprotocol/core';
 import type { McpServer } from '@modelcontextprotocol/server';
 
 /** Version of the proxy implementation. */
 export const PROXY_VERSION = '0.0.0';
+
+/**
+ * Scaffold shape for a translated `tools/call`.
+ *
+ * TODO(phase-4): replace with `BeforeCallInput` from `@agentfuse/core`, which
+ * also carries the session id, the upstream alias and the traceparent. Declared
+ * locally for now so the proxy scaffold does not depend on a placeholder type
+ * in core's public surface.
+ */
+export interface ToolCall {
+  readonly toolName: string;
+  readonly arguments: Record<string, unknown>;
+  readonly calledAt: number;
+}
 
 /**
  * The two halves of a running proxy.
@@ -35,9 +48,9 @@ export interface ProxyWiring {
 export function toToolCall(params: unknown, now: number = Date.now()): ToolCall {
   const parsed = CallToolRequestParamsSchema.parse(params);
 
-  return parseToolCall({
+  return {
     toolName: parsed.name,
     arguments: parsed.arguments ?? {},
     calledAt: now,
-  });
+  };
 }

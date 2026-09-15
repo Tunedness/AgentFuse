@@ -7,21 +7,24 @@ export default defineConfig({
     // package.json; the package name becomes the project name in the reporter.
     projects: ['packages/*', 'bench'],
     coverage: {
+      // On by default, so `npm test` is the gate rather than a separate command
+      // somebody remembers to run. The whole suite takes well under a second.
+      enabled: true,
       provider: 'v8',
       reporter: ['text', 'lcov'],
       reportsDirectory: 'coverage',
       include: ['packages/*/src/**/*.ts'],
       exclude: ['**/*.test.ts', '**/dist/**'],
-      // TODO(phase-2): the policy engine lands in @agentfuse/core and brings the
-      // real test suite with it. Raise these to 90 (lines/functions/branches/
-      // statements) and make coverage a blocking CI gate at that point. They are
-      // pinned at 0 for now so the scaffold does not fail on an empty suite.
+      // `@agentfuse/core` is the whole product's safety net: if its decisions
+      // are wrong, a working agent gets halted or a runaway one does not. The
+      // gate is deliberately only on core — the proxy and CLI are thin, and
+      // padding their numbers would tell nobody anything.
       thresholds: {
         'packages/core/src/**': {
-          lines: 0,
-          functions: 0,
-          branches: 0,
-          statements: 0,
+          lines: 90,
+          functions: 90,
+          branches: 90,
+          statements: 90,
         },
       },
     },

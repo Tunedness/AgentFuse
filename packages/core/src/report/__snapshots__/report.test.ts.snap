@@ -1,0 +1,110 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`renderTripReport > renders a compact terminal view 1`] = `
+"━━ AgentFuse · circuit tripped ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  LOOP_EXACT_REPEAT  session=01SESSION  2025-09-15T14:03:44.000Z  mode=enforce
+  This is call 3 with identical arguments to read_file (threshold 3). The
+  result will not change. Try a different approach or report the blocker.
+
+  breaker: open  ·  cooldown: 3 approvals or 2m
+
+  budget      used         limit        
+  calls       2            200          [··········]  1%
+  duration    42s          30m          [··········]  2%
+  tokens ~    12+270       400000       [··········]  0%
+  usd ~       $0.00        $5.00        [··········]  0%
+  ~ tool-I/O floor estimate, not LLM usage
+
+  recent calls (oldest first)
+  1  fs__read_file               ok   1s      {"path":"/etc/hosts"} ×2
+  →  fs__read_file               ok   —       {"path":"/etc/hosts"}
+
+  policy sha256=<sha12>  ·  trip=01TEST00000000000000000004  ·  agentfuse 0.0.0"
+`;
+
+exports[`trip report > builds the documented shape 1`] = `
+{
+  "agentfuse": {
+    "version": "0.0.0",
+  },
+  "breaker": {
+    "cooldown": {
+      "calls": 3,
+      "durationMs": 120000,
+    },
+    "phase": "open",
+  },
+  "budgets": {
+    "calls": 2,
+    "durationMs": 42000,
+    "limits": {
+      "calls": 200,
+      "durationMs": 1800000,
+      "tokensEstimated": 400000,
+      "usdEstimated": 5,
+    },
+    "tokensEstimated": {
+      "args": 12,
+      "note": "tool-I/O floor estimate, not LLM usage",
+      "results": 270,
+    },
+    "usdEstimated": 0.004086,
+  },
+  "kind": "trip",
+  "mode": "enforce",
+  "policy": {
+    "sha256": "<sha256>",
+    "version": 1,
+  },
+  "recentCalls": [
+    {
+      "argsPreview": "{"path":"/etc/hosts"}",
+      "durationMs": 1000,
+      "fingerprint": "<sha256>",
+      "id": "01TEST00000000000000000001",
+      "isError": false,
+      "startedAt": "2025-09-15T14:03:02.000Z",
+      "tool": "fs__read_file",
+    },
+    {
+      "argsPreview": "{"path":"/etc/hosts"}",
+      "durationMs": 1000,
+      "fingerprint": "<sha256>",
+      "id": "01TEST00000000000000000002",
+      "isError": false,
+      "startedAt": "2025-09-15T14:03:23.000Z",
+      "tool": "fs__read_file",
+    },
+    {
+      "argsPreview": "{"path":"/etc/hosts"}",
+      "durationMs": 0,
+      "fingerprint": "<sha256>",
+      "id": "01TEST00000000000000000003",
+      "isError": false,
+      "startedAt": "2025-09-15T14:03:44.000Z",
+      "tool": "fs__read_file",
+    },
+  ],
+  "reportVersion": 1,
+  "sessionId": "01SESSION",
+  "traceparent": "00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01",
+  "trigger": {
+    "code": "LOOP_EXACT_REPEAT",
+    "evidence": {
+      "callIds": [
+        "01TEST00000000000000000001",
+        "01TEST00000000000000000002",
+        "01TEST00000000000000000003",
+      ],
+      "count": 3,
+      "fingerprint": "<sha12>",
+      "idempotent": false,
+      "threshold": 3,
+      "windowSize": 8,
+    },
+    "message": "This is call 3 with identical arguments to read_file (threshold 3). The result will not change. Try a different approach or report the blocker.",
+  },
+  "tripId": "01TEST00000000000000000004",
+  "trippedAt": "2025-09-15T14:03:44.000Z",
+}
+`;

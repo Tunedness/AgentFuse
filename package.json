@@ -18,6 +18,8 @@
     "typecheck": "tsc -b && tsc -p tsconfig.test.json",
     "test": "vitest run",
     "test:watch": "vitest",
+    "schema:generate": "npm run build && npm run schema:generate --workspace @agentfuse/core",
+    "schema:check": "npm run build && npm run schema:check --workspace @agentfuse/core",
     "lint": "biome check .",
     "format": "biome format --write .",
     "changeset": "changeset",
@@ -29,6 +31,7 @@
     "@changesets/cli": "^3.0.3",
     "@types/node": "^26.5.1",
     "@vitest/coverage-v8": "^5.0.1",
+    "fast-check": "^4.10.0",
     "typescript": "^5.9.3",
     "vitest": "^5.0.1"
   }

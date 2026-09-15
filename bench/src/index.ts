@@ -1,5 +1,4 @@
-import type { ToolCall } from '@agentfuse/core';
-import { toToolCall } from '@agentfuse/proxy';
+import { type ToolCall, toToolCall } from '@agentfuse/proxy';
 
 /**
  * A named workload the benchmark harness replays through the proxy.

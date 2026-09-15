@@ -42,24 +42,25 @@ jobs:
       - name: Test
         run: npm test
 
-  # TODO(phase-2): the config/policy schemas become the public contract in
-  # phase 2. Turn this on once `agentfuse schema --emit` exists, so a changed
-  # zod schema that was not regenerated into the checked-in JSON Schema fails
-  # the build instead of shipping.
+  # The FusePolicy schema is the public contract: people's editors validate
+  # against the committed JSON Schema, while the runtime validates against the
+  # zod object it is generated from. If those two ever disagree, a policy that
+  # looks valid in an editor gets rejected at startup. This job makes that
+  # impossible to ship.
   #
-  # schema-drift:
-  #   name: schema drift
-  #   runs-on: ubuntu-latest
-  #   steps:
-  #     - uses: actions/checkout@v4
-  #     - uses: actions/setup-node@v4
-  #       with:
-  #         node-version: 24
-  #         cache: npm
-  #     - run: npm ci
-  #     - run: npm run build
-  #     - run: npx agentfuse schema --emit
-  #     - run: git diff --exit-code -- schemas/
+  # Pinned to Node 24 because the generator is a `.mts` file run through Node's
+  # native type stripping.
+  schema-drift:
+    name: schema drift
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - run: npm run schema:check
 
   # TODO(phase-9): the proxy sits on the hot path of every tool call, so the
   # added latency is a product requirement, not a nice-to-have. Turn this on

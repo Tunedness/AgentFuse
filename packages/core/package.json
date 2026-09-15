@@ -1,7 +1,7 @@
 {
   "name": "@agentfuse/core",
   "version": "0.0.0",
-  "description": "Core domain types and policy primitives for AgentFuse. Protocol-agnostic by design.",
+  "description": "Pure decision engine for AgentFuse: policy, budgets, loop detection and the circuit breaker. No I/O, no protocol.",
   "license": "Apache-2.0",
   "type": "module",
   "engines": {
@@ -15,15 +15,23 @@
     "./policy": {
       "types": "./dist/policy/index.d.ts",
       "default": "./dist/policy/index.js"
-    }
+    },
+    "./testing": {
+      "types": "./dist/testing.d.ts",
+      "default": "./dist/testing.js"
+    },
+    "./schemas/fusepolicy.v1.schema.json": "./schemas/fusepolicy.v1.schema.json"
   },
   "files": [
-    "dist"
+    "dist",
+    "schemas"
   ],
   "sideEffects": false,
   "scripts": {
     "build": "tsc -b",
-    "clean": "tsc -b --clean"
+    "clean": "tsc -b --clean",
+    "schema:generate": "node scripts/generate-schema.mts",
+    "schema:check": "node scripts/generate-schema.mts --check"
   },
   "dependencies": {
     "zod": "^4.6.5"

@@ -1,0 +1,536 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.tunedness.com/agentfuse/fusepolicy.v1.schema.json",
+  "type": "object",
+  "properties": {
+    "version": {
+      "type": "number",
+      "const": 1
+    },
+    "mode": {
+      "default": "warn",
+      "type": "string",
+      "enum": [
+        "warn",
+        "enforce"
+      ]
+    },
+    "session": {
+      "default": {},
+      "type": "object",
+      "properties": {
+        "key": {
+          "default": "auto",
+          "anyOf": [
+            {
+              "type": "string",
+              "const": "auto"
+            },
+            {
+              "type": "string",
+              "const": "connection"
+            },
+            {
+              "type": "string",
+              "const": "traceparent"
+            },
+            {
+              "type": "string",
+              "pattern": "^baggage:[A-Za-z0-9._-]+$"
+            }
+          ]
+        },
+        "idle_timeout": {
+          "default": "10m",
+          "anyOf": [
+            {
+              "type": "string",
+              "pattern": "^[0-9]+(ms|s|m|h|d)$"
+            },
+            {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 9007199254740991
+            }
+          ]
+        }
+      },
+      "additionalProperties": false
+    },
+    "budgets": {
+      "default": {},
+      "type": "object",
+      "properties": {
+        "max_duration": {
+          "default": "30m",
+          "anyOf": [
+            {
+              "type": "string",
+              "pattern": "^[0-9]+(ms|s|m|h|d)$"
+            },
+            {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 9007199254740991
+            }
+          ]
+        },
+        "max_calls": {
+          "default": 200,
+          "type": "integer",
+          "exclusiveMinimum": 0,
+          "maximum": 9007199254740991
+        },
+        "max_tokens_estimated": {
+          "default": 400000,
+          "type": "integer",
+          "exclusiveMinimum": 0,
+          "maximum": 9007199254740991
+        },
+        "max_usd_estimated": {
+          "default": 5,
+          "type": "number",
+          "minimum": 0
+        },
+        "on_exceeded": {
+          "default": "require_approval",
+          "type": "string",
+          "enum": [
+            "halt",
+            "require_approval",
+            "warn"
+          ]
+        }
+      },
+      "additionalProperties": false
+    },
+    "loop_detection": {
+      "default": {},
+      "type": "object",
+      "properties": {
+        "window": {
+          "default": 8,
+          "type": "integer",
+          "exclusiveMinimum": 0,
+          "maximum": 9007199254740991
+        },
+        "min_calls": {
+          "default": 5,
+          "type": "integer",
+          "exclusiveMinimum": 0,
+          "maximum": 9007199254740991
+        },
+        "exact_repeat": {
+          "default": {},
+          "type": "object",
+          "properties": {
+            "count": {
+              "default": 3,
+              "type": "integer",
+              "minimum": 2,
+              "maximum": 9007199254740991
+            }
+          },
+          "additionalProperties": false
+        },
+        "error_repeat": {
+          "default": {},
+          "type": "object",
+          "properties": {
+            "count": {
+              "default": 3,
+              "type": "integer",
+              "minimum": 2,
+              "maximum": 9007199254740991
+            }
+          },
+          "additionalProperties": false
+        },
+        "cycle": {
+          "default": {},
+          "type": "object",
+          "properties": {
+            "max_period": {
+              "default": 4,
+              "type": "integer",
+              "minimum": 2,
+              "maximum": 9007199254740991
+            }
+          },
+          "additionalProperties": false
+        },
+        "semantic": {
+          "default": {},
+          "type": "object",
+          "properties": {
+            "enabled": {
+              "default": true,
+              "type": "boolean"
+            },
+            "provider": {
+              "default": "local",
+              "type": "string",
+              "enum": [
+                "local",
+                "openai",
+                "none"
+              ]
+            },
+            "model": {
+              "default": "Xenova/all-MiniLM-L6-v2",
+              "type": "string",
+              "minLength": 1
+            },
+            "threshold": {
+              "default": 0.83,
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1
+            },
+            "consecutive_windows": {
+              "default": 2,
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            }
+          },
+          "additionalProperties": false
+        },
+        "on_trip": {
+          "default": "halt",
+          "type": "string",
+          "enum": [
+            "halt",
+            "require_approval",
+            "warn"
+          ]
+        },
+        "cooldown": {
+          "default": {},
+          "type": "object",
+          "properties": {
+            "calls": {
+              "default": 3,
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            },
+            "duration": {
+              "default": "2m",
+              "anyOf": [
+                {
+                  "type": "string",
+                  "pattern": "^[0-9]+(ms|s|m|h|d)$"
+                },
+                {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 9007199254740991
+                }
+              ]
+            }
+          },
+          "additionalProperties": false
+        }
+      },
+      "additionalProperties": false
+    },
+    "tools": {
+      "default": [
+        {
+          "match": "*",
+          "action": "allow"
+        }
+      ],
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "match": {
+            "type": "string",
+            "minLength": 1
+          },
+          "action": {
+            "type": "string",
+            "enum": [
+              "allow",
+              "warn",
+              "deny",
+              "require_approval"
+            ]
+          },
+          "note": {
+            "type": "string"
+          },
+          "idempotent": {
+            "default": false,
+            "type": "boolean"
+          },
+          "loop_detection": {
+            "type": "object",
+            "properties": {
+              "window": {
+                "type": "integer",
+                "exclusiveMinimum": 0,
+                "maximum": 9007199254740991
+              },
+              "min_calls": {
+                "type": "integer",
+                "exclusiveMinimum": 0,
+                "maximum": 9007199254740991
+              },
+              "exact_repeat": {
+                "type": "object",
+                "properties": {
+                  "count": {
+                    "type": "integer",
+                    "minimum": 2,
+                    "maximum": 9007199254740991
+                  }
+                },
+                "required": [
+                  "count"
+                ],
+                "additionalProperties": false
+              },
+              "error_repeat": {
+                "type": "object",
+                "properties": {
+                  "count": {
+                    "type": "integer",
+                    "minimum": 2,
+                    "maximum": 9007199254740991
+                  }
+                },
+                "required": [
+                  "count"
+                ],
+                "additionalProperties": false
+              },
+              "cycle": {
+                "type": "object",
+                "properties": {
+                  "max_period": {
+                    "type": "integer",
+                    "minimum": 2,
+                    "maximum": 9007199254740991
+                  }
+                },
+                "required": [
+                  "max_period"
+                ],
+                "additionalProperties": false
+              },
+              "semantic": {
+                "type": "object",
+                "properties": {
+                  "enabled": {
+                    "type": "boolean"
+                  },
+                  "provider": {
+                    "type": "string",
+                    "enum": [
+                      "local",
+                      "openai",
+                      "none"
+                    ]
+                  },
+                  "model": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "threshold": {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 1
+                  },
+                  "consecutive_windows": {
+                    "type": "integer",
+                    "exclusiveMinimum": 0,
+                    "maximum": 9007199254740991
+                  }
+                },
+                "additionalProperties": false
+              },
+              "on_trip": {
+                "type": "string",
+                "enum": [
+                  "halt",
+                  "require_approval",
+                  "warn"
+                ]
+              },
+              "cooldown": {
+                "type": "object",
+                "properties": {
+                  "calls": {
+                    "type": "integer",
+                    "exclusiveMinimum": 0,
+                    "maximum": 9007199254740991
+                  },
+                  "duration": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "pattern": "^[0-9]+(ms|s|m|h|d)$"
+                      },
+                      {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 9007199254740991
+                      }
+                    ]
+                  }
+                },
+                "additionalProperties": false
+              }
+            },
+            "additionalProperties": false
+          }
+        },
+        "required": [
+          "match",
+          "action"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "annotations": {
+      "default": {},
+      "type": "object",
+      "properties": {
+        "trust_hints": {
+          "default": false,
+          "type": "boolean"
+        }
+      },
+      "additionalProperties": false
+    },
+    "approvals": {
+      "default": {},
+      "type": "object",
+      "properties": {
+        "timeout": {
+          "default": "120s",
+          "anyOf": [
+            {
+              "type": "string",
+              "pattern": "^[0-9]+(ms|s|m|h|d)$"
+            },
+            {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 9007199254740991
+            }
+          ]
+        },
+        "on_timeout": {
+          "default": "deny",
+          "type": "string",
+          "enum": [
+            "deny",
+            "allow"
+          ]
+        },
+        "gateways": {
+          "default": [
+            "cli"
+          ],
+          "type": "array",
+          "items": {
+            "type": "string",
+            "enum": [
+              "cli",
+              "webhook"
+            ]
+          }
+        },
+        "webhook": {
+          "type": "object",
+          "properties": {
+            "url": {
+              "type": "string",
+              "format": "uri"
+            },
+            "secret_env": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "required": [
+            "url",
+            "secret_env"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "additionalProperties": false
+    },
+    "pricing": {
+      "default": {},
+      "type": "object",
+      "properties": {
+        "input_per_mtok_usd": {
+          "default": 3,
+          "type": "number",
+          "minimum": 0
+        },
+        "output_per_mtok_usd": {
+          "default": 15,
+          "type": "number",
+          "minimum": 0
+        }
+      },
+      "additionalProperties": false
+    },
+    "report": {
+      "default": {},
+      "type": "object",
+      "properties": {
+        "dir": {
+          "default": ".agentfuse/reports",
+          "type": "string",
+          "minLength": 1
+        },
+        "recent_calls": {
+          "default": 20,
+          "type": "integer",
+          "exclusiveMinimum": 0,
+          "maximum": 9007199254740991
+        },
+        "redact_args": {
+          "default": false,
+          "type": "boolean"
+        }
+      },
+      "additionalProperties": false
+    },
+    "telemetry": {
+      "default": {},
+      "type": "object",
+      "properties": {
+        "enabled": {
+          "default": false,
+          "type": "boolean"
+        },
+        "otlp_endpoint": {
+          "default": "http://localhost:4318",
+          "type": "string",
+          "minLength": 1
+        },
+        "service_name": {
+          "default": "agentfuse",
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  "required": [
+    "version"
+  ],
+  "additionalProperties": false,
+  "title": "FusePolicy v1",
+  "description": "Circuit-breaker policy for AgentFuse. Every field is optional except `version`; defaults are safe (mode: warn)."
+}
