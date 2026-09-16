@@ -14,7 +14,10 @@
     }
   },
   "files": [
-    "dist"
+    "dist",
+    "!dist/**/*.map",
+    "!dist/.tsbuildinfo",
+    "NOTICE"
   ],
   "sideEffects": false,
   "scripts": {

@@ -8,7 +8,7 @@
     "node": ">=20.19"
   },
   "bin": {
-    "agentfuse": "./dist/main.js"
+    "agentfuse": "dist/main.js"
   },
   "exports": {
     ".": {
@@ -17,7 +17,10 @@
     }
   },
   "files": [
-    "dist"
+    "dist",
+    "!dist/**/*.map",
+    "!dist/.tsbuildinfo",
+    "NOTICE"
   ],
   "keywords": [
     "mcp",

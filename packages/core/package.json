@@ -24,7 +24,10 @@
   },
   "files": [
     "dist",
-    "schemas"
+    "!dist/**/*.map",
+    "!dist/.tsbuildinfo",
+    "schemas",
+    "NOTICE"
   ],
   "sideEffects": false,
   "scripts": {

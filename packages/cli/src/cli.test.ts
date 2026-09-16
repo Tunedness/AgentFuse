@@ -246,7 +246,12 @@ describe('the binary', () => {
       readFileSync(fileURLToPath(new URL('../package.json', import.meta.url)), 'utf8'),
     ) as { bin?: Record<string, string> };
 
-    expect(manifest.bin?.agentfuse).toBe('./dist/main.js');
+    // Without the `./`, deliberately. npm's own normaliser strips the prefix
+    // on the way to the registry and warns `"bin[agentfuse]" script name
+    // dist/main.js was invalid and removed` while doing it — a message that
+    // reads like the bin entry is being dropped, on every publish, forever.
+    // Nothing is dropped; the fix is to write the path npm is going to write.
+    expect(manifest.bin?.agentfuse).toBe('dist/main.js');
   });
 
   it('starts with a shebang, so npm can link it', () => {
