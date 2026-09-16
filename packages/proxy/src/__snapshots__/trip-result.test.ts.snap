@@ -21,6 +21,21 @@ exports[`renderTripDiagnostic > is core’s renderer, not a second implementatio
   policy sha256=0f1e2d3c4b5a  ·  trip=01J0TRIP  ·  agentfuse 0.0.0"
 `;
 
+exports[`the human’s reason, in the text the agent reads > carries a denial reason, attributed to the person who wrote it 1`] = `
+"AgentFuse circuit breaker OPEN — a human explicitly denied this call.
+
+A human denied this call. Reason given: we do not delete production data
+
+Retrying this call unchanged — or with only cosmetic changes to its arguments — will be blocked too.
+
+Do this instead:
+  1. Accept the decision: ask the user what they would like instead.
+  2. Continue with the parts of the task that do not need this call.
+  3. Do not re-issue the call, and do not look for an equivalent tool to do it with.
+
+Trip report: .agentfuse/reports/01J0TRIP.json"
+`;
+
 exports[`the refusal text > has its own variant for APPROVAL_DENIED 1`] = `
 "AgentFuse circuit breaker OPEN — a human explicitly denied this call.
 

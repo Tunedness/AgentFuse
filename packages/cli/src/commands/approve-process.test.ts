@@ -257,6 +257,11 @@ describe.runIf(built)('a real approval, two processes', () => {
       expect(textOf(result)).toContain('a human explicitly denied this call');
       expect(textOf(result)).toContain('Retrying this call unchanged');
       expect(JSON.stringify(result.structuredContent)).toContain('APPROVAL_DENIED');
+      // ADR-009: the human's own words reach the agent for a denial, attributed
+      // so the model reads them as a person's statement rather than as another
+      // instruction. This is the whole trip: `--reason` on a second process, in
+      // over a unix socket, out through the refusal the first process renders.
+      expect(textOf(result)).toContain('A human denied this call. Reason given: not on prod');
 
       agent.endInput();
       expect((await agent.exit()).code).toBe(0);

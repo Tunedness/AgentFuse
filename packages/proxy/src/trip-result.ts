@@ -26,6 +26,14 @@
  * Around 120 tokens. Longer crowds the context the agent needs to recover with;
  * shorter stops being actionable.
  *
+ * ## And, for a denial, the human's own reason
+ *
+ * ADR-009: "a human denied this call" is measurably less useful to an agent
+ * than "a human denied this call, because we do not allow calls that delete
+ * production data". The reason goes in — for denials only, since an approved
+ * call is forwarded and has no refusal text at all. See
+ * {@link humanDenialLine} for why it is attributed rather than stated.
+ *
  * Every {@link TripCode} gets its own variant. A blown budget and a semantic
  * loop are different situations and the advice that fits one is noise in the
  * other: "try a materially different strategy" is exactly wrong when the
@@ -40,11 +48,14 @@
  */
 
 import {
+  APPROVAL_REASON_LIMIT,
+  type ApprovalRecord,
   type BreakerPhase,
   type Decision,
   formatDuration,
   type Reason,
   renderTripReport,
+  sanitizeFreeText,
   TOKEN_ESTIMATE_NOTE,
   type TripCode,
   type TripReport,
@@ -310,17 +321,62 @@ function unexplained(decision: Decision): Reason {
   };
 }
 
-/** Renders the agent-facing refusal text. Snapshot-tested; change it on purpose. */
-export function renderTripText(reason: Reason, reportRef: string | undefined): string {
+/**
+ * The human's own words about a denial, attributed to them.
+ *
+ * ADR-009 decided this text reaches the agent, and the attribution is the
+ * decision, not decoration. What lands in the model's context is free-form
+ * prose written by somebody at a terminal — or, on the webhook channel, by a
+ * remote endpoint. Stated bare it reads as another instruction in the tool
+ * result; introduced as `A human denied this call. Reason given: …` it reads as
+ * a report of what a person said, which is what it is.
+ *
+ * **Denials only.** An approved call is forwarded and never sees this file, and
+ * a timeout is nobody's statement — attributing one to a human who never
+ * answered would be the one kind of lie this text must not tell. The guard is
+ * on the verdict rather than the {@link TripCode} so that a gateway answering
+ * `denied` is always quoted, whichever code the engine settled on.
+ *
+ * The sanitiser is core's, the same one the engine already ran through
+ * `approvalRecordOf`, and it is idempotent — running it twice costs nothing and
+ * changes nothing. It runs again here because {@link buildTripResult} is a
+ * public entry point that takes any `Decision` a host hands it, and an escape
+ * sequence on its way into a model's context is not a place to trust an
+ * upstream invariant.
+ */
+function humanDenialLine(approval: ApprovalRecord | undefined): string | undefined {
+  if (approval?.verdict !== 'denied') return undefined;
+  const reason = sanitizeFreeText(approval.reason, APPROVAL_REASON_LIMIT);
+  if (reason === undefined) return undefined;
+  return `A human denied this call. Reason given: ${reason}`;
+}
+
+/**
+ * Renders the agent-facing refusal text. Snapshot-tested; change it on purpose.
+ *
+ * @param approval the human's answer when the policy asked for one. Only a
+ * `denied` verdict carrying words adds anything; see {@link humanDenialLine}.
+ */
+export function renderTripText(
+  reason: Reason,
+  reportRef: string | undefined,
+  approval?: ApprovalRecord | undefined,
+): string {
   const advice = ADVICE[reason.code];
-  const lines = [
-    `AgentFuse circuit breaker OPEN — ${advice.headline(reason)}`,
+  const lines = [`AgentFuse circuit breaker OPEN — ${advice.headline(reason)}`];
+  const denial = humanDenialLine(approval);
+  if (denial !== undefined) {
+    // Before the retry warning, not after: the reason is part of what happened,
+    // and the warning plus the alternatives are what to do about it.
+    lines.push('', denial);
+  }
+  lines.push(
     '',
     RETRY_WARNING,
     '',
     'Do this instead:',
     ...advice.alternatives.map((alternative, index) => `  ${index + 1}. ${alternative}`),
-  ];
+  );
   if (reportRef !== undefined) {
     lines.push('', `Trip report: ${reportRef}`);
   }
@@ -365,7 +421,9 @@ export function buildTripResult(input: TripResultInput): CallToolResult {
   return {
     resultType: 'complete',
     isError: true,
-    content: [{ type: 'text', text: renderTripText(reason, reportPath ?? reportId) }],
+    content: [
+      { type: 'text', text: renderTripText(reason, reportPath ?? reportId, decision.approval) },
+    ],
     structuredContent: structured as unknown as Record<string, unknown>,
     _meta: {
       [TRIP_META_KEY]: {
