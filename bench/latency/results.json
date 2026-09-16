@@ -1,0 +1,273 @@
+{
+  "generatedBy": "bench/src/latency/run.ts",
+  "node": "v24.20.0",
+  "platform": "darwin/arm64",
+  "calls": 1000,
+  "warmup": 200,
+  "budgetP95Ms": 50,
+  "measurements": [
+    {
+      "tier": "in-memory",
+      "config": "direct",
+      "telemetry": "off",
+      "distribution": {
+        "samples": 1000,
+        "min": 0.009417,
+        "mean": 0.01780029400000002,
+        "p50": 0.012875,
+        "p95": 0.024917,
+        "p99": 0.040458,
+        "max": 1.587625
+      }
+    },
+    {
+      "tier": "in-memory",
+      "config": "rules",
+      "telemetry": "off",
+      "distribution": {
+        "samples": 1000,
+        "min": 0.022417,
+        "mean": 0.035101560000000004,
+        "p50": 0.029834,
+        "p95": 0.047125,
+        "p99": 0.060667,
+        "max": 1.188875
+      }
+    },
+    {
+      "tier": "in-memory",
+      "config": "semantic",
+      "telemetry": "off",
+      "distribution": {
+        "samples": 1000,
+        "min": 0.021834,
+        "mean": 0.028798219999999965,
+        "p50": 0.026,
+        "p95": 0.031959,
+        "p99": 0.04025,
+        "max": 1.367333
+      },
+      "queue": {
+        "offered": 1200,
+        "embedded": 0,
+        "droppedSampling": 0,
+        "droppedOverflow": 1135,
+        "depth": 64
+      }
+    },
+    {
+      "tier": "in-memory",
+      "config": "direct",
+      "telemetry": "on",
+      "distribution": {
+        "samples": 1000,
+        "min": 0.008042,
+        "mean": 0.011985939000000003,
+        "p50": 0.00925,
+        "p95": 0.012208,
+        "p99": 0.018583,
+        "max": 2.304875
+      }
+    },
+    {
+      "tier": "in-memory",
+      "config": "rules",
+      "telemetry": "on",
+      "distribution": {
+        "samples": 1000,
+        "min": 0.020375,
+        "mean": 0.03096399399999999,
+        "p50": 0.028042,
+        "p95": 0.034625,
+        "p99": 0.04275,
+        "max": 2.103083
+      }
+    },
+    {
+      "tier": "in-memory",
+      "config": "semantic",
+      "telemetry": "on",
+      "distribution": {
+        "samples": 1000,
+        "min": 0.020417,
+        "mean": 0.026365515999999936,
+        "p50": 0.023917,
+        "p95": 0.030167,
+        "p99": 0.042792,
+        "max": 1.683583
+      },
+      "queue": {
+        "offered": 1200,
+        "embedded": 0,
+        "droppedSampling": 0,
+        "droppedOverflow": 1135,
+        "depth": 64
+      }
+    },
+    {
+      "tier": "stdio",
+      "config": "direct",
+      "telemetry": "off",
+      "distribution": {
+        "samples": 1000,
+        "min": 0.023708,
+        "mean": 0.048113121,
+        "p50": 0.043458,
+        "p95": 0.070375,
+        "p99": 0.130792,
+        "max": 0.647875
+      }
+    },
+    {
+      "tier": "stdio",
+      "config": "rules",
+      "telemetry": "off",
+      "distribution": {
+        "samples": 1000,
+        "min": 0.08625,
+        "mean": 0.1355679089999999,
+        "p50": 0.115791,
+        "p95": 0.204792,
+        "p99": 0.446083,
+        "max": 0.974042
+      }
+    },
+    {
+      "tier": "stdio",
+      "config": "semantic",
+      "telemetry": "off",
+      "distribution": {
+        "samples": 1000,
+        "min": 4.109625,
+        "mean": 4.531761888000004,
+        "p50": 4.498583,
+        "p95": 4.807375,
+        "p99": 7.518875,
+        "max": 8.64125
+      }
+    },
+    {
+      "tier": "stdio",
+      "config": "direct",
+      "telemetry": "on",
+      "distribution": {
+        "samples": 1000,
+        "min": 0.023292,
+        "mean": 0.046077662999999915,
+        "p50": 0.043,
+        "p95": 0.061792,
+        "p99": 0.109125,
+        "max": 0.6845
+      }
+    },
+    {
+      "tier": "stdio",
+      "config": "rules",
+      "telemetry": "on",
+      "distribution": {
+        "samples": 1000,
+        "min": 0.098167,
+        "mean": 0.1588337590000001,
+        "p50": 0.125084,
+        "p95": 0.269166,
+        "p99": 0.680167,
+        "max": 1.39725
+      },
+      "exports": 18
+    },
+    {
+      "tier": "stdio",
+      "config": "semantic",
+      "telemetry": "on",
+      "distribution": {
+        "samples": 1000,
+        "min": 4.141667,
+        "mean": 4.586951740000001,
+        "p50": 4.516,
+        "p95": 4.896541,
+        "p99": 7.945792,
+        "max": 8.86625
+      },
+      "exports": 18
+    }
+  ],
+  "added": {
+    "in-memory · rules · telemetry off": {
+      "samples": 1000,
+      "min": 0.013,
+      "mean": 0.017301265999999985,
+      "p50": 0.016959000000000002,
+      "p95": 0.022208,
+      "p99": 0.020208999999999998,
+      "max": -0.39875000000000016
+    },
+    "in-memory · semantic · telemetry off": {
+      "samples": 1000,
+      "min": 0.012417,
+      "mean": 0.010997925999999946,
+      "p50": 0.013125,
+      "p95": 0.007042,
+      "p99": -0.00020799999999999985,
+      "max": -0.22029200000000015
+    },
+    "in-memory · rules · telemetry on": {
+      "samples": 1000,
+      "min": 0.012333,
+      "mean": 0.018978054999999987,
+      "p50": 0.018792000000000003,
+      "p95": 0.022417000000000003,
+      "p99": 0.024167000000000004,
+      "max": -0.2017920000000002
+    },
+    "in-memory · semantic · telemetry on": {
+      "samples": 1000,
+      "min": 0.012375,
+      "mean": 0.014379576999999933,
+      "p50": 0.014667000000000001,
+      "p95": 0.017959,
+      "p99": 0.024208999999999998,
+      "max": -0.621292
+    },
+    "stdio · rules · telemetry off": {
+      "samples": 1000,
+      "min": 0.06254199999999999,
+      "mean": 0.0874547879999999,
+      "p50": 0.07233300000000001,
+      "p95": 0.134417,
+      "p99": 0.315291,
+      "max": 0.326167
+    },
+    "stdio · semantic · telemetry off": {
+      "samples": 1000,
+      "min": 4.085917,
+      "mean": 4.483648767000004,
+      "p50": 4.455125,
+      "p95": 4.737,
+      "p99": 7.388083000000001,
+      "max": 7.9933749999999995
+    },
+    "stdio · rules · telemetry on": {
+      "samples": 1000,
+      "min": 0.074875,
+      "mean": 0.1127560960000002,
+      "p50": 0.082084,
+      "p95": 0.207374,
+      "p99": 0.5710419999999999,
+      "max": 0.7127500000000001
+    },
+    "stdio · semantic · telemetry on": {
+      "samples": 1000,
+      "min": 4.118375,
+      "mean": 4.540874077000001,
+      "p50": 4.473,
+      "p95": 4.834749,
+      "p99": 7.836667,
+      "max": 8.181750000000001
+    }
+  },
+  "worst": {
+    "configuration": "stdio · semantic · telemetry on",
+    "p95Ms": 4.834749
+  },
+  "met": true
+}

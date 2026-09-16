@@ -24,5 +24,10 @@
   "dependencies": {
     "@agentfuse/core": "*",
     "@agentfuse/proxy": "*"
+  },
+  "devDependencies": {
+    "@modelcontextprotocol/client": "^2.0.0",
+    "@modelcontextprotocol/server": "^2.0.0",
+    "yaml": "^2.9.1"
   }
 }

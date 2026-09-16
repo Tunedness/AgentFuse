@@ -13,7 +13,9 @@
       "!**/node_modules",
       "!**/*.tsbuildinfo",
       "!**/__snapshots__",
-      "!packages/core/schemas"
+      "!packages/core/schemas",
+      "!bench/detection/results.json",
+      "!bench/latency/results.json"
     ]
   },
   "formatter": {

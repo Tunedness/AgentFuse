@@ -190,7 +190,7 @@ export class OtlpExporter {
         continue;
       }
       if (this.depth === 0) return;
-      this.#pump();
+      this.#pump(true);
       if (this.#running === undefined) return;
     }
   }
@@ -239,7 +239,7 @@ export class OtlpExporter {
       this.#dropped += 1;
     }
     if (queue.length >= this.#batchSize) {
-      this.#pump();
+      this.#pump(false);
       return;
     }
     this.#schedule();
@@ -258,7 +258,7 @@ export class OtlpExporter {
     const timer = setTimeout(
       () => {
         this.#timer = undefined;
-        this.#pump();
+        this.#pump(true);
       },
       Math.max(this.#flushIntervalMs, remaining),
     );
@@ -273,7 +273,19 @@ export class OtlpExporter {
     this.#timer = undefined;
   }
 
-  #pump(): void {
+  /**
+   * Starts the worker, if it is not already running.
+   *
+   * `drain` says whether a partly-filled queue is worth a request. The timer
+   * and {@link flush} say yes; a queue that merely reached {@link batchSize}
+   * says no, and phase 9 measured why. Against a collector on loopback a POST
+   * finishes in about a millisecond, so a worker that looped "while anything is
+   * queued" sent a request per two records: 1003 of them over one benchmark
+   * configuration where twenty would have carried the same data. The flush
+   * interval is the contract this file already documented; draining eagerly
+   * because the collector happens to be fast was the code quietly ignoring it.
+   */
+  #pump(drain: boolean): void {
     if (this.#running !== undefined || this.depth === 0) return;
     if (this.#now() < this.#retryAfter) {
       // Still inside a backoff. Come back when it has elapsed rather than
@@ -282,7 +294,7 @@ export class OtlpExporter {
       return;
     }
     this.#clearTimer();
-    const run = this.#run();
+    const run = this.#run(drain);
     this.#running = run;
     void run.then(() => {
       this.#running = undefined;
@@ -292,8 +304,14 @@ export class OtlpExporter {
   }
 
   /** The worker. Never rejects: every failure mode is handled inside. */
-  async #run(): Promise<void> {
+  async #run(drain: boolean): Promise<void> {
     while (this.depth > 0 && this.#now() >= this.#retryAfter) {
+      // A size-driven pump sends only what is actually full and leaves the
+      // remainder to the timer; records that arrived while a batch was in
+      // flight are not a reason to send another half-empty one.
+      if (!drain && this.#spans.length < this.#batchSize && this.#logs.length < this.#batchSize) {
+        break;
+      }
       const spans = this.#spans.splice(0, this.#batchSize);
       if (spans.length > 0) await this.#send(this.#tracesUrl, traceRequest, spans, 'traces');
       if (this.#now() < this.#retryAfter) break;
