@@ -1,9 +1,10 @@
 # AgentFuse — uygulama durumu ve devir notu
 
-**Son güncelleme:** 2026-09-16 · **`main`'deki son kod commit'i:** `146b709`
-(`main` HEAD bunu izleyen bu doküman commit'i) · **Durum:** Faz 4 bitti;
-geriye Faz 9 (benchmark'lar + eşik kalibrasyonu) ve Faz 10 (doküman + v0.1.0)
-kaldı
+**Son güncelleme:** 2026-09-16 · **`main`'deki son kod commit'i:** `8c89a3d`
+(`main` HEAD bunu izleyen bu doküman commit'i) · **Durum:** Faz 9 bitti;
+geriye yalnız Faz 10 (doküman + v0.1.0) kaldı. **PRD §6'nın tespit hedefi
+karşılanmıyor** (ölçülen %87, hedef %90) — bkz. Faz 9 bölümü ve "Sırada ne
+var".
 
 Bu dosya, işi başka bir oturumda kaldığı yerden sürdürebilmek için tutulur.
 Ürün tanımı burada değil — tek doğruluk kaynağı `../.ssot/PRD.md` ve
@@ -26,7 +27,7 @@ dosyasındadır.
 | 6 | CLI (`agentfuse`) | **Bitti** — 6a: `373c240` `f503322` `58741ba` `c80c4db` · 6b: `54d858e` `19c96f8` `7447c48` |
 | 7 | Onay akışı + rapor UX | **Bitti** — `84b903e` `935146d` `a7a8ddc` |
 | 8 | Telemetri (OTLP) | **Bitti** — `0172deb` `3d36b9f` `3177f90` `3e791d4` |
-| 9 | Benchmark'lar (tespit + gecikme) | Başlanmadı |
+| 9 | Benchmark'lar (tespit + gecikme) | **Bitti** — `bdd1fff` `1f3992e` `b0e0c68` `7479363` `8c89a3d` |
 | 10 | Dokümanlar + v0.1.0 | Başlanmadı |
 | — | Faz 7/8'den kalan iki boşluk | **Bitti** — `a3e7752` `a92f06d` |
 
@@ -40,19 +41,26 @@ kritik yol: 0-1-2-5-6-9-10
 ### `main` yeşil — 2026-09-16'da bizzat koşuldu
 
 ```
-npm run lint          → Checked 204 files. No fixes applied. (exit 0)
+npm run lint          → Checked 220 files. No fixes applied. (exit 0)
 npm run typecheck     → temiz (tsc -b && tsc -p tsconfig.test.json)
 npm run build         → temiz
-npm test              → Test Files 74 passed · Tests 1614 passed | 1 skipped (~7,7 s)
+npm test              → Test Files 76 passed · Tests 1655 passed | 1 skipped (~7,9 s)
 npm run schema:check  → schema up to date
 ```
 
-Faz 4 öncesindeki sayılar 65 dosya / 1527 test idi; bu faz dokuz dosya ve 88
-test ekledi, bir tanesini (`index.test.ts` stub testi) sildi. **Atlanan tek
-test** `model.test.ts`'teki soğuk indirme; `AGENTFUSE_TEST_DOWNLOAD=1`
-olmadan koşmuyor — aşağıya bakın. `lint` çıktısındaki 42 `info`
-(`useLiteralKeys`) Faz 7'den beri aynı ve exit 0'ı etkilemiyor. Faz 4 yeni
-`biome-ignore` eklemedi.
+Faz 9 öncesindeki sayılar 74 dosya / 1614 test idi; bu faz iki dosya
+(`core/src/loop/novelty.test.ts`, `bench/src/detection/corpus.test.ts`) ve 41
+test ekledi. **Atlanan tek test** `model.test.ts`'teki soğuk indirme;
+`AGENTFUSE_TEST_DOWNLOAD=1` olmadan koşmuyor — aşağıya bakın. `lint`
+çıktısındaki 42 `info` (`useLiteralKeys`) Faz 7'den beri aynı ve exit 0'ı
+etkilemiyor. Faz 9 yeni `biome-ignore` eklemedi; `biome.json`'a iki satır
+ekledi (`bench/*/results.json`), gerekçesi `packages/core/schemas` ile aynı:
+dosya generator'ın ürünü, formatı da onun işi.
+
+**`wrap-process.test.ts` yük altında kırılgan.** Tam süiti art arda koşarken
+"exits 70 when the wrapped server dies under it" bir kez düştü, tek başına
+koşturulunca geçti. `a95209f` bu testlere duvar saati payı eklemişti; kalan
+kırılganlık ölçüm değil zamanlama. Faz 10 isterse payı bir kez daha artırabilir.
 
 Değişen tek CLI dosyası `packages/cli/src/embeddings.test.ts`, ve değişmek
 zorundaydı: "gerçek loader" testi, depo içinde çözülen paketin
@@ -69,14 +77,17 @@ Bu çalışmanın sonundaki ölçümler (`coverage/lcov.info` üzerinden, glob b
 
 | Paket | lines | functions | branches |
 | --- | --- | --- | --- |
-| `packages/core/src/**` (kapılı) | %99.89 | %100 | %95.65 |
+| `packages/core/src/**` (kapılı) | %99.90 | %100 | %94.72 |
 | `packages/proxy/src/**` (kapısız) | %98.90 | %100 | %91.51 |
-| `packages/cli/src/**` (kapısız) | %99.93 | %100 | %99.52 |
+| `packages/cli/src/**` (kapısız) | %99.87 | %100 | %99.24 |
 | `packages/embeddings-local/src/**` (kapısız) | %98.03 | %96.55 | %87.25 |
 
-İlk üçü Faz 8 sonrası "iki boşluk" çalışmasındaki rakamlarının **birebir
-aynısı** — Faz 4 o üç pakete dokunmadı (tek istisna bir CLI *testi*, ki
-coverage'a girmiyor). `telemetry/` dizini dört metrikte de **%100** kaldı.
+`core` branch'i %95.65'ten %94.72'ye indi: Faz 9 iki dosyaya dal ekledi
+(`loop/novelty.ts` %92.3, `guards/rule-loop.ts` %90.56) ve ikisi de %90'lık
+kapının üstünde. `proxy` rakamları **birebir aynı** — Faz 9 o pakete hiç
+dokunmadı. `cli` yalnız `telemetry/exporter.ts` değiştiği için oynadı
+(%99.2 statement, kapalı kalan tek satır serileştirilemeyen bir kaydın
+savunma yolu).
 
 `embeddings-local` kapısız ve kapıya alınmadı: kapı bilinçli olarak yalnız
 `core`'da, çünkü ürünün güvenlik ağı orası. Kapalı kalan satırlar iki türden:
@@ -105,13 +116,12 @@ harness'lar, senaryo dublörleri ve `json-schema.ts` doğrulayıcısı `.test.ts
 bitmediği halde test iskelesidir, ve yayınlanmaları her senaryoyu public
 kontrata çevirirdi.
 
-Senkron yolun ölçülen maliyeti (`beforeCall` + `afterCall` + `observe`, 20 000
-çağrı, 50 oturum, `HashingProvider(384)` bağlı, `mode: warn`): ortalama
-0.018 ms, **p95 0.023 ms**, p99 0.038 ms. PRD §6'nın çağrı başına p95 < 50 ms
-bütçesi bu katman için üç büyüklük mertebesi boş duruyor — çünkü embedding
-hesabı bu yolda değil. Bu rakam kural katmanının maliyetidir; gerçek modelin
-gecikmesi kuyrukta ölçülür ve bir `tools/call`'a hiç dokunmaz. Kesin ölçüm ve
-eşik kalibrasyonu Faz 9'un işi.
+Senkron yolun Faz 2'de ölçülen maliyeti (`beforeCall` + `afterCall` +
+`observe`, 20 000 çağrı, 50 oturum, `HashingProvider(384)` bağlı, `mode: warn`):
+ortalama 0.018 ms, **p95 0.023 ms**, p99 0.038 ms. **Faz 9 bunu gerçek MCP
+trafiğiyle ve gerçek modelle yeniden ölçtü**; tam tablo aşağıdaki Faz 9
+bölümünde ve `bench/latency/results.md`'de. Özet: eklenen gecikme en kötü
+yapılandırmada **p95 4,84 ms**, PRD §6'nın 50 ms bütçesinin onda ikisi.
 
 ---
 
@@ -2430,9 +2440,338 @@ inisiyatifiyle birleştirmedi — brifing de bunu istemedi.
 
 ---
 
+## Faz 9 — benchmark'lar ve eşik kalibrasyonu (bitti)
+
+Beş commit: `bdd1fff` corpus üreteci + determinizm testleri, `1f3992e` replay +
+sweep + ablation, `b0e0c68` algoritma değişikliği + kalibre edilmiş
+varsayılanlar, `7479363` gecikme benchmark'ı + exporter düzeltmesi, `8c89a3d`
+CI. `bench/` ağacı:
+
+```
+bench/src/rng.ts                    — tohumlu mulberry32
+bench/src/detection/types.ts        — corpus formatı ve senaryo adları
+bench/src/detection/corpus.ts       — üreteç (10 senaryo × 20 oturum)
+bench/src/detection/generate.ts     — corpus.jsonl'i yazar
+bench/src/detection/replay.ts       — gerçek FuseEngine ile replay + embed
+bench/src/detection/sweep.ts        — skor dizisi, kritik eşik, metrikler
+bench/src/detection/run.ts          — sweep, seçim, uçtan uca doğrulama
+bench/src/detection/ablation.ts     — ekseni seçen ölçüm (aşağıya bakın)
+bench/src/latency/{stats,inmemory,stdio,run}.ts
+bench/detection/corpus.jsonl        — commit'li, hash'i testle pinli
+bench/{detection,latency}/results.{md,json}  — commit'li ölçümler
+bench/latency/noop-server.mjs       — boş MCP sunucusu
+```
+
+### Corpus — her senaryo neyi yakalamak için var
+
+200 oturum, 2084 çağrı, 100 pozitif / 100 negatif. Her oturum
+`<seed>:<senaryo>:<index>` ile tohumlanmış kendi `Rng`'sinden doğuyor, yani yeni
+bir senaryo eklemek yanındakileri kaydırmıyor ve JSONL bayt-birebir yeniden
+üretiliyor (`corpus.test.ts` sha256 ile pinliyor).
+
+| senaryo | etiket | neyi sınıyor |
+| --- | --- | --- |
+| `verbatim-retry` | pozitif | R1'in var olma sebebi. Zor değil; tespit gecikmesinin tabanını çiviliyor (üçüncü çağrıda trip = iki boşa tur). |
+| `reworded-retry` | pozitif | **Yalnız semantik katmanın görebileceği iki senaryodan biri.** Aynı soru her turda başka kelimelerle; bütün fingerprint'ler farklı, hiç hata yok, salınım yok — R1/R2/R3 yapısal olarak kör. |
+| `error-loop` | pozitif | R2, ve `errorSignature`'ın maskelemesi: `/tmp/<hex>` dışında aynı olan iki hata aynı imzaya düşmezse kural hiç ateşlenmez. |
+| `oscillation` | pozitif | R3. Period 2 ve 3; hiçbir araç tek başına R1 eşiğine varmıyor. |
+| `drifting-loop` | pozitif | **İkinci semantik-only senaryo** ve gerçek model hatasına en çok benzeyeni: her turda bir düğme kımıldıyor, hiçbir şey tekrarlamıyor, cevap hiç değişmiyor. |
+| `pagination-sweep` | negatif | Ürünün en pahalı yanlış pozitifi. Faz 4 sayfa 1 ↔ sayfa 2'yi **0.9971** ölçmüştü — gerçek bir döngüden ayırt edilemeyecek kadar yakın. Yarısı hex cursor, yarısı base64 token, üçte biri cursor'suz (offset SQL'in içinde). |
+| `bulk-edit` | negatif | Tek araç, N çağrı, yalnız bir yol ya da bir id'de farklılaşan argümanlar, yalnız bir bayt sayısında farklılaşan sonuçlar. |
+| `try-then-fix` | negatif | Aynı build komutu düzeltmeden önce ve sonra. Tek pencerede iki özdeş fingerprint. |
+| `list-traverse-process` | negatif | Ortasında pencereyi tek başına dolduran bir `read_file` koşusu. |
+| `converging-build-test` | negatif | Aynı komut üç-dört kez, hata sayısı yediden sıfıra düşerek. **Argümanlar hiç değişmiyor; ilerleme tümüyle sonucun içinde.** |
+
+**Corpus'ta bilinçli bir düzeltme yapıldı ve rakamları görmeden önce değil,
+gördükten sonra yapıldı — o yüzden burada yazıyor.** İlk taslakta
+`reworded-retry`'nin sonuç metni her çağrıda dört farklı "bir şey bulunamadı"
+ifadesi arasından rastgele seçiliyordu. **Hiçbir araç kendi çıktısını çağrılar
+arasında yeniden ifade etmez**: yeniden ifade eden ajandır, arama API'si boş
+sonuca her seferinde aynı cümleyi döner. Düzeltme, oturum başına sabit bir
+ifade (yarısı) ya da sorguyu cevabın içine yankılayan bir şablon (diğer yarısı)
+oldu. İkincisi kasten zor: cevap sorguyla birlikte hareket ediyor.
+
+**İkinci bir düzeltme yapılmadı ve sebebi de kayda değer.**
+`list-traverse-process`'in okuduğu dosya içerikleri şablon; gerçek dosyalar
+birbirinden çok daha fazla ayrışır, yani bu negatif gerçekte olduğundan daha
+"döngü gibi" duruyor ve tam olarak eşiği sıkıştıran şey o. Değiştirmek rakamı
+iyileştirirdi — ve tuzağı zayıflatmak olurdu. Duruyor.
+
+### Ölçüm önce ekseni reddetti
+
+İlk tam sweep, eski tasarımla (tek birleşik embedding, `semanticEmbeddingText`
+üzerinden ortalama ikili kosinüs) **düz bir ret** üretti: 2337 aday arasında PRD
+§6'nın iki hedefini birlikte tutan **sıfır** tane vardı. Sebep eşik değil,
+eksen. Kritik eşik dağılımları (pencere şekli 5/5/2):
+
+| senaryo | median | max |
+| --- | --- | --- |
+| `drifting-loop` (poz) | 0.9965 | 0.9976 |
+| `bulk-edit` (neg) | 0.9115 | **0.9970** |
+| `reworded-retry` (poz) | 0.8999 | 0.9460 |
+| `list-traverse-process` (neg) | 0.8584 | 0.9109 |
+| `pagination-sweep` (neg) | 0.8202 | **0.9952** |
+
+**Pozitifler negatiflerin altında.** Faz 4'ün tablosu bunu zaten söylüyordu ve
+biz okumamıştık: `search_issues` sayfa 1 ↔ sayfa 2 = 0.9971, aynı aracın "login
+bug" ↔ "login error" hâli = 0.9791. En uzak olması gereken çift, en yakın olan.
+Birleştirilmiş metinde araç adı ve argümanlar baskın, cevap ise 1000 karakterlik
+bir dizenin sonundaki tek satır.
+
+`ablation.ts` üç alternatifi aynı corpus üzerinde ölçtü (pencere 6, min_calls 5,
+consecutive 2; "en yüksek negatifin üstünde kalan pozitif sayısı"):
+
+| eksen | en yüksek negatif | üstünde kalan pozitif |
+| --- | --- | --- |
+| birleşik kosinüs (eski) | 0.9968 | 19/100 |
+| istek ve cevap ayrı gömülüp `min` | 0.9904 | 27/100 |
+| cevap token örtüşmesi (staleness) | 0.9000 | 62/100 |
+| `min(birleşik kosinüs, staleness)` | 0.8881 | 46/100 |
+
+İkinci satır — cevabı ayrı gömmek — çağrı başına iki embedding'e mal oluyor ve
+`pagination-sweep`'in en kötü hâlini hâlâ çözmüyor. Üçüncüsü tek başına
+embedding'i tamamen dışarıda bırakırdı, ki ADR-002'nin kararını iptal etmek
+olurdu. Dördüncüsü seçildi.
+
+### Core'da yapılan iki değişiklik
+
+İkisi de **daraltıyor**, genişletmiyor: eskisinin trip etmediği hiçbir yerde
+trip etmiyorlar. Bir devre kesicinin yanılabileceği yön budur.
+
+**1. R1 artık cevabın da durduğunu soruyor** (`guards/rule-loop.ts`). Kuralın
+kendi mesajı "The result will not change" diyordu ve bunu hiçbir şey kontrol
+etmiyordu. Ölçülen bedel: varsayılan `window: 8` ile corpus'un **her**
+`converging-build-test` oturumu ve `try-then-fix`'lerin yarısı durduruluyordu —
+yalnız deterministik katmandan **%31 yanlış pozitif**, hem de çalışan bir ajanın
+ürettiği en yaygın şekil üzerinde. Sayım artık "aynı fingerprint'e sahip önceki
+çağrılar"ın değil, **cevabı üzerinde de anlaşan en büyük grubun** üzerinde.
+Cevap kimliği hatalarda `errorSignature`, başarılarda `maskString`'den geçmiş
+özet — yani çıktısına zaman damgası basan bir araç R1'i kör etmiyor. Düzeltme
+sonrası kural katmanının tek başına yanlış pozitifi %31 → **%9**.
+
+**2. Pencere skoru artık iki eksenin küçüğü** (`loop/novelty.ts` +
+`guards/semantic-loop.ts`). `ResultNoveltyWindow` pencerenin cevaplarının token
+kümelerini ve document frequency'sini artımlı tutuyor; `staleness` = her cevabın
+"pencerede başka bir cevapta da geçen" token oranının ortalaması. Skor =
+`min(ortalama ikili kosinüs, staleness)`. Model çağrısı yok, saf, deterministik,
+ve rapora insan doğrulayabileceği bir cümle veriyor: "son altı cevapta sana daha
+önce gösterilmemiş hiçbir şey yoktu". Kenar durumlar bilinçli: **boş cevap tam
+bayat sayılıyor** — hiçbir şey döndürmeyen bir araç, tekrar tekrar hiçbir şey
+söylüyordur; boş dizeyi "yeni" saymak sessiz-araç döngüsünü tek görünmez vaka
+yapardı.
+
+`purity.test.ts` gevşetilmedi; yeni dosya `node:*` de timer de kullanmıyor.
+
+### ROC ve seçilen çalışma noktası
+
+Seçim kuralı rakamlar görülmeden `run.ts`'e yazıldı ve değiştirilmedi:
+
+1. Yanlış pozitif çizgisini tut (`< %5`) **ve** en yakın oturuma en az
+   **0.004** uzak dur — modelin kendi çözünürlük tabanının (±0.002, ADR-003) iki
+   katı. Bundan yakın bir eşik kalibrasyon değil, bu 200 oturumdan geçirilmiş
+   bir çizgidir.
+2. Sonra PRD §6'nın recall hedefini de tutanları tercih et.
+3. Sonra en yüksek F1, sonra en geniş marj, sonra en düşük gecikme p95, sonra
+   küçük pencere.
+4. Ölçülen her şey eşitse **daha muhafazakâr** şekil: büyük `min_calls`, büyük
+   `consecutive_windows`. Corpus'un ayırt edemediği iki ayar, birinin ajanını
+   durdurmadan önce daha çok kanıt isteyerek çözülür.
+
+3198 aday tarandı. Seçilen: **`window: 5` · `min_calls: 5` ·
+`threshold: 0.905` · `consecutive_windows: 1`**. Eşiğin etrafındaki eğri
+(`bench/detection/results.md`'de tam hâli):
+
+| threshold | recall | FP oranı | precision | F1 |
+| --- | --- | --- | --- | --- |
+| 0.845 | %90.0 | %16.0 | %84.9 | 0.874 |
+| 0.870 | %88.0 | %5.0 | %94.6 | 0.912 |
+| 0.890 | %88.0 | %1.0 | %98.9 | 0.931 |
+| **0.905** | **%87.0** | **%0.0** | **%100.0** | **0.930** |
+| 0.915 | %85.0 | %0.0 | %100.0 | 0.919 |
+| 1.000 | %60.0 | %0.0 | %100.0 | 0.750 |
+
+En yakın negatif 0.8982 (`list-traverse-process`), en yakın pozitif 0.9130 →
+marj **0.0068**, çözünürlük tabanının üç katından fazla.
+
+**`window: 5` bu dosyanın en sonuçlu sayısı.** Pencere ≥ 6 olan **hiçbir aday**
+PRD §6'nın yanlış pozitif çizgisini hiçbir eşikte tutamadı — çünkü kural
+katmanının yanlış pozitifleri eşiğe bakmıyor ve 8'lik bir pencere, iki tur
+düzeltme arasında aynı komutun üç koşusunu görüyor.
+
+### Ölçülen sonuç — ve karşılanmayan hedef
+
+Uçtan uca (gerçek motor, gerçek dedektör, gerçek sağlayıcı; sweep modeliyle 200
+oturumun 200'ünde aynı fikirde):
+
+| metrik | değer |
+| --- | --- |
+| precision | **1.000** |
+| recall | **0.870** |
+| F1 | **0.930** |
+| TP / FN / FP / TN | 87 / 13 / 0 / 100 |
+| yanlış pozitif oranı | **%0.0** |
+| tespit gecikmesi (tur) | ortalama 3.53 · p50 3 · **p95 5** · max 5 |
+| kimin yakaladığı | kurallar 60, semantik 27 |
+
+Senaryo bazında: `verbatim-retry` 20/20, `error-loop` 20/20, `oscillation`
+20/20, `drifting-loop` 20/20, **`reworded-retry` 7/20**; beş negatifin
+hepsi 0/20.
+
+**PRD §6 karşılaştırması, dürüst hâliyle:**
+
+- yanlış pozitif < %5 → **karşılandı** (%0.0, 100 dürüst oturumda)
+- tespit ≥ %90 → **karşılanmadı** (%87.0)
+
+Kaçan 13 oturumun hepsi `reworded-retry`. Sweep neden satın alınamadığını
+gösteriyor: o oturumlar ölçülen her eksende `list-traverse-process`
+negatiflerinin **altında** duruyor (median 0.8491'e karşı negatif max 0.8982),
+yani daha fazlasını yakalayan her eşik daha fazla dürüst işi durduruyor. %90'a
+çıkmanın tek yolu eşiği 0.845'e indirmek ve yanlış pozitifi %16'ya çıkarmak —
+PRD §8'in birinci riskini üçe katlamak.
+
+**Kalibrasyonun vazgeçtiği şey tam olarak bu:** 3 puanlık recall karşılığında
+%16 yerine %0 yanlış pozitif ve 0.0068'lik bir genelleme marjı. Daha yüksek
+recall'lu noktalar tabloda duruyor (0.890'da %88 / %1) ama marjları
+çözünürlük tabanının altına iniyor; onları seçmek "yalnız bu corpus'ta çalışan
+eşik" olurdu.
+
+### `cursor` muafiyeti ağırlığını taşıyor mu — evet, ama yalnız bir katmanda
+
+Ölçüldü, iddia edilmedi. 20 `pagination-sweep` oturumunun 15'i `cursor`
+argümanı kullanıyor. Muafiyet kaldırılıp cursor hex maskesine bırakılsaydı:
+**15'i fingerprint çeşitliliğini tümüyle kaybederdi ve 12'si R1 tarafından
+üçüncü sayfada durdurulurdu.** Yani asimetri deterministik katmanda gerçekten
+taşıyor.
+
+**Semantik katmanda hiçbir ağırlığı yok.** Değişen bir cursor'ın gömme
+uzayındaki etkisi ~0.003; pagination'ı bir döngüden ayıran şey cursor değil,
+sayfaların birbirinden farklı cevaplar döndürmesi. Faz 3'ün "sonuç metni de
+değişmeli" notu doğruydu ve yetersizdi: sonucun metinde **bulunması** yetmiyor,
+kendi ekseninde ölçülmesi gerekiyor.
+
+### Gecikme — ölçülen tablo
+
+1000 sıcak çağrı × yapılandırma, önce 200 çağrı atılıyor. Node 24,
+darwin/arm64. Tam tablo `bench/latency/results.md`'de.
+
+**Eklenen gecikme = (rules | semantic) − direct, persentil persentil:**
+
+| yapılandırma | p50 | p95 | p99 |
+| --- | --- | --- | --- |
+| in-memory · rules · telemetri kapalı | 0.017 | 0.022 | 0.020 |
+| in-memory · semantic · telemetri kapalı | 0.013 | 0.007 | ~0 |
+| in-memory · rules · telemetri açık | 0.019 | 0.022 | 0.024 |
+| in-memory · semantic · telemetri açık | 0.015 | 0.018 | 0.024 |
+| stdio · rules · telemetri kapalı | 0.072 | 0.134 | 0.315 |
+| stdio · semantic · telemetri kapalı | 4.455 | 4.737 | 7.388 |
+| stdio · rules · telemetri açık | 0.082 | 0.207 | 0.571 |
+| **stdio · semantic · telemetri açık** | 4.473 | **4.835** | 7.837 |
+
+PRD §6'nın çağrı başına p95 < 50 ms bütçesi **karşılanıyor**; en kötü
+yapılandırma bütçenin onda ikisinde.
+
+**İki tier neden bu kadar farklı — ölçülerek cevaplandı.** Kuyruk sayaçları:
+in-memory 1200 çağrıda `offered 1200, embedded 0, droppedOverflow 1135`;
+sarılmış gerçek process 300 çağrıda `offered 300, embedded 300, batches 300`.
+Bellek içinde istemci hiçbir modelin yetişemeyeceği hızda çağırıyor, kuyruk yük
+atıyor ve semantik katman **bedava** oluyor — ADR-002'nin tasarladığı özellik
+ve sıcak yolun gerçekten ayrıldığının kanıtı. Boru üzerinden çağrılar yavaş,
+kuyruk yetişiyor, ve ONNX işi proxy ile aynı process ve aynı çekirdekleri
+paylaşıyor: fazladan dört milisaniye oradan geliyor.
+
+**`batches 300 / offered 300` — kuyruk hiç batch'lemiyor.** Düzenli bir varış
+hızında worker, bir sonraki çağrı bittiğinde hep boşta oluyor, birlik batch
+alıyor ve modelin sabit çağrı maliyetini her seferinde ödüyor (Faz 4: sekizlik
+batch 10,7 ms). Kuyruk arkadaş bekleyemiyor çünkü kendi timer'ı yok — Faz 3
+`Scheduler` portunu bilinçle reddetti — ve tek alternatif, bir sonraki
+`enqueue`'da kontrol edilen bir deadline, kısa bir oturumun kuyruğunu hiç
+skorlanmadan bırakırdı. Bu, on kat boşluğu olan bir gecikme bütçesi için tespit
+kapsamından ödün vermek olurdu; **alınmadı, kayda geçirildi.**
+
+### Telemetri açık/kapalı — ve exporter'ın düzeltilen bir hatası
+
+Faz 8 "fark ölçüm gürültüsünün altında kalmalı, aksi hâlde `exporter.ts`'in
+sabitleri kalibrasyona açık" demişti. Fark görünürdü ve sebebi sabitler değildi:
+
+`#run()` "kuyrukta bir şey varken" döngüsündeydi. Loopback'teki bir collector'a
+POST ~1 ms sürüyor, o sırada kuyruğa iki kayıt daha geliyor, döngü onları da
+yolluyor. Sonuç: **bir yapılandırmada 1003 istek**, aynı veriyi 18 istek
+taşıyabilecekken. Dosyanın kendi belgelediği 1000 ms'lik flush aralığı, collector
+hızlı olduğu için sessizce yok sayılıyordu. Düzeltme: boyut tetiklemeli bir pump
+yalnız **dolu** batch'leri yolluyor, kalanı timer'a bırakıyor; timer ve `flush()`
+hâlâ her şeyi boşaltıyor.
+
+Sonrası (aynı koşum, aynı makine):
+
+| | önce | sonra |
+| --- | --- | --- |
+| stdio rules, export POST | 200 | **18** |
+| stdio semantic, export POST | 1003 | **18** |
+| stdio rules, eklenen p95 | +0.119 ms | **+0.064 ms** |
+| stdio semantic, eklenen p95 | +0.249 ms | **+0.089 ms** |
+
+In-memory tier'da telemetrinin farkı ölçüm gürültüsünün içinde (işaret bile
+değişiyor: −0.012 ile +0.008 arası). Faz 8'in iddiası — `emit` birkaç nesne
+kurup bir diziye push ediyor — doğrulandı.
+
+### CI
+
+`.github/workflows/bench.yml`: Node 24 tek sürüm (matris `ci.yml`'nin işi; üç
+sürümde üç farklı rakam üretmek "ölçüm hangisi" sorusunu cevapsız bırakırdı),
+model `actions/cache` ile revision anahtarlı, `ONNXRUNTIME_NODE_INSTALL: skip`,
+corpus commit'liyle karşılaştırılıyor, iki benchmark koşuyor, sonuçlar artifact
+olarak yükleniyor.
+
+**Kapı bilinçli olarak PRD §6'nın %90'ına değil ölçülen recall'a bakıyor**
+(`GATE.recall = 0.85`; ölçülen 0.87, aradaki 0.02 int8 çekirdeklerinin
+platformlar arası bit-birebir olmamasına pay). Yanlış pozitif kapısı PRD'nin
+kendi rakamında, çünkü karşılanıyor. Her koşum PRD verdict'ini koşulsuz
+yazdırıyor. Gerekçe `run.ts`'in içinde uzun uzun yazılı: %90'da kapı koymak
+workflow'u kalıcı kırmızı yapar ve kimsenin okumadığı bir kapı, kapı değildir.
+**Oradaki `recall` sayısını düşürmek bir değişikliği geçirmenin yolu değildir;**
+o sayı ulaşılanın kaydıdır.
+
+### Tasarımın sınırında olduğu yerler
+
+1. **`reworded-retry` ayrılabilir değil.** Ölçülen her eksende
+   `list-traverse-process` ve `bulk-edit` negatiflerinin arasına düşüyor. Cevabı
+   sorguyu yankılayan yarısı özellikle çaresiz: hem istek hem cevap her turda
+   değişiyor, ve "niyet aynı" bilgisi hiçbir bant içi sinyalde yok.
+2. **`pagination-sweep`'in postgres varyantı** (`OFFSET` SQL'in içinde,
+   `cursor` argümanı yok) kosinüs ekseninde 0.99'a çıkıyor; onu tutan tek şey
+   staleness. Sonuç metnini kısaltan bir sunucu bu korumayı zayıflatır.
+3. **`list-traverse-process` eşiği sıkıştıran negatif** ve corpus'taki dosya
+   içerikleri şablon olduğu için gerçeğinden zor. Gerçek dosyalarla marj daha
+   geniş olur; yani 0.905 muhafazakâr taraftan hatalı.
+4. **Kuyruk batch'lemiyor** (yukarıda). Gecikme bütçesi rahat olduğu için
+   dokunulmadı.
+5. **Kalibrasyon tek modele ait.** `Xenova/all-MiniLM-L6-v2` int8. Başka bir
+   model `threshold`'u geçersiz kılar; `semantic.model` değiştiren bir operatör
+   kendi kalibrasyonunu yapmak zorunda ve doküman bunu söylemeli.
+
+### Faz 10'un bilmesi gerekenler
+
+- **PRD §6'nın tespit rakamı ya değişmeli ya da tasarım.** Doküman "%90 tespit"
+  diye yazamaz; ölçülen %87 ve karşılığında %0 yanlış pozitif. Bu bir `.ssot`
+  kararı (aşağıya bakın).
+- Varsayılanlar artık kalibre: `window: 5`, `min_calls: 5`, `threshold: 0.905`,
+  `consecutive_windows: 1`. `agentfuse init` şablonu ve JSON Schema ikisi de
+  güncellendi ve her biri rakamın nereden geldiğini yazıyor.
+- **`consecutive_windows` varsayılanı 2'den 1'e indi** ve bu bir geri alma:
+  "bir sıçrama gürültüdür" yalnız kosinüs-tek skor için doğruydu. Staleness
+  terimi skoru düzleştirdiği için sweep, bir kez yargılanan yüksek bir eşiği iki
+  kez yargılanan düşük birine tercih etti.
+- Gecikme cümlesi: "eklenen gecikme p95 4,8 ms'nin altında" söylenebilir, ama
+  **semantik katman açıkken** rakamın 0,2 ms değil ~4,8 ms olduğu ve sebebinin
+  ONNX'in aynı process'i paylaşması olduğu da söylenmeli.
+- `bench` private kalıyor ve hiçbir tarball'a girmiyor; `bench/package.json`
+  `private: true` ve `files` alanı yok.
+
+---
+
 ## Sırada ne var
 
-### Önce `.ssot`: iki nokta kendi kararını bekliyor
+### Önce `.ssot`: dört nokta kendi kararını bekliyor
 
 Çatı ADR-002 kapsam değiştiren koddan önce doküman güncellemesi şart koşuyor.
 Açık duran noktalar:
@@ -2452,7 +2791,34 @@ zaten oydu. Aynı ADR'ın ikinci yarısı (onay gerekçesi) da kapandı; bkz.
 ve belgelenmiş durumda: iki gateway'in kompozisyon kuralı, ve açılamayan bir
 onay kanalının sert hata değil uyarı olması.
 
-**Bu çalışmadan çıkan yeni bir nokta:** onay gerekçesi **ajana** da gitmeli mi?
+**Faz 9'dan çıkan iki nokta — ikisi de karar bekliyor:**
+
+3. **PRD §6'nın tespit hedefi ölçümle uyuşmuyor.** Metin "≥ %90 tespit, < %5
+   yanlış pozitif" diyor. Ölçülen: **%87 tespit, %0 yanlış pozitif**, 200
+   etiketli oturumda, eşik en yakın dürüst oturumdan çözünürlük tabanının üç
+   katı uzakta. Kaçan 13 oturumun hepsi `reworded-retry` ve sweep bunların
+   `list-traverse-process` negatiflerinin *altında* durduğunu gösteriyor: %90'a
+   çıkmanın tek yolu yanlış pozitifi %16'ya yükseltmek. Üç okuma mümkün ve
+   seçim `.ssot`'un:
+   - **(a)** PRD §6'nın rakamı ölçülene çekilir ve yanında karşılığı yazılır
+     ("%87 tespit, %0 yanlış pozitif"), çünkü PRD §8'in birinci riski yanlış
+     pozitiftir ve ürün onu satın almıştır;
+   - **(b)** hedef korunur ve ADR-002'ye ikinci bir kademe eklenir (örneğin
+     eşik sınırındaki pencereler için bir LLM-hakem çağrısı) — ADR-002'nin
+     "pahalı ve yavaş" diye reddettiği şey, ama artık yalnız sınır vakalarında;
+   - **(c)** hedef korunur ve daha güçlü bir embedding modeline geçilir —
+     ADR-003'ün kurulum boyutu kararını yeniden açar.
+   Kod bugün (a)'yı varsayıyor: CI kapısı ölçülen recall'a bakıyor ve PRD
+   verdict'ini her koşumda yazdırıyor.
+4. **ADR-002'nin anlatımı uygulamanın gerisinde.** ADR "her araç çağrısının
+   … yerel embedding'i alınır, kayan pencere içi ortalama benzerlik eşiği
+   aşarsa devre kesilir" diyor. Uygulama artık `min(ortalama benzerlik,
+   cevap bayatlığı)` kullanıyor. Değişiklik **daraltıcı** — ADR'ın kuralının
+   trip etmediği hiçbir yerde trip etmiyor — ve ADR'ın kendi gerekçesini
+   ("sonuç özeti dahil") gerçekten uyguluyor, ama metin bunu söylemiyor. Bir
+   paragraf ya onaylamalı ya tersini söylemeli.
+
+**Faz 7'den kalan bir nokta:** onay gerekçesi **ajana** da gitmeli mi?
 ADR-009 boşluğu tarif ederken "kesinti raporuna ve ajanın gördüğü metne
 ulaşmıyor" diyor, ama kararı yalnız "port `{ verdict, reason? }` döndürür ve
 karar kaydı gerekçeyi taşır" diye yazıyor. Uygulama dar okumayı seçti: rapor ve
@@ -2469,29 +2835,13 @@ Bu bir kurulum talimatı meselesi (Faz 10), ADR meselesi değil — ADR-003'ün
 "opsiyonel yoldaş paket" kararını değiştiren bir şey yok, yalnız o paketin
 gerçek kurulum maliyeti tahmin edilenden büyük.
 
-### Faz 9–10
+### Faz 10
 
-Plan dosyasındaki brifingler geçerli. Kısaca: Faz 9 benchmark'lar ve eşik
-kalibrasyonu; Faz 10 dokümanlar ve v0.1.0.
+Plan dosyasındaki brifing geçerli: dokümanlar ve v0.1.0.
 
-**Faz 9'un Faz 4'ten alacakları** yukarıdaki Faz 4 bölümünün son iki alt
-başlığında: ölçülen kosinüs sayıları, ±0.002'lik eşik çözünürlüğü tabanı,
-kurulum adımları ve pagination uyarısı.
-
-**Faz 9'un Faz 8'den alacakları:**
-
-- Ölçüm noktası hazır: `telemetry.enabled: true` + `otlp_endpoint`'i süreç içi
-  bir alıcıya çevirmek, ROC taramasının her kararı, her döngü tespitini ve her
-  `loop.window_score`'u yapılandırılmış olarak okumasını sağlıyor —
-  `lastScore()` ile birlikte ikinci okuma noktası bu.
-  `testing/otlp-receiver.ts` zaten o alıcıdır ve build dışıdır.
-- **Gecikme ölçümünde telemetri açıkken de sıcak yol değişmiyor:** `emit`
-  birkaç nesne kurup bir diziye `push` ediyor, socket işi timer'da. Faz 9 p95'i
-  ölçerken telemetriyi hem açık hem kapalı koşup farkın ölçüm gürültüsünün
-  altında kaldığını göstermeli; aksi hâlde batch ve kuyruk sabitleri
-  (`exporter.ts`) kalibrasyona açık.
-- Faz 3'ün notu duruyor: fingerprint'e duyarlı örnekleme ROC taramasında
-  ölçülecek bir iyileştirme adayı.
+**Faz 10'un Faz 9'dan alacakları** yukarıdaki Faz 9 bölümünün son alt
+başlığında; en önemlisi PRD §6'nın tespit rakamının ölçümle uyuşmaması ve
+kalibrasyonun tek bir modele ait olması.
 
 **Faz 10'un Faz 8'den alacakları:**
 
@@ -2512,21 +2862,17 @@ yakalamak için kurulan 25 ms'lik zamanlayıcı silinsin diye). Üçüncüsü �
 `ToolCallGuardOptions.traceparentFor` — `a3e7752` ile eklendi ve üçünün aynı
 deseni paylaşması yukarıda kayda geçti.
 
-**Faz 9 ve 10 için iki not daha:** telemetri açık koşulan bir benchmark artık
-her araç çağrısında bir `_meta` anahtarı daha yazıyor (`traceparent`) ve
-sarılan sunucu ajanınki yerine bizim span'imizi görüyor — gecikme ölçümü
-telemetriyi hem açık hem kapalı koşarken bunu da kapsıyor. Faz 10'un onay
-bölümü ise `--reason`'ın artık kesinti raporunda ve `agentfuse report`
-çıktısında göründüğünü anlatmalı; Faz 7'nin "yalnız log'a gider" cümlesi
-geçersiz.
+**Faz 10 için bir not daha:** telemetri açık koşan bir kurulum her araç
+çağrısında bir `_meta` anahtarı daha yazıyor (`traceparent`) ve sarılan sunucu
+ajanınki yerine bizim span'imizi görüyor; gecikme ölçümü bunu da kapsıyor ve
+farkı gürültünün içinde buldu. Onay bölümü ise `--reason`'ın artık kesinti
+raporunda ve `agentfuse report` çıktısında göründüğünü anlatmalı; Faz 7'nin
+"yalnız log'a gider" cümlesi geçersiz.
 
-**Faz 9 yalnız test değil, ürünün sayısal iddiasıdır.** PRD §6 eşikleri —
-recall ≥ 0.90, FP < 0.05, p95 eklenen < 50 ms — CI'da kapı olur. Corpus'un
-negatif tarafı (yanlış pozitif tuzakları: pagination taraması, N benzer dosyanın
-toplu düzenlenmesi, dene-sonra-düzelt, yakınsayan build-test döngüsü) pozitif
-tarafı kadar önemli. Eşikler tutmuyorsa **yumuşatılmaz** — algoritma ya da
-corpus düzeltilir. Şemadaki `threshold`/`window`/`consecutive_windows`
-varsayılanları yer tutucudur ve bu fazın ROC taramasından kesinleşir.
+**Faz 9'un kuralı Faz 10 için de geçerli:** rakamlar yumuşatılmaz. CI
+kapısındaki `GATE.recall` ulaşılanın kaydıdır, geçirilecek bir eşik değil;
+düşürülmesi tespitin kötüleştiği anlamına gelir ve o zaman düşürülecek şey kapı
+değil, konuşulacak şey algoritmadır.
 
 ---
 
