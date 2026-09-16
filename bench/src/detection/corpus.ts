@@ -299,6 +299,20 @@ function rewordedRetry(rng: Rng, id: string): CorpusSession {
     '0 results.',
   ] as const;
 
+  /**
+   * How the tool words its empty answer.
+   *
+   * Fixed per session, not per call, and the distinction matters more than it
+   * looks: **a tool does not reword its own output between calls.** An earlier
+   * draft picked a new phrasing on every turn, which models nothing real — the
+   * agent is what rewords, and the search API answers the same way each time it
+   * finds nothing. `echo` is the other common shape, where the answer quotes the
+   * query back and therefore *does* move with it; half the sessions use it, so
+   * the easy case is not the only case.
+   */
+  const style = rng.bool(0.5) ? 'fixed' : 'echo';
+  const fixedAnswer = rng.pick(answers);
+
   for (let i = 0; i < repeats; i += 1) {
     const query = queries[i % queries.length] as string;
     // The shape of the arguments wobbles too, the way a model's output does:
@@ -309,7 +323,12 @@ function rewordedRetry(rng: Rng, id: string): CorpusSession {
         : i % 3 === 1
           ? { repo, query, state: 'open' }
           : { query, repo, limit: 20 + (i % 4) * 10 };
-    b.ok('github', 'search_issues', args, rng.pick(answers));
+    b.ok(
+      'github',
+      'search_issues',
+      args,
+      style === 'fixed' ? fixedAnswer : `No issues matched "${query}" in ${repo}.`,
+    );
   }
 
   return b.done({
@@ -317,7 +336,7 @@ function rewordedRetry(rng: Rng, id: string): CorpusSession {
     scenario: 'reworded-retry',
     label: 'positive',
     loopStartIndex: start,
-    note: 'same question, new words each turn; every fingerprint differs so only the semantic layer can see it',
+    note: `same question, new words each turn, ${style} answer; every fingerprint differs so only the semantic layer can see it`,
   });
 }
 
