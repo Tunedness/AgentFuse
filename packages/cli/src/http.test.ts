@@ -228,16 +228,27 @@ describe('the node to fetch bridge', () => {
   it('streams a response rather than buffering it', async () => {
     // An SSE response never ends, so a bridge that waited for the whole body
     // would hang the request the modern era delivers progress on.
+    //
+    // The second frame is produced only once the first has been *read*, rather
+    // than after a short timer. A timer races the reader: on a loaded machine
+    // both frames are produced before the first read completes, they arrive in
+    // one segment, and the test fails having proved nothing about buffering.
+    // Gating on the read asserts the property itself — the first frame arrived
+    // before the second existed — with no wall clock in it.
+    let releaseSecond = (): void => {};
+    const firstWasRead = new Promise<void>((resolve) => {
+      releaseSecond = resolve;
+    });
     const base = await listen(
       async () =>
         new Response(
           new ReadableStream<Uint8Array>({
             start(controller) {
               controller.enqueue(new TextEncoder().encode('event: one\n\n'));
-              setTimeout(() => {
+              void firstWasRead.then(() => {
                 controller.enqueue(new TextEncoder().encode('event: two\n\n'));
                 controller.close();
-              }, 5);
+              });
             },
           }),
           { headers: { 'content-type': 'text/event-stream' } },
@@ -250,6 +261,7 @@ describe('the node to fetch bridge', () => {
 
     // The first frame arrives before the second has been produced.
     expect(new TextDecoder().decode(first.value)).toBe('event: one\n\n');
+    releaseSecond();
 
     const rest: string[] = [];
     for (;;) {
