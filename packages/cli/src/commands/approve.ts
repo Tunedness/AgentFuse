@@ -10,9 +10,9 @@
  * **`--reason` is required.** A verdict without one is unauditable a week
  * later, and the moment somebody has the context to write it down is the moment
  * they are typing the command. It is recorded in the wrap's `approval_resolved`
- * diagnostic line. It does *not* reach the agent-facing refusal text or the
- * JSON trip report — see the module doc in `approvals/cli-gateway.ts` for why
- * that would need a change to a frozen package.
+ * diagnostic line, carried into the JSON trip report, and — for a denial —
+ * into the refusal the agent reads, attributed to the person who wrote it. See
+ * the module doc in `approvals/cli-gateway.ts`.
  *
  * **`--reset` lives on `approve`, not on `deny`.** Resetting a breaker is an
  * act of permission: it says "carry on". `agentfuse deny --reset` is therefore

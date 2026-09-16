@@ -47,9 +47,13 @@
  * assumes the text is safe, because on the webhook channel it is written by a
  * remote endpoint rather than by the operator.
  *
- * It still does **not** reach the agent-facing refusal text. Putting an
- * operator's words into the model's context is a product decision of its own
- * and is not one this seam makes.
+ * For a **denial** it also reaches the agent-facing refusal text, attributed
+ * (`A human denied this call. Reason given: …`) so the model reads it as a
+ * person's statement rather than as an instruction. ADR-009's 2026-09-16
+ * clarification settled that: the refusal's whole job is to let the agent
+ * correct itself, and "a human denied this call" is measurably less useful
+ * than the same sentence carrying the reason. An approval has no refusal text,
+ * so nothing is added there. `proxy/src/trip-result.ts` renders it.
  */
 
 import type { ApprovalAnswer, ApprovalGateway, ApprovalRequest } from '@agentfuse/core';

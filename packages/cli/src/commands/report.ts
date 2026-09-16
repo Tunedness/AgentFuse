@@ -30,18 +30,19 @@ export const REPORT_FLAGS = {
 /** `agentfuse report --help`. */
 export function reportHelp(): string[] {
   return [
-    'Usage: agentfuse report [last | list | <trip id>] [--dir <path>] [--json]',
+    'Usage: agentfuse report [last | list | <trip id>] [--dir <path>]',
+    '                       [--policy <path>] [--limit <n>] [--json]',
     '',
     'Reads the trip reports AgentFuse wrote when a circuit broke.',
     '',
-    '  last             Render the most recent report. The default.',
-    '  list             List what is on disk, newest first.',
-    '  <trip id>        Render one report, by trip id or filename.',
+    '  last                 Render the most recent report. The default.',
+    '  list                 List what is on disk, newest first.',
+    '  <trip id>            Render one report, by trip id or filename.',
     '',
-    '  --dir <path>     Where the reports are. Defaults to the policy’s report.dir.',
-    '  --policy <path>  The policy to read report.dir from.',
-    '  --limit, -n <n>  How many rows `list` shows. Default 20.',
-    '  --json           Print the stored JSON instead of the rendered report.',
+    '  --dir <path>         Where the reports are. Defaults to report.dir.',
+    '  --policy, -p <path>  The policy to read report.dir from.',
+    '  --limit, -n <n>      How many rows `list` shows. Default 20.',
+    '  --json               Print the stored JSON instead of the rendered report.',
   ];
 }
 

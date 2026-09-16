@@ -225,9 +225,9 @@ export class SessionKeyResolver {
     // Below the chaining contract on purpose. ADR-006 says an inner proxy
     // *adopts* the baggage member an outer one injected; a transport-level id
     // the outer proxy does not control must not outrank that, or chaining
-    // stops meaning anything the moment both are present. The ADR's own
-    // wording for the legacy-HTTP case reads the other way round and is worth
-    // a clarifying edit.
+    // stops meaning anything the moment both are present. The ADR used to read
+    // the other way round for the legacy-HTTP case; it was amended on
+    // 2026-09-16 and now states this order, with this reasoning, explicitly.
     if (input.mcpSessionId !== undefined) {
       return { sessionId: input.mcpSessionId, source: 'mcp-session-id', exact: true };
     }

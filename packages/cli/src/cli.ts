@@ -75,8 +75,8 @@ export function usage(): string[] {
     '',
     'A policy is found at --policy, then AGENTFUSE_POLICY, then fusepolicy.yaml',
     'searched upwards from the working directory. It starts in `mode: warn`:',
-    'AgentFuse observes and writes reports until you decide its trips are the',
-    'ones you want.',
+    'AgentFuse decides, says on stderr what it would have stopped, and forwards',
+    'the call anyway until you decide its trips are the ones you want.',
   ];
 }
 

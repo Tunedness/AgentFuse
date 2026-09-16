@@ -261,11 +261,12 @@ export function initHelp(): string[] {
     '',
     `Writes a starter policy file (default: ./${DEFAULT_POLICY_FILENAME}).`,
     '',
-    '  --policy <path>  Where to write it.',
-    '  --force, -f      Overwrite an existing file.',
+    '  --policy, -p <path>  Where to write it.',
+    '  --force, -f          Overwrite an existing file.',
     '',
-    'The starter file defaults to `mode: warn`: AgentFuse observes and writes',
-    'reports until you decide its trips are the ones you want.',
+    'The starter file defaults to `mode: warn`: AgentFuse decides and reports on',
+    'stderr what it would have stopped, and forwards the call anyway. No report',
+    'files are written until a trip is enforced or a human answers one.',
   ];
 }
 

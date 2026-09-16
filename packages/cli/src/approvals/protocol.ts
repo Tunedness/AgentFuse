@@ -80,7 +80,11 @@ export interface VerdictFrame {
   readonly type: 'verdict';
   readonly approvalId: string;
   readonly verdict: 'approved' | 'denied';
-  /** Why. Recorded in the diagnostic line; see the module doc in `cli-gateway.ts`. */
+  /**
+   * Why. Reaches the diagnostic line, the trip report, and — on a denial — the
+   * refusal the agent reads. Sanitised and capped by the engine, never here:
+   * on the webhook channel this text is written by a remote endpoint.
+   */
   readonly reason: string;
 }
 
