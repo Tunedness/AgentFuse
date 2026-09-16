@@ -230,7 +230,15 @@ approvals:
   #   url: https://example.internal/agentfuse/approvals
   #   secret_env: AGENTFUSE_WEBHOOK_SECRET
 
-# OpenTelemetry export. Not in this build yet, and off unless asked for.
+# OpenTelemetry export, over OTLP/HTTP. Off unless you ask, and off means
+# nothing is constructed: no queue, no timer, no line on stderr.
+#
+# Turning it on installs NOTHING. The OTLP JSON is written by hand and the
+# transport is Node's own fetch, so the install size is identical either way.
+# Spans go to <endpoint>/v1/traces and events to <endpoint>/v1/logs, as the
+# four tunedness.* event types. \`node examples/otlp-receiver.mjs\` prints what
+# arrives, with no collector to install. A collector that is down costs one
+# diagnostic line, never a tool call.
 #
 # telemetry:
 #   enabled: false
