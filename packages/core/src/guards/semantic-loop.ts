@@ -21,12 +21,34 @@
  *
  * ## What trips it
  *
- * The mean pairwise cosine similarity of the window (see {@link
- * EmbeddingWindow}) has to exceed `semantic.threshold` in
- * `semantic.consecutive_windows` **consecutive** windows. One spike is noise —
- * two similar calls in a row happen constantly in honest work. Two consecutive
- * spikes mean the window as a whole stopped moving, which is what a loop looks
- * like from the outside.
+ * Two things have to be true at once, and the window score is the **smaller**
+ * of them:
+ *
+ * - **Similarity** — the mean pairwise cosine of the window's embeddings (see
+ *   {@link EmbeddingWindow}). The agent keeps asking the same kind of thing.
+ * - **Staleness** — the mean fraction of each answer's tokens that another
+ *   answer in the window also produced (see {@link ResultNoveltyWindow}). The
+ *   agent keeps being told the same thing.
+ *
+ * Phase 9 added the second one, and the measurement that forced it is worth
+ * keeping close: on similarity alone, a `search_issues` pagination sweep scored
+ * **higher** than a genuine reworded retry — 0.9971 against 0.9791 in phase 4's
+ * own table — because the tool name and the argument shape dominate a
+ * concatenated text and the answer is one short line at the end of it. No
+ * threshold separates a loop from progress on that axis, at any value; the
+ * corpus of 200 labelled sessions put a hard ceiling of about 75% recall on it
+ * at a usable false-positive rate. Taking the minimum of the two axes can only
+ * ever *narrow* what trips, which is the direction a circuit breaker is allowed
+ * to be wrong in.
+ *
+ * That score has to exceed `semantic.threshold` in
+ * `semantic.consecutive_windows` **consecutive** windows. The calibrated
+ * default is one, reversing the original guess of two: a similarity-only score
+ * spikes, because two similar calls in a row happen constantly in honest work,
+ * but the minimum of similarity and staleness moves smoothly as the window
+ * slides and does not. Given that, the sweep preferred a higher threshold
+ * judged once over a lower one judged twice. Operators who want the extra
+ * confirmation still have the knob.
  *
  * `min_calls` gates this rule and only this rule. Phase 2 recorded why: gating
  * the deterministic rules behind it would make "the same call three times →
@@ -38,8 +60,9 @@ import { NoopTelemetrySink } from '../adapters/telemetry.js';
 import type { Reason } from '../domain/decision.js';
 import type { ToolCallRecord } from '../domain/records.js';
 import type { DegradedCause, SessionState } from '../domain/session.js';
-import { semanticEmbeddingText } from '../loop/embed-text.js';
+import { semanticEmbeddingText, semanticResultText } from '../loop/embed-text.js';
 import { shortFingerprint } from '../loop/fingerprint.js';
+import { ResultNoveltyWindow } from '../loop/novelty.js';
 import { type EmbeddingJob, EmbeddingQueue, type EmbeddingQueueStats } from '../loop/queue.js';
 import { EmbeddingWindow } from '../loop/window.js';
 import type { CompiledPolicy } from '../policy/compile.js';
@@ -70,6 +93,8 @@ export interface SemanticHost {
 interface SemanticJob extends EmbeddingJob {
   callId: string;
   fingerprint: string;
+  /** The answer half of {@link EmbeddingJob.text}, for the novelty window. */
+  resultText: string;
   /**
    * The merged loop settings for this call's matched rule.
    *
@@ -84,6 +109,12 @@ interface SemanticJob extends EmbeddingJob {
 /** Per-session scoring state. */
 interface SessionSemantics {
   window: EmbeddingWindow;
+  /** The answer side of the same window. Resized and cleared in lockstep. */
+  novelty: ResultNoveltyWindow;
+  /** The most recent similarity, before it was combined with staleness. */
+  lastSimilarity: number | undefined;
+  /** The most recent staleness. */
+  lastStaleness: number | undefined;
   /** Consecutive windows scored above the threshold. */
   streak: number;
   /** The most recent score, or `undefined` before the window filled. */
@@ -212,6 +243,7 @@ export class SemanticLoopDetector {
       callId: record.id,
       fingerprint: record.fingerprint,
       text: semanticEmbeddingText(record),
+      resultText: semanticResultText(record),
       loop,
     });
   }
@@ -252,12 +284,21 @@ export class SemanticLoopDetector {
     const state = this.#stateFor(job.sessionId, loop.window);
 
     state.window.push(vector);
+    state.novelty.push(job.resultText);
     state.callIds.push(job.callId);
     state.prints.push(shortFingerprint(job.fingerprint));
     while (state.callIds.length > state.window.capacity) state.callIds.shift();
     while (state.prints.length > state.window.capacity) state.prints.shift();
 
-    const score = state.window.score(loop.min_calls);
+    const similarity = state.window.score(loop.min_calls);
+    const staleness = state.novelty.staleness(loop.min_calls);
+    state.lastSimilarity = similarity ?? undefined;
+    state.lastStaleness = staleness ?? undefined;
+    // The two windows are pushed together and gated by the same `min_calls`, so
+    // they answer `null` together; the check covers both anyway rather than
+    // relying on that.
+    const score =
+      similarity === null || staleness === null ? null : Math.min(similarity, staleness);
     state.lastScore = score ?? undefined;
     if (score === null) {
       // Not enough of a window to compare yet. `min_calls` gates this rule and
@@ -287,12 +328,16 @@ export class SemanticLoopDetector {
     const reason: Reason = {
       code: 'LOOP_SEMANTIC',
       message:
-        `The last ${size} calls are ${(score * 100).toFixed(0)}% similar to each other on average ` +
-        `(threshold ${(loop.semantic.threshold * 100).toFixed(0)}%), for ` +
+        `The last ${size} calls are ${((state.lastSimilarity ?? score) * 100).toFixed(0)}% similar ` +
+        `to each other on average, and ${((state.lastStaleness ?? score) * 100).toFixed(0)}% of what ` +
+        `came back was already in one of the other answers (threshold ` +
+        `${(loop.semantic.threshold * 100).toFixed(0)}% on both), for ` +
         `${loop.semantic.consecutive_windows} windows running. The arguments keep changing but the ` +
         'work does not. Stop, and report what you are stuck on instead of trying another variation.',
       evidence: {
         score: Number(score.toFixed(4)),
+        similarity: Number((state.lastSimilarity ?? score).toFixed(4)),
+        staleness: Number((state.lastStaleness ?? score).toFixed(4)),
         threshold: loop.semantic.threshold,
         consecutiveWindows: loop.semantic.consecutive_windows,
         windowSize: size,
@@ -323,6 +368,7 @@ export class SemanticLoopDetector {
     // The history that tripped it would trip it again on the very next call,
     // which is the same reason `resetBreaker` drops the session's call window.
     state.window.clear();
+    state.novelty.clear();
     state.callIds.length = 0;
     state.prints.length = 0;
     state.streak = 0;
@@ -334,6 +380,7 @@ export class SemanticLoopDetector {
       // A session that touches two differently-configured tools can ask for two
       // window sizes; resizing keeps the history already paid for.
       existing.window.ensureCapacity(capacity);
+      existing.novelty.ensureCapacity(capacity);
       // Refresh recency: the bound below evicts the least recently scored.
       this.#sessions.delete(sessionId);
       this.#sessions.set(sessionId, existing);
@@ -342,8 +389,11 @@ export class SemanticLoopDetector {
 
     const created: SessionSemantics = {
       window: new EmbeddingWindow({ capacity, dims: this.#provider.dims }),
+      novelty: new ResultNoveltyWindow({ capacity }),
       streak: 0,
       lastScore: undefined,
+      lastSimilarity: undefined,
+      lastStaleness: undefined,
       callIds: [],
       prints: [],
     };

@@ -157,7 +157,7 @@ describe('runValidate on a good policy', () => {
 
     runValidate(context(), []);
 
-    expect(stdout.text).toMatch(/semantic\s+local, threshold 0\.83, 2 consecutive windows/);
+    expect(stdout.text).toMatch(/semantic\s+local, threshold 0\.905, one window/);
   });
 
   it('says when arguments will be redacted in written reports', () => {

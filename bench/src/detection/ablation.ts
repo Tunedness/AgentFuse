@@ -30,6 +30,7 @@ import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import type { EmbeddingProvider, ToolCallRecord } from '@agentfuse/core';
 import {
+  EmbeddingWindow,
   errorSignature,
   MAX_ARGS_CHARS,
   MAX_SUMMARY_CHARS,
@@ -38,7 +39,7 @@ import {
   toolKey,
 } from '@agentfuse/core';
 import { fromJsonl } from './corpus.js';
-import { criticalThreshold, scoreSequence } from './sweep.js';
+import { criticalThreshold } from './sweep.js';
 import type { CorpusCall, CorpusSession } from './types.js';
 
 const CORPUS = fileURLToPath(new URL('../../detection/corpus.jsonl', import.meta.url));
@@ -125,6 +126,26 @@ const CONSECUTIVE = 2;
  * The quantity is *staleness*: one minus the fraction of a result's tokens that
  * did not appear in any earlier result still inside the window.
  */
+/**
+ * The cosine-only window score.
+ *
+ * A local copy rather than `sweep.ts`'s, which now mirrors the shipped detector
+ * and therefore includes the staleness gate. This file is the record of the
+ * investigation that produced that gate, so it has to keep measuring the
+ * *previous* axis exactly as it was.
+ */
+function similaritySequence(
+  vectors: readonly Float32Array[],
+  window: number,
+  minCalls: number,
+): (number | null)[] {
+  const ring = new EmbeddingWindow({ capacity: window, dims: vectors[0]?.length ?? 384 });
+  return vectors.map((vector) => {
+    ring.push(vector);
+    return ring.score(minCalls);
+  });
+}
+
 function tokens(text: string): Set<string> {
   return new Set(text.toLowerCase().match(/[a-z0-9]+/g) ?? []);
 }
@@ -207,9 +228,9 @@ async function main(): Promise<void> {
       texts.map((t) => t.answer),
     );
 
-    const combinedScores = scoreSequence(combined, WINDOW, MIN_CALLS);
-    const requestScores = scoreSequence(request, WINDOW, MIN_CALLS);
-    const answerScores = scoreSequence(answer, WINDOW, MIN_CALLS);
+    const combinedScores = similaritySequence(combined, WINDOW, MIN_CALLS);
+    const requestScores = similaritySequence(request, WINDOW, MIN_CALLS);
+    const answerScores = similaritySequence(answer, WINDOW, MIN_CALLS);
     // The paired score: both axes have to agree that nothing is moving.
     const pairedScores = requestScores.map((r, i) => {
       const a = answerScores[i];

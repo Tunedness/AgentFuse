@@ -31,6 +31,7 @@ import {
   parsePolicy,
   SemanticLoopDetector,
   semanticEmbeddingText,
+  semanticResultText,
   type ToolCallRecord,
   type TripCode,
 } from '@agentfuse/core';
@@ -244,4 +245,27 @@ export async function replayEndToEnd(
   } finally {
     detector.forget(session.id);
   }
+}
+
+/**
+ * The answer half of each call, exactly as the novelty window will see it.
+ *
+ * Through `semanticResultText` for the same reason the embedding text goes
+ * through `semanticEmbeddingText`: it is a contract, and a benchmark that spelt
+ * it a second time would eventually be measuring a different product.
+ */
+export function resultTextsOf(session: CorpusSession): string[] {
+  return session.calls.map((call) =>
+    semanticResultText({
+      id: '',
+      sessionId: session.id,
+      serverName: call.serverName,
+      toolName: call.toolName,
+      args: call.args,
+      argsNormalized: '',
+      fingerprint: '',
+      startedAt: 0,
+      outcome: outcomeOf(call),
+    }),
+  );
 }

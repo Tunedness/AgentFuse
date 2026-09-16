@@ -62,6 +62,26 @@ function clip(text: string, max: number): string {
 }
 
 /**
+ * Just the answer half, error signature included.
+ *
+ * Split out because phase 9's result-novelty window needs exactly this string
+ * and must not spell it a second time: the similarity axis and the novelty axis
+ * have to be describing the same answer, and two copies of "what the answer
+ * is" would eventually disagree about an error prefix or a cap.
+ *
+ * Uncapped here, unlike inside {@link semanticEmbeddingText}: the novelty
+ * window tokenises and bounds the token count itself, and truncating first
+ * would hide the tail of a long answer from the only signal that reads it.
+ */
+export function semanticResultText(record: ToolCallRecord): string {
+  const outcome = record.outcome;
+  const raw = outcome?.resultSummary ?? '';
+  return outcome?.isError === true
+    ? `ERROR(${outcome.errorSignature ?? 'unknown_error'}): ${raw}`
+    : raw;
+}
+
+/**
  * The text for one completed call.
  *
  * A record with no outcome — a call still in flight, or one the engine
@@ -69,10 +89,7 @@ function clip(text: string, max: number): string {
  * cannot accidentally make the detector throw on the response path.
  */
 export function semanticEmbeddingText(record: ToolCallRecord): string {
-  const outcome = record.outcome;
-  const raw = outcome?.resultSummary ?? '';
-  const summary =
-    outcome?.isError === true ? `ERROR(${outcome.errorSignature ?? 'unknown_error'}): ${raw}` : raw;
+  const summary = semanticResultText(record);
 
   // `toolKey` rather than the bare tool name: the fingerprint is built over
   // `<server>\0<tool>\0<args>` for the same reason, and `read_file` on two

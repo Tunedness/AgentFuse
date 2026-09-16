@@ -21,7 +21,7 @@
  * run, and the two are required to agree.
  */
 
-import { EmbeddingWindow } from '@agentfuse/core';
+import { EmbeddingWindow, ResultNoveltyWindow } from '@agentfuse/core';
 import type { LoopSettingsCandidate, ReplayOutcome } from './replay.js';
 import type { CorpusSession, ScenarioName } from './types.js';
 
@@ -29,17 +29,25 @@ import type { CorpusSession, ScenarioName } from './types.js';
  * The window scores a session produces under one `(window, min_calls)` pair.
  *
  * `scores[i]` is the score *after* call `i` was folded in, or `null` while the
- * window is still shorter than `min_calls`.
+ * window is still shorter than `min_calls`. The two rings and the `min` are the
+ * detector's own arithmetic, held here rather than imported because the
+ * detector applies it inside a queue callback; `replayEndToEnd` checks the two
+ * against each other on every session at the end of a run.
  */
 export function scoreSequence(
   vectors: readonly Float32Array[],
+  resultTexts: readonly string[],
   window: number,
   minCalls: number,
 ): (number | null)[] {
   const ring = new EmbeddingWindow({ capacity: window, dims: vectors[0]?.length ?? 384 });
-  return vectors.map((vector) => {
+  const answers = new ResultNoveltyWindow({ capacity: window });
+  return vectors.map((vector, index) => {
     ring.push(vector);
-    return ring.score(minCalls);
+    answers.push(resultTexts[index] ?? '');
+    const similarity = ring.score(minCalls);
+    const staleness = answers.staleness(minCalls);
+    return similarity === null || staleness === null ? null : Math.min(similarity, staleness);
   });
 }
 
@@ -105,6 +113,8 @@ export interface SessionFacts {
   /** Where R1/R2/R3 stop it under this `window`, per window size. */
   readonly deterministic: ReadonlyMap<number, ReplayOutcome>;
   readonly vectors: readonly Float32Array[];
+  /** The answer half of each call, for the novelty window. */
+  readonly resultTexts: readonly string[];
 }
 
 /** The combined verdict of both tiers for one candidate. */
@@ -113,7 +123,12 @@ export function combinedTrip(
   candidate: LoopSettingsCandidate,
 ): { index: number | null; source: 'rule' | 'semantic' | null } {
   const rule = facts.deterministic.get(candidate.window)?.tripIndex ?? null;
-  const scores = scoreSequence(facts.vectors, candidate.window, candidate.min_calls);
+  const scores = scoreSequence(
+    facts.vectors,
+    facts.resultTexts,
+    candidate.window,
+    candidate.min_calls,
+  );
   const semantic = semanticTripIndex(scores, candidate.threshold, candidate.consecutive_windows);
 
   const length = facts.session.calls.length;
@@ -172,7 +187,8 @@ export function evaluate(
 
   for (const fact of facts) {
     const scenario = fact.session.scenario as ScenarioName;
-    const bucket = (byScenario[scenario] ??= { tripped: 0, total: 0 });
+    const bucket = byScenario[scenario] ?? { tripped: 0, total: 0 };
+    byScenario[scenario] = bucket;
     bucket.total += 1;
 
     const { index, source } = combinedTrip(fact, candidate);

@@ -156,5 +156,7 @@ function describeSemantic(
   windows: number,
 ): string {
   if (!wanted) return 'off';
-  return `${providers.join(', ')}, threshold ${threshold}, ${windows} consecutive windows`;
+  // The calibrated default is one window, so the plural has to be earned.
+  const run = windows === 1 ? 'one window' : `${windows} consecutive windows`;
+  return `${providers.join(', ')}, threshold ${threshold}, ${run}`;
 }

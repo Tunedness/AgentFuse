@@ -46,17 +46,52 @@ const SemanticSchema = z
     enabled: z.boolean().default(true),
     provider: z.enum(['local', 'openai', 'none']).default('local'),
     model: z.string().min(1).default('Xenova/all-MiniLM-L6-v2'),
-    /** Cosine similarity above which two windows count as "the same work". */
-    threshold: z.number().min(0).max(1).default(0.83),
-    /** How many consecutive windows must score above the threshold to trip. */
-    consecutive_windows: positiveInt().default(2),
+    /**
+     * Window score above which the calls count as "the same work".
+     *
+     * The score is `min(similarity, staleness)` — see `guards/semantic-loop.ts`
+     * — so this one number caps both how alike the requests are and how much of
+     * each answer was already in one of the others.
+     *
+     * **Calibrated, not chosen.** Phase 9 swept 3198 candidates over a corpus
+     * of 200 labelled sessions and picked the point with the best F1 that held
+     * the false-positive line with a real margin: 0.905, with the nearest
+     * negative session at 0.8982 and the nearest positive at 0.9130. That
+     * margin of 0.0068 is more than three times the embedder's own resolution
+     * floor of ±0.002 (ADR-003), which is the smallest gap that can mean
+     * anything on this model.
+     */
+    threshold: z.number().min(0).max(1).default(0.905),
+    /**
+     * How many consecutive windows must score above the threshold to trip.
+     *
+     * One, which reverses the original guess of two. The reason the guess was
+     * two was that a similarity-only score spikes: a couple of similar calls in
+     * a row happen constantly in honest work. With the staleness term in the
+     * score, both halves move smoothly as the window slides, and the sweep
+     * preferred a *higher* threshold judged once over a lower one judged twice
+     * — on the same corpus that is 87% recall at 0% false positives against
+     * 86% at 1%.
+     */
+    consecutive_windows: positiveInt().default(1),
   })
   .prefault({});
 
 const LoopDetectionSchema = z
   .strictObject({
-    /** How many recent calls the rules look at. */
-    window: positiveInt().default(8),
+    /**
+     * How many recent calls the rules look at.
+     *
+     * Five, down from a placeholder eight, and this is the single most
+     * consequential number in the file. At eight, **the deterministic tier
+     * alone** false-positives on 9% of the benchmark corpus's honest sessions:
+     * a window that wide sees three runs of one unchanging build command
+     * across two rounds of edits, and halts an agent that is fixing things. No
+     * semantic threshold can undo that, because the rules do not consult one —
+     * which is why no candidate with `window >= 6` could hold PRD §6's 5%
+     * false-positive line at any threshold.
+     */
+    window: positiveInt().default(5),
     /**
      * Minimum calls in the window before the **semantic** rule is allowed to
      * score. The deterministic rules (exact repeat, error repeat, cycle) are

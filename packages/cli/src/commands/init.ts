@@ -97,8 +97,11 @@ budgets:
   on_exceeded: halt
 
 loop_detection:
-  # How many recent calls the rules look at.
-  window: 8
+  # How many recent calls the rules look at. Calibrated against the phase 9
+  # benchmark corpus: at 8 the deterministic rules alone false-positive on the
+  # test-fix-test cycle, because a window that wide sees three runs of one
+  # unchanging command across two rounds of edits.
+  window: 5
   # Minimum calls before the SEMANTIC rule may score. The deterministic rules
   # below ignore it on purpose, so "same call three times" still trips on the
   # third call.
@@ -130,11 +133,13 @@ loop_detection:
     enabled: true
     provider: local
     model: Xenova/all-MiniLM-L6-v2
-    # Mean pairwise cosine similarity of the window above which it counts as
-    # "the same work". These three numbers are still being calibrated against a
-    # benchmark corpus; expect them to move.
-    threshold: 0.83
-    consecutive_windows: 2
+    # Window score above which the calls count as "the same work". The score is
+    # the smaller of two numbers: how alike the requests are, and how much of
+    # each answer was already in one of the others. Calibrated on 200 labelled
+    # sessions — 87% detection at 0% false positives, with the nearest honest
+    # session 0.007 below.
+    threshold: 0.905
+    consecutive_windows: 1
 
   # What a tripped loop does: halt | require_approval | warn.
   on_trip: halt

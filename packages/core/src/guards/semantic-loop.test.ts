@@ -188,24 +188,20 @@ describe('the semantic rule trips on the next call, never on this one', () => {
       expect(h.engine.ports.sessions.get(SESSION)?.pendingTrip).toBeUndefined();
     }
 
-    // Call 5 fills the window and scores above the threshold once. One spike is
-    // noise, so `consecutive_windows: 2` holds the verdict back.
+    // Call 5 fills the window and scores above the threshold. Under the
+    // calibrated `consecutive_windows: 1` that is already a verdict — but it is
+    // still allowed, because the evidence for it only exists after it
+    // completed. That is the whole property this test is named for.
     const fifth = await scoredCall(h, attempt(5));
     expect(fifth.action).toBe('allow');
-    expect(h.engine.ports.sessions.get(SESSION)?.pendingTrip).toBeUndefined();
-
-    // Call 6 is the second consecutive window over the threshold. It is still
-    // allowed — the evidence for it only exists after it completed.
-    const sixth = await scoredCall(h, attempt(6));
-    expect(sixth.action).toBe('allow');
-    expect(sixth.report).toBeUndefined();
+    expect(fifth.report).toBeUndefined();
     expect(h.engine.ports.sessions.get(SESSION)?.pendingTrip?.code).toBe('LOOP_SEMANTIC');
 
-    // Call 7 pays for it.
-    const seventh = await scoredCall(h, attempt(7));
-    expect(seventh.action).toBe('deny');
-    expect(codes(seventh)).toEqual(['LOOP_SEMANTIC']);
-    expect(seventh.report?.trigger.code).toBe('LOOP_SEMANTIC');
+    // Call 6 pays for it.
+    const sixth = await scoredCall(h, attempt(6));
+    expect(sixth.action).toBe('deny');
+    expect(codes(sixth)).toEqual(['LOOP_SEMANTIC']);
+    expect(sixth.report?.trigger.code).toBe('LOOP_SEMANTIC');
     expect(h.engine.ports.sessions.get(SESSION)?.breaker.phase).toBe('open');
     expect(h.engine.ports.sessions.get(SESSION)?.pendingTrip).toBeUndefined();
   });
@@ -230,37 +226,37 @@ describe('the semantic rule trips on the next call, never on this one', () => {
 
   it('reports the score, the threshold and the calls it looked at', async () => {
     const h = harness({ document: { mode: 'enforce' } });
-    for (let n = 1; n <= 6; n += 1) await scoredCall(h, attempt(n));
+    for (let n = 1; n <= 5; n += 1) await scoredCall(h, attempt(n));
 
     const reason = h.engine.ports.sessions.get(SESSION)?.pendingTrip;
     const evidence = reason?.evidence as Record<string, unknown>;
-    expect(evidence.threshold).toBe(0.83);
-    expect(evidence.consecutiveWindows).toBe(2);
+    expect(evidence.threshold).toBe(0.905);
+    expect(evidence.consecutiveWindows).toBe(1);
     expect(evidence.minCalls).toBe(5);
     expect(evidence.model).toBe('test:hashing-trigram-128');
-    expect(evidence.score as number).toBeGreaterThan(0.83);
-    expect(evidence.callIds).toHaveLength(6);
-    expect(evidence.fingerprints).toHaveLength(6);
+    expect(evidence.score as number).toBeGreaterThan(0.905);
+    expect(evidence.callIds).toHaveLength(5);
+    expect(evidence.fingerprints).toHaveLength(5);
     // The message has to tell the agent to stop rather than to try again.
     expect(reason?.message).toContain('Stop');
   });
 
   it('emits a loop_detection event carrying the window score', async () => {
     const h = harness({ document: { mode: 'enforce' } });
-    for (let n = 1; n <= 6; n += 1) await scoredCall(h, attempt(n));
+    for (let n = 1; n <= 5; n += 1) await scoredCall(h, attempt(n));
 
     const events = h.telemetry.ofType('loop_detection');
     expect(events).toHaveLength(1);
     expect(events[0]?.code).toBe('LOOP_SEMANTIC');
-    expect(events[0]?.windowScore as number).toBeGreaterThan(0.83);
+    expect(events[0]?.windowScore as number).toBeGreaterThan(0.905);
     expect(events[0]?.enforced).toBe(true);
     expect(events[0]?.timestamp).toBe(h.clock.now());
   });
 
   it('does not immediately trip again on the history that just tripped it', async () => {
     const h = harness({ document: { mode: 'enforce' } });
-    for (let n = 1; n <= 6; n += 1) await scoredCall(h, attempt(n));
-    await scoredCall(h, attempt(7));
+    for (let n = 1; n <= 5; n += 1) await scoredCall(h, attempt(n));
+    await scoredCall(h, attempt(6));
     expect(h.engine.ports.sessions.get(SESSION)?.breaker.phase).toBe('open');
 
     // Operator resets; the window the detector held is gone too, so it needs
@@ -290,10 +286,13 @@ describe('consecutive windows', () => {
   });
 
   it('resets the streak when a window drops back below the threshold', async () => {
-    const h = harness({ document: { mode: 'enforce' } });
-    // Four near-identical calls get the window most of the way there.
+    // `consecutive_windows: 2`, above the calibrated default of 1, because the
+    // streak is only observable when more than one crossing is needed.
+    const h = harness({
+      document: { mode: 'enforce', loop_detection: { semantic: { consecutive_windows: 2 } } },
+    });
     for (let n = 1; n <= 5; n += 1) await scoredCall(h, attempt(n));
-    expect(h.detector.lastScore(SESSION) as number).toBeGreaterThan(0.83);
+    expect(h.detector.lastScore(SESSION) as number).toBeGreaterThan(0.905);
 
     // One genuinely different piece of work drags the mean back down and the
     // streak restarts from zero — which is exactly what stops an agent that is
@@ -305,7 +304,7 @@ describe('consecutive windows', () => {
         tool: 'query',
       },
     );
-    expect(h.detector.lastScore(SESSION) as number).toBeLessThan(0.83);
+    expect(h.detector.lastScore(SESSION) as number).toBeLessThan(0.905);
     expect(h.engine.ports.sessions.get(SESSION)?.pendingTrip).toBeUndefined();
   });
 
@@ -316,7 +315,7 @@ describe('consecutive windows', () => {
       expect(decision.action).toBe('allow');
     }
     expect(h.detector.stats.trips).toBe(0);
-    expect(h.detector.lastScore(SESSION) as number).toBeLessThan(0.83);
+    expect(h.detector.lastScore(SESSION) as number).toBeLessThan(0.905);
   });
 });
 
@@ -325,20 +324,20 @@ describe('warn mode', () => {
     // `warn` is the default, and it is how a user measures their own
     // false-positive rate before switching enforcement on.
     const h = harness();
-    for (let n = 1; n <= 6; n += 1) await scoredCall(h, attempt(n));
+    for (let n = 1; n <= 5; n += 1) await scoredCall(h, attempt(n));
     expect(h.engine.ports.sessions.get(SESSION)?.pendingTrip?.code).toBe('LOOP_SEMANTIC');
 
-    const seventh = await scoredCall(h, attempt(7));
-    expect(seventh.action).toBe('warn');
-    expect(seventh.wouldTrip).toBe(true);
-    expect(codes(seventh)).toEqual(['LOOP_SEMANTIC']);
+    const sixth = await scoredCall(h, attempt(6));
+    expect(sixth.action).toBe('warn');
+    expect(sixth.wouldTrip).toBe(true);
+    expect(codes(sixth)).toEqual(['LOOP_SEMANTIC']);
     // A report is still produced: warn mode observes everything enforce mode
     // would have done.
-    expect(seventh.report?.trigger.code).toBe('LOOP_SEMANTIC');
-    expect(seventh.report?.mode).toBe('warn');
+    expect(sixth.report?.trigger.code).toBe('LOOP_SEMANTIC');
+    expect(sixth.report?.mode).toBe('warn');
 
     // And the call went through, so the session keeps accumulating.
-    expect(h.engine.ports.sessions.get(SESSION)?.counters.calls).toBe(7);
+    expect(h.engine.ports.sessions.get(SESSION)?.counters.calls).toBe(6);
   });
 
   it('records that enforcement did not follow', async () => {
@@ -498,7 +497,7 @@ describe('a queue that overflows', () => {
 describe('the detector bookkeeping', () => {
   it('scores sessions independently', async () => {
     const h = harness({ document: { mode: 'enforce' } });
-    for (let n = 0; n < 6; n += 1) {
+    for (let n = 0; n < 5; n += 1) {
       await scoredCall(h, attempt(n));
       const [tool, args] = VARIED[n] as [string, unknown];
       await scoredCall(h, args, { tool, sessionId: 'session-2' });
@@ -565,5 +564,104 @@ describe('the detector bookkeeping', () => {
     // Nothing subscribed, so a completed call reaches the detector only if a
     // caller hands it over.
     expect(detector.stats.offered).toBe(0);
+  });
+});
+
+/**
+ * The answer axis, added in phase 9.
+ *
+ * The window score is `min(similarity, staleness)`, and these tests drive the
+ * two apart with a provider that reports perfect similarity for everything.
+ * That is the only way to see the gate on its own: with a real embedder, a
+ * changing answer moves both numbers at once, and a test that could not tell
+ * them apart would pass whether or not the gate existed.
+ *
+ * The measurement that forced this: on similarity alone, a `search_issues`
+ * pagination pair scored 0.9971 while a genuine reworded retry scored 0.9791 —
+ * the two sit on the wrong side of each other, so no threshold separates them.
+ */
+describe('the semantic rule also asks whether the answers moved', () => {
+  /** Every text is the same point, so the similarity axis is pinned at 1. */
+  const IDENTICAL: EmbeddingProvider = {
+    id: 'test:identical',
+    dims: 4,
+    embed: (texts) => Promise.resolve(texts.map(() => new Float32Array([1, 0, 0, 0]))),
+  };
+
+  const answered = (text: string): CallOutcome => ({
+    isError: false,
+    resultSummary: text,
+    resultBytes: text.length,
+  });
+
+  it('trips when the answers repeat', async () => {
+    const h = harness({ document: { mode: 'enforce' }, provider: IDENTICAL });
+    // Five calls fill the window and score above the threshold; the sixth
+    // consumes the verdict.
+    for (let n = 1; n <= 5; n += 1) {
+      await scoredCall(h, attempt(n), { outcome: answered('No issues matched the query.') });
+    }
+    expect(h.detector.lastScore(SESSION)).toBe(1);
+    expect(codes(await call(h, attempt(6)))).toContain('LOOP_SEMANTIC');
+  });
+
+  it('holds its fire through a pagination sweep', async () => {
+    // Identical vectors, so the similarity axis says "loop" as loudly as it
+    // can. Only the answers disagree, and they are enough.
+    const h = harness({ document: { mode: 'enforce' }, provider: IDENTICAL });
+    for (let n = 1; n <= 12; n += 1) {
+      await scoredCall(h, attempt(n), {
+        outcome: answered(`issue${n * 7} titled quaver${n} owned by hoopoe${n * 3}`),
+      });
+    }
+    expect(h.detector.lastScore(SESSION)).toBeLessThanOrEqual(0.5);
+    expect(codes(await call(h, attempt(99)))).not.toContain('LOOP_SEMANTIC');
+    expect((await call(h, attempt(100))).action).toBe('allow');
+  });
+
+  it('reports both numbers in the trip evidence', async () => {
+    const h = harness({ document: { mode: 'enforce' }, provider: IDENTICAL });
+    for (let n = 1; n <= 5; n += 1) {
+      await scoredCall(h, attempt(n), { outcome: answered('still nothing') });
+    }
+    const reason = (await call(h, attempt(6))).reasons.find((r) => r.code === 'LOOP_SEMANTIC');
+
+    expect(reason?.evidence?.similarity).toBe(1);
+    expect(reason?.evidence?.staleness).toBe(1);
+    expect(reason?.message).toContain('already in one of the other answers');
+  });
+
+  it('keeps the two windows the same size when a rule overrides it', async () => {
+    // The novelty window is resized in lockstep with the embedding window; if
+    // it were not, the two would be describing different windows of calls and
+    // the minimum of their scores would mean nothing.
+    const h = harness({
+      document: {
+        mode: 'enforce',
+        tools: [
+          { match: 'fs__write_file', action: 'allow', loop_detection: { window: 12 } },
+          { match: '*', action: 'allow' },
+        ],
+      },
+      provider: IDENTICAL,
+    });
+    for (let n = 1; n <= 12; n += 1) {
+      await scoredCall(h, attempt(n), { outcome: answered('unchanged') });
+    }
+    expect(h.detector.lastScore(SESSION)).toBe(1);
+  });
+
+  it('clears the answers too when it trips', async () => {
+    const h = harness({ document: { mode: 'enforce' }, provider: IDENTICAL });
+    for (let n = 1; n <= 5; n += 1) {
+      await scoredCall(h, attempt(n), { outcome: answered('same again') });
+    }
+    expect(codes(await call(h, attempt(6)))).toContain('LOOP_SEMANTIC');
+    h.engine.resetBreaker(SESSION);
+
+    // The window that tripped it is gone, so nothing is scorable until a new
+    // one has been built from scratch.
+    await scoredCall(h, attempt(100), { outcome: answered('same again') });
+    expect(h.detector.lastScore(SESSION)).toBeUndefined();
   });
 });

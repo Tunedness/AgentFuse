@@ -92,7 +92,12 @@ export {
   runGuards,
   SemanticLoopDetector,
 } from './guards/index.js';
-export { MAX_ARGS_CHARS, MAX_SUMMARY_CHARS, semanticEmbeddingText } from './loop/embed-text.js';
+export {
+  MAX_ARGS_CHARS,
+  MAX_SUMMARY_CHARS,
+  semanticEmbeddingText,
+  semanticResultText,
+} from './loop/embed-text.js';
 export type { ErrorInput } from './loop/fingerprint.js';
 export { errorSignature, fingerprint, shortFingerprint } from './loop/fingerprint.js';
 export {
@@ -103,6 +108,8 @@ export {
   normalizeArgs,
   truncateValue,
 } from './loop/normalize.js';
+export type { ResultNoveltyWindowOptions } from './loop/novelty.js';
+export { noveltyTokens, ResultNoveltyWindow } from './loop/novelty.js';
 export type {
   DropCause,
   EmbeddingJob,

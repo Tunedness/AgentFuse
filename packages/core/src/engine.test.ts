@@ -871,3 +871,115 @@ describe('ports and defaults', () => {
     expect(engine.policy.sha256).toHaveLength(64);
   });
 });
+
+/**
+ * R1's answer condition, added in phase 9.
+ *
+ * The rule's message has always claimed "the result will not change". Nothing
+ * checked it until the detection benchmark measured the cost: with the window
+ * at its default 8, **every** converging build-test session in the corpus was
+ * halted, and so were half the try-then-fix sessions — a 31% false-positive
+ * rate from the deterministic tier alone, on the shape an agent that is
+ * *working* produces most often.
+ */
+describe('exact repeat requires the answer to have stopped moving', () => {
+  const answered = (text: string): CallOutcome => ({
+    isError: false,
+    resultSummary: text,
+    resultBytes: text.length,
+  });
+
+  it('still halts a loop whose answers are identical', async () => {
+    const h = harness({ mode: 'enforce' });
+    await call(h, { path: '/a' }, { outcome: answered('nothing here') });
+    await call(h, { path: '/a' }, { outcome: answered('nothing here') });
+
+    expect(codes(await call(h, { path: '/a' }))).toContain('LOOP_EXACT_REPEAT');
+  });
+
+  it('lets a converging build-test loop keep working', async () => {
+    // `npm test`, read, fix, `npm test` again: one command repeated verbatim
+    // while the answer moves from seven failures to four to one.
+    const h = harness({ mode: 'enforce' });
+    const run = (failures: number) =>
+      call(
+        h,
+        { command: 'npm test' },
+        {
+          tool: 'run_command',
+          outcome: answered(`Tests: ${failures} failed, ${48 - failures} passed.`),
+        },
+      );
+
+    for (const failures of [7, 4, 1]) {
+      expect((await run(failures)).action).toBe('allow');
+      // The file is re-read after each edit, so the same request returns
+      // something different every time — which is the same exemption the
+      // repeated command relies on.
+      expect(
+        (
+          await call(
+            h,
+            { path: '/src/a.ts' },
+            {
+              tool: 'read_file',
+              outcome: answered(`export const version = ${failures};`),
+            },
+          )
+        ).action,
+      ).toBe('allow');
+      expect(
+        (await call(h, { path: '/src/a.ts', content: `fix ${failures}` }, { tool: 'write_file' }))
+          .action,
+      ).toBe('allow');
+    }
+    expect((await run(0)).action).toBe('allow');
+  });
+
+  it('counts the largest group of matching answers, not the total', async () => {
+    // Two calls said one thing, then two said another. Neither group reaches
+    // three, so the fourth call is allowed even though four identical requests
+    // are in the window.
+    const h = harness({ mode: 'enforce' });
+    await call(h, { path: '/a' }, { outcome: answered('first answer') });
+    await call(h, { path: '/a' }, { outcome: answered('first answer') });
+    expect((await call(h, { path: '/a' }, { outcome: answered('second answer') })).action).toBe(
+      'deny',
+    );
+
+    const g = harness({ mode: 'enforce', loop_detection: { exact_repeat: { count: 4 } } });
+    await call(g, { path: '/a' }, { outcome: answered('first answer') });
+    await call(g, { path: '/a' }, { outcome: answered('first answer') });
+    await call(g, { path: '/a' }, { outcome: answered('second answer') });
+    expect((await call(g, { path: '/a' }, { outcome: answered('second answer') })).action).toBe(
+      'allow',
+    );
+  });
+
+  it('sees through a timestamp in the answer', async () => {
+    // A tool that stamps its output would otherwise make R1 permanently blind,
+    // which is why the comparison runs the same value masks the argument
+    // normalizer uses.
+    const h = harness({ mode: 'enforce' });
+    await call(h, { path: '/a' }, { outcome: answered('at 2026-09-16T03:00:01Z: no results') });
+    await call(h, { path: '/a' }, { outcome: answered('at 2026-09-16T03:00:07Z: no results') });
+
+    const third = await call(
+      h,
+      { path: '/a' },
+      {
+        outcome: answered('at 2026-09-16T03:00:12Z: no results'),
+      },
+    );
+    expect(codes(third)).toContain('LOOP_EXACT_REPEAT');
+  });
+
+  it('groups failures by signature rather than by message', async () => {
+    const h = harness({ mode: 'enforce', loop_detection: { error_repeat: { count: 99 } } });
+    await call(h, { path: '/a' }, { outcome: failure('EACCES') });
+    await call(h, { path: '/a' }, { outcome: failure('EACCES') });
+
+    // R2 is turned off above, so the trip here can only be R1.
+    expect(codes(await call(h, { path: '/a' }))).toEqual(['LOOP_EXACT_REPEAT']);
+  });
+});

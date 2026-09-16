@@ -1,6 +1,7 @@
 import type { Reason } from '../domain/decision.js';
 import type { ToolCallRecord } from '../domain/records.js';
 import { shortFingerprint } from '../loop/fingerprint.js';
+import { maskString } from '../loop/normalize.js';
 import type { LoopDetectionSettings } from '../policy/schema.js';
 import { applyTrip, type GuardContext, type GuardState } from './types.js';
 
@@ -25,7 +26,39 @@ function recentWindow(window: readonly ToolCallRecord[], size: number): ToolCall
 }
 
 /**
- * R1 — the same fingerprint, over and over.
+ * What "the same answer" means for R1.
+ *
+ * An error is identified by its signature, which `errorSignature` has already
+ * stripped of volatile paths, hex runs and numbers. A success is identified by
+ * its summary with the same value masks the argument normalizer applies, so a
+ * result that differs only in a timestamp, a uuid or a request id still counts
+ * as the same answer — otherwise a tool that stamps its output would make R1
+ * permanently blind.
+ */
+function answerIdentity(record: ToolCallRecord, now: number): string {
+  const outcome = record.outcome;
+  if (outcome === undefined) return '';
+  if (outcome.isError) return `e:${outcome.errorSignature ?? 'unknown_error'}`;
+  return `r:${maskString(outcome.resultSummary, now)}`;
+}
+
+/**
+ * R1 — the same fingerprint, over and over, **getting the same answer**.
+ *
+ * The answer condition is not decoration: the rule's own message says "the
+ * result will not change", and phase 9 measured what happens when nothing
+ * checks that. A converging build-test loop — `npm test`, read, fix, `npm test`
+ * again — repeats one command verbatim while the answer moves from seven
+ * failures to four to none. With the window at its default 8, **every** such
+ * session in the benchmark corpus was halted, and so were half the
+ * try-then-fix sessions: a 31% false-positive rate from the deterministic tier
+ * alone, on the single most common shape an agent that is *working* produces.
+ *
+ * So the count is over the largest group of previous identical calls that also
+ * agreed on their answer, rather than over every identical call. An agent
+ * hammering a broken thing still trips on the third attempt; an agent whose
+ * repeats keep returning something new does not, because it is being told
+ * something new.
  *
  * The threshold doubles when the operator declared the rule `idempotent`, or
  * when the server claims `idempotentHint` **and** the policy has opted into
@@ -42,13 +75,25 @@ function exactRepeat(
   const idempotent = ctx.evaluation.idempotent || trusted;
   const threshold = loop.exact_repeat.count * (idempotent ? 2 : 1);
 
-  const matches = recent.filter((r) => r.fingerprint === ctx.record.fingerprint);
+  const identical = recent.filter((r) => r.fingerprint === ctx.record.fingerprint);
+  // Group by answer and keep the largest group. The call being decided has no
+  // outcome yet, so it joins whichever group is already the strongest evidence.
+  const groups = new Map<string, ToolCallRecord[]>();
+  for (const record of identical) {
+    const key = answerIdentity(record, ctx.now);
+    const group = groups.get(key) ?? [];
+    group.push(record);
+    groups.set(key, group);
+  }
+  let matches: ToolCallRecord[] = [];
+  for (const group of groups.values()) if (group.length > matches.length) matches = group;
+
   const count = matches.length + 1; // +1 for the call being decided
   if (count < threshold) return undefined;
 
   return {
     code: 'LOOP_EXACT_REPEAT',
-    message: `This is call ${count} with identical arguments to ${ctx.record.toolName} (threshold ${threshold}). The result will not change. Try a different approach or report the blocker.`,
+    message: `This is call ${count} with identical arguments to ${ctx.record.toolName}, and the earlier ones all came back the same (threshold ${threshold}). The result will not change. Try a different approach or report the blocker.`,
     evidence: {
       count,
       threshold,

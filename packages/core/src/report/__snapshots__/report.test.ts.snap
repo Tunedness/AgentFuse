@@ -3,8 +3,9 @@
 exports[`renderTripReport > renders a compact terminal view 1`] = `
 "━━ AgentFuse · circuit tripped ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
   LOOP_EXACT_REPEAT  session=01SESSION  2025-09-15T14:03:44.000Z  mode=enforce
-  This is call 3 with identical arguments to read_file (threshold 3). The
-  result will not change. Try a different approach or report the blocker.
+  This is call 3 with identical arguments to read_file, and the earlier ones
+  all came back the same (threshold 3). The result will not change. Try a
+  different approach or report the blocker.
 
   breaker: open  ·  cooldown: 3 approvals or 2m
 
@@ -100,9 +101,9 @@ exports[`trip report > builds the documented shape 1`] = `
       "fingerprint": "<sha12>",
       "idempotent": false,
       "threshold": 3,
-      "windowSize": 8,
+      "windowSize": 5,
     },
-    "message": "This is call 3 with identical arguments to read_file (threshold 3). The result will not change. Try a different approach or report the blocker.",
+    "message": "This is call 3 with identical arguments to read_file, and the earlier ones all came back the same (threshold 3). The result will not change. Try a different approach or report the blocker.",
   },
   "tripId": "01TEST00000000000000000004",
   "trippedAt": "2025-09-15T14:03:44.000Z",
