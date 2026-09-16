@@ -16,7 +16,10 @@
   },
   "scripts": {
     "build": "tsc -b",
-    "clean": "tsc -b --clean"
+    "clean": "tsc -b --clean",
+    "bench:corpus": "npm run build && node dist/detection/generate.js",
+    "bench:detection": "npm run build && node dist/detection/run.js",
+    "bench:latency": "npm run build && node dist/latency/run.js"
   },
   "dependencies": {
     "@agentfuse/core": "*",
