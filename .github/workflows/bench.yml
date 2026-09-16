@@ -1,0 +1,115 @@
+name: Benchmarks
+
+# PRD §6 is the product's numerical claim: ≥90% detection, <5% false positives,
+# and p95 added latency under 50 ms. Until this workflow runs those are
+# assertions. Separate from `ci.yml` because it needs a 23 MB model and takes
+# minutes rather than seconds, and because a red benchmark means something
+# different from a red test: it is a change in what the product *measures*, and
+# whoever made it needs to read the numbers rather than retry the job.
+#
+# Both benchmarks fail the run on a regression against the committed results in
+# `bench/detection/results.md` and `bench/latency/results.md`. The detection
+# gate deliberately checks the **measured** recall rather than PRD §6's 90%:
+# the target is not currently met, the shortfall is one documented scenario,
+# and `bench/src/detection/run.ts` says so at length and prints the PRD verdict
+# either way. Gating on a number the design cannot reach would make this
+# permanently red and teach everyone to ignore it.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    paths:
+      - 'packages/core/src/**'
+      - 'packages/proxy/src/**'
+      - 'packages/cli/src/**'
+      - 'packages/embeddings-local/src/**'
+      - 'bench/**'
+      - '.github/workflows/bench.yml'
+  workflow_dispatch:
+
+concurrency:
+  group: bench-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  # Same reason as `ci.yml`: on linux/x64 the `onnxruntime-node` postinstall
+  # fetches a 236 MB CUDA runtime from nuget.org that `session.ts` can never
+  # use, because it pins `executionProviders: ['cpu']`.
+  ONNXRUNTIME_NODE_INSTALL: skip
+  # Keep the model out of the home directory so the cache key below owns it.
+  AGENTFUSE_CACHE_DIR: ${{ github.workspace }}/.model-cache
+
+jobs:
+  bench:
+    name: detection and latency
+    runs-on: ubuntu-latest
+    # The model download plus two full benchmark runs. Generous, because a
+    # timeout that fires mid-run produces a number nobody can interpret.
+    timeout-minutes: 30
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # Node 24 only. The matrix in `ci.yml` proves the product runs on 20, 22
+      # and 24; a benchmark run on three Node versions would produce three
+      # different sets of numbers and no way to say which is *the* measurement.
+      - name: Set up Node 24
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Install
+        run: npm ci
+
+      # ~23 MB across three files, pinned by revision and verified by sha256 on
+      # every load. The key carries the revision, so re-pinning the model is a
+      # cache miss rather than a stale hit.
+      - name: Restore the model
+        id: model
+        uses: actions/cache@v4
+        with:
+          path: ${{ env.AGENTFUSE_CACHE_DIR }}
+          key: agentfuse-model-Xenova-all-MiniLM-L6-v2-751bff37182d3f1213fa05d7196b954e230abad9
+
+      - name: Build
+        run: npm run build
+
+      - name: Install the model
+        if: steps.model.outputs.cache-hit != 'true'
+        run: node packages/cli/dist/main.js models install
+
+      # `bench:corpus` regenerates the JSONL and would rewrite the committed
+      # file; the determinism test in `npm test` already hashes the generator
+      # against it, so this only has to check that nothing drifted on this
+      # machine.
+      - name: Check the corpus is what is committed
+        run: |
+          npm run bench:corpus --workspace @agentfuse/bench
+          git diff --exit-code -- bench/detection/corpus.jsonl
+
+      - name: Detection benchmark
+        run: npm run bench:detection --workspace @agentfuse/bench
+
+      - name: Latency benchmark
+        run: npm run bench:latency --workspace @agentfuse/bench
+
+      # The committed results are the baseline the next run is read against, so
+      # a diff here is a signal rather than noise: it means the numbers moved.
+      # Printed rather than failed on — the two runners' CPUs differ, and the
+      # gates inside each benchmark are what actually fail the job.
+      - name: Show what moved
+        if: always()
+        run: git --no-pager diff --stat -- bench/detection/results.md bench/latency/results.md
+
+      - name: Upload the results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: benchmark-results
+          path: |
+            bench/detection/results.md
+            bench/detection/results.json
+            bench/latency/results.md
+            bench/latency/results.json

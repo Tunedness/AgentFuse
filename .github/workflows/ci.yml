@@ -76,21 +76,5 @@ jobs:
       - run: npm ci
       - run: npm run schema:check
 
-  # TODO(phase-9): the proxy sits on the hot path of every tool call, so the
-  # added latency is a product requirement, not a nice-to-have. Turn this on
-  # with the bench harness and fail the run on a regression against the
-  # committed baseline.
-  #
-  # bench:
-  #   name: benchmarks
-  #   runs-on: ubuntu-latest
-  #   if: github.event_name == 'push'
-  #   steps:
-  #     - uses: actions/checkout@v4
-  #     - uses: actions/setup-node@v4
-  #       with:
-  #         node-version: 24
-  #         cache: npm
-  #     - run: npm ci
-  #     - run: npm run build
-  #     - run: npm run bench --workspace @agentfuse/bench
+# The benchmarks live in `bench.yml`: they need a 23 MB model and minutes rather
+# than seconds, and a red benchmark means something different from a red test.
