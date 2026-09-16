@@ -136,8 +136,15 @@ counter is on yours.
 ## The policy file
 
 One declarative YAML file, versioned, with a published JSON Schema so editors
-validate it as you type. `version: 1` on its own is a complete, valid policy
-that means exactly the defaults below.
+validate it as you type. `version: 1` on its own is a complete, valid policy.
+
+What follows is a tour of the keys rather than a printout of the defaults —
+`on_exceeded` is shown as `halt`, while the schema default is
+`require_approval`, and the `session` and `annotations` groups are left out
+entirely. For the defaults exactly as the schema states them, run `agentfuse
+validate`, which prints the policy it resolved, or read the
+[Configuration](https://github.com/Tunedness/AgentFuse/wiki/Configuration) page
+in the wiki.
 
 ```yaml
 version: 1
@@ -627,7 +634,10 @@ npx agentfuse models install
 
 This is a deliberate second step, and the numbers are why.
 
-- **`onnxruntime-node` is 113.5 MB compressed and 292 MB unpacked.** It ships
+- **`onnxruntime-node` is 113.5 MB compressed and 292 MB unpacked** — the
+  registry reports `dist.unpackedSize` as 301,068,136 bytes, and 292 MB is what
+  it actually occupies once installed, so both figures are real and the CLI's
+  own messages quote the larger one. It ships
   every platform's binaries in one tarball, with no per-platform
   `optionalDependencies` to narrow it down. A 300 MB `npx agentfuse` would end
   adoption for a tool whose whole pitch is a frictionless drop-in, so the
