@@ -1,10 +1,11 @@
 # AgentFuse — uygulama durumu ve devir notu
 
-**Son güncelleme:** 2026-09-16 · **`main`'deki son kod commit'i:** `8c89a3d`
-(`main` HEAD bunu izleyen bu doküman commit'i) · **Durum:** Faz 9 bitti;
-geriye yalnız Faz 10 (doküman + v0.1.0) kaldı. **PRD §6'nın tespit hedefi
-karşılanmıyor** (ölçülen %87, hedef %90) — bkz. Faz 9 bölümü ve "Sırada ne
-var".
+**Son güncelleme:** 2026-09-16 · **`main`'deki son kod commit'i:** `1539f3b`
+(`main` HEAD bunu izleyen bu doküman commit'i) · **Durum:** **on fazın onu da
+bitti.** v0.1.0 yayına hazır ama **yayımlanmadı** — ve bir yayın engeli var:
+`agentfuse` adı npm'de başkasına ait (bkz. Faz 10). **PRD §6'nın tespit hedefi
+karşılanmıyor** (ölçülen %87, hedef %90) ve bu bilinçli bir takastır; bkz.
+Faz 9.
 
 Bu dosya, işi başka bir oturumda kaldığı yerden sürdürebilmek için tutulur.
 Ürün tanımı burada değil — tek doğruluk kaynağı `../.ssot/PRD.md` ve
@@ -28,7 +29,7 @@ dosyasındadır.
 | 7 | Onay akışı + rapor UX | **Bitti** — `84b903e` `935146d` `a7a8ddc` |
 | 8 | Telemetri (OTLP) | **Bitti** — `0172deb` `3d36b9f` `3177f90` `3e791d4` |
 | 9 | Benchmark'lar (tespit + gecikme) | **Bitti** — `bdd1fff` `1f3992e` `b0e0c68` `7479363` `8c89a3d` |
-| 10 | Dokümanlar + v0.1.0 | Başlanmadı |
+| 10 | Dokümanlar + v0.1.0 | **Bitti** — `dfe01ab` `76a1869` `e77c43c` `1a608b4` `1539f3b` |
 | — | Faz 7/8'den kalan iki boşluk | **Bitti** — `a3e7752` `a92f06d` |
 
 Bağımlılık grafiği ve kritik yol:
@@ -2769,110 +2770,156 @@ o sayı ulaşılanın kaydıdır.
 
 ---
 
-## Sırada ne var
+## Faz 10 — dokümanlar ve v0.1.0 (bitti)
 
-### Önce `.ssot`: dört nokta kendi kararını bekliyor
+İki yarıda yapıldı: dokümanlar bir ajanda (`dfe01ab` `76a1869` `e77c43c`),
+release plumbing ve temiz makine doğrulaması elle (`1a608b4` `1539f3b`).
 
-Çatı ADR-002 kapsam değiştiren koddan önce doküman güncellemesi şart koşuyor.
-Açık duran noktalar:
+### Önce bir kod değişikliği: ret gerekçesi ajana da gidiyor
 
-1. **HTTP gateway hangi paketin işi ve upstream havuzunun anahtarı ne?**
-   ADR-008 birinci yarısını kapattı (giriş noktası `packages/proxy`, `serve` P0'da
-   uç), havuz anahtarı hâlâ P1'e bırakılmış durumda.
-2. **ADR-006 merdiven sıralaması** (Faz 5 → çelişki kaydı #3) hâlâ
-   açıklayıcı bir düzeltme bekliyor: ADR metni legacy HTTP'de
-   `Mcp-Session-Id`'yi önce sayıyor, uygulama onu `baggage`'ın altına koyuyor,
-   ve gerekçe aynı ADR'ın zincirleme sözleşmesi. Faz 6b bu sırayı `serve`'de
-   uyguladı ve testle pinledi; metin hâlâ ötekini söylüyor.
-**Kapanan üçüncü nokta:** `approve --reset` hangi phase'e götürmeli sorusunu
-ADR-009 karara bağladı — devre **kapanır** (`closed`), ve uygulanan davranış
-zaten oydu. Aynı ADR'ın ikinci yarısı (onay gerekçesi) da kapandı; bkz.
-"Kapanan iki boşluk". Hâlâ `.ssot`'ta yeri olmayan iki şey Faz 7'de uygulanmış
-ve belgelenmiş durumda: iki gateway'in kompozisyon kuralı, ve açılamayan bir
-onay kanalının sert hata değil uyarı olması.
+ADR-009'un açıklaması Faz 10'un ilk commit'i oldu (`dfe01ab`): insanın verdiği
+gerekçe artık **ret metnine** de giriyor, yalnız retlerde — onaylanan çağrının
+zaten ret metni yok. Modele **atfedilerek** veriliyor (`A human denied this
+call. Reason given: …`), talimat gibi değil bir kişinin beyanı gibi okunsun
+diye. Temizlik (ANSI/kontrol karakteri silme, 500 karakter sınırı) zaten
+uygulanmıştı; yeniden yazılmadı, kullanıldı.
 
-**Faz 9'dan çıkan iki nokta — ikisi de karar bekliyor:**
+### Dokümanlar
 
-3. **PRD §6'nın tespit hedefi ölçümle uyuşmuyor.** Metin "≥ %90 tespit, < %5
-   yanlış pozitif" diyor. Ölçülen: **%87 tespit, %0 yanlış pozitif**, 200
-   etiketli oturumda, eşik en yakın dürüst oturumdan çözünürlük tabanının üç
-   katı uzakta. Kaçan 13 oturumun hepsi `reworded-retry` ve sweep bunların
-   `list-traverse-process` negatiflerinin *altında* durduğunu gösteriyor: %90'a
-   çıkmanın tek yolu yanlış pozitifi %16'ya yükseltmek. Üç okuma mümkün ve
-   seçim `.ssot`'un:
-   - **(a)** PRD §6'nın rakamı ölçülene çekilir ve yanında karşılığı yazılır
-     ("%87 tespit, %0 yanlış pozitif"), çünkü PRD §8'in birinci riski yanlış
-     pozitiftir ve ürün onu satın almıştır;
-   - **(b)** hedef korunur ve ADR-002'ye ikinci bir kademe eklenir (örneğin
-     eşik sınırındaki pencereler için bir LLM-hakem çağrısı) — ADR-002'nin
-     "pahalı ve yavaş" diye reddettiği şey, ama artık yalnız sınır vakalarında;
-   - **(c)** hedef korunur ve daha güçlü bir embedding modeline geçilir —
-     ADR-003'ün kurulum boyutu kararını yeniden açar.
-   Kod bugün (a)'yı varsayıyor: CI kapısı ölçülen recall'a bakıyor ve PRD
-   verdict'ini her koşumda yazdırıyor.
-4. **ADR-002'nin anlatımı uygulamanın gerisinde.** ADR "her araç çağrısının
-   … yerel embedding'i alınır, kayan pencere içi ortalama benzerlik eşiği
-   aşarsa devre kesilir" diyor. Uygulama artık `min(ortalama benzerlik,
-   cevap bayatlığı)` kullanıyor. Değişiklik **daraltıcı** — ADR'ın kuralının
-   trip etmediği hiçbir yerde trip etmiyor — ve ADR'ın kendi gerekçesini
-   ("sonuç özeti dahil") gerçekten uyguluyor, ama metin bunu söylemiyor. Bir
-   paragraf ya onaylamalı ya tersini söylemeli.
+Kök `README.md` ve dört paket README'si. Kök README warn-önce anlatıyor,
+ölçülen rakamları (`%87,0 tespit / %0,0 yanlış pozitif`, p95 4,84 ms) hedef
+gibi değil ölçüm gibi veriyor, bütçe semantiğini ADR-007'nin diliyle yazıyor,
+McpGuard zincirlemesini anlatıyor ve **`serve`'ün P0'da korumalı bir gateway
+olmadığını** (ADR-008) açıkça söylüyor.
 
-**Faz 7'den kalan bir nokta:** onay gerekçesi **ajana** da gitmeli mi?
-ADR-009 boşluğu tarif ederken "kesinti raporuna ve ajanın gördüğü metne
-ulaşmıyor" diyor, ama kararı yalnız "port `{ verdict, reason? }` döndürür ve
-karar kaydı gerekçeyi taşır" diye yazıyor. Uygulama dar okumayı seçti: rapor ve
-karar kaydı evet, ajanın gördüğü ret metni hayır. Gerekçe, insanın serbest
-metnini modelin bağlamına koymanın kendi ürün kararı olması (ve ADR-004'ün
-"AgentFuse ne olacağına karar verir, ne söyleneceğine değil" çizgisine yakın
-durması). Bir ADR satırı bunu ya onaylamalı ya da tersini söylemeli.
+Belgelenen sınırlar — hepsi ölçülmüş, hiçbiri gizlenmemiş: `reworded-retry`
+bu embedder'la ayrıştırılamıyor; postgres pagination varyantını yalnız cevap
+bayatlığı ekseni tutuyor; kalibrasyon **tek bir modele ait** ve
+`semantic.model` değişirse `threshold` geçersizleşir; semantik katman açıkken
+gecikme ~4,8 ms (0,2 değil) ve nedeni kuyruğun düzenli varışta batch'lememesi;
+linux/x64'te 236 MB'lık CUDA fetch'i ve `ONNXRUNTIME_NODE_INSTALL=skip`.
 
-**Faz 4'ten çıkan bir nokta daha:** `onnxruntime-node`'un postinstall'ı
-linux/x64'te nuget.org'dan 236 MB'lık bir CUDA çalışma zamanı çekiyor. CI'da
-`ONNXRUNTIME_NODE_INSTALL=skip` ile kapatıldı, ama aynı şey
-`@agentfuse/embeddings-local` kuran her linux kullanıcısının başına geliyor.
-Bu bir kurulum talimatı meselesi (Faz 10), ADR meselesi değil — ADR-003'ün
-"opsiyonel yoldaş paket" kararını değiştiren bir şey yok, yalnız o paketin
-gerçek kurulum maliyeti tahmin edilenden büyük.
+### `npm pack` denetimi — komut değil test
 
-### Faz 10
+`e77c43c` denetimi bir teste dönüştürdü. Elle de doğrulandı: dört tarball'ın
+hiçbirinde `.test.`, `src/testing/`, `.map`, `.tsbuildinfo`, `.onnx` ya da
+`bench/` yok. `bench` `private: true`.
 
-Plan dosyasındaki brifing geçerli: dokümanlar ve v0.1.0.
+| paket | tarball | açılmış | dosya |
+| --- | --- | --- | --- |
+| `@agentfuse/core` | 91,4 kB | 288,8 kB | 97 |
+| `@agentfuse/proxy` | 49,8 kB | 156,8 kB | 24 |
+| `@agentfuse/embeddings-local` | 29,3 kB | 86,8 kB | 22 |
+| `agentfuse` | 142,9 kB | 445,0 kB | 74 |
 
-**Faz 10'un Faz 9'dan alacakları** yukarıdaki Faz 9 bölümünün son alt
-başlığında; en önemlisi PRD §6'nın tespit rakamının ölçümle uyuşmaması ve
-kalibrasyonun tek bir modele ait olması.
+### `release.yml`
 
-**Faz 10'un Faz 8'den alacakları:**
+Changesets bir "version pull request" açık tutuyor ve **yayın onu merge etmek**
+— hiçbir push kendiliğinden yayımlamıyor. Kapı bu workflow'un içinde yeniden
+koşuyor; bir yayın, "dün yeşildi"nin yetmediği tek build'dir ve tekrar koşmak
+iki dakika. Yayın `--provenance` taşıyor, yani npm'deki tarball GitHub'daki
+commit'e ve workflow koşumuna kadar izlenebiliyor.
 
-- Telemetri bölümünün anlatması gerekenler: **varsayılan kapalı** (çatı
-  ADR-003), `telemetry.enabled` + `otlp_endpoint` + `service_name`, sinyal
-  yollarının (`/v1/traces`, `/v1/logs`) eklendiği, dört olay tipi ve
-  `tunedness.*` öznitelik adları, `--quiet`'in telemetriyi **susturmadığı**, ve
-  collector'ın düşmesinin bir teşhis satırından başka bir şeye mal olmadığı.
-- `examples/otlp-receiver.mjs` bağımlılıksız bir alıcı ve dokümanın "çıktıyı
-  gör" adımı olmaya hazır; başındaki blok ne geldiğini anlatıyor.
-- ADR-010 kurulum boyutuna dokunmadığımızı söylüyor: doküman "telemetri açmak
-  ek paket kurdurmaz" diyebilir, çünkü öyle.
+### Temiz makine doğrulaması — depo dışından, tarball'dan
 
-Faz 9 ya da 10 proxy'ye dokunuyorsa birlikte alınacak **iki** kanca kaldı, ikisi
-de belgelenmiş ödünç: `StdioWrapOptions.onChildExit` (çocuğun exit code'u
-aynalanabilsin diye) ve `StdioWrapHandle.onConnect` (bağlantının açıldığı anı
-yakalamak için kurulan 25 ms'lik zamanlayıcı silinsin diye). Üçüncüsü —
-`ToolCallGuardOptions.traceparentFor` — `a3e7752` ile eklendi ve üçünün aynı
-deseni paylaşması yukarıda kayda geçti.
+Dört paket `npm pack` ile paketlenip depo dışında bir dizine kuruldu ve
+**workspace'e hiç bakmayan** bir JSON-RPC sürücüsüyle sürüldü. Bu adım
+`exports` haritasındaki bir kırığı, eksik bir `bin`'i ya da `files`'tan düşmüş
+bir dosyayı yakalar — yayından *sonra* ortaya çıkan hatalar bunlardır.
 
-**Faz 10 için bir not daha:** telemetri açık koşan bir kurulum her araç
-çağrısında bir `_meta` anahtarı daha yazıyor (`traceparent`) ve sarılan sunucu
-ajanınki yerine bizim span'imizi görüyor; gecikme ölçümü bunu da kapsıyor ve
-farkı gürültünün içinde buldu. Onay bölümü ise `--reason`'ın artık kesinti
-raporunda ve `agentfuse report` çıktısında göründüğünü anlatmalı; Faz 7'nin
-"yalnız log'a gider" cümlesi geçersiz.
+Doğrulanan zincir:
 
-**Faz 9'un kuralı Faz 10 için de geçerli:** rakamlar yumuşatılmaz. CI
-kapısındaki `GATE.recall` ulaşılanın kaydıdır, geçirilecek bir eşik değil;
-düşürülmesi tespitin kötüleştiği anlamına gelir ve o zaman düşürülecek şey kapı
-değil, konuşulacak şey algoritmadır.
+1. `agentfuse init` → başlangıç politikası yazıldı; `agentfuse validate` →
+   çözümlenmiş politikayı ve rapor dizinini bastı.
+2. `mode: enforce` + `semantic.provider: local`, paket kurulu değilken →
+   **sert hata, exit 4**, ne kurulacağını ve `provider: none` seçeneğini
+   söyleyen metinle. Karar tablosunun tarball'dan kurulu bir sistemde
+   doğrulanması.
+3. `provider: none` + `enforce` → handshake aynalandı (`raw-server 2025-11-25`),
+   `tools/list` iki aracı döndürdü, 1. ve 2. çağrı iletildi, **3. çağrı
+   `isError: true` ile bloklandı** (`LOOP_EXACT_REPEAT`), JSON-RPC hatası
+   olarak değil; rapor `.agentfuse/reports/` altına düştü; `agentfuse report
+   last` kutu çizgili raporu render etti; exit 0; stdout'ta protokol
+   frame'inden başka satır yok.
+4. `@agentfuse/embeddings-local` tarball'ı kuruldu → `agentfuse models install`
+   modeli doğrulayıp yerleştirdi (23,7 MB), `provider: local` ile aynı senaryo
+   yine bloklandı.
+
+npm 11 `onnxruntime-node`'un postinstall'ını **çalıştırmadı** (install-scripts
+kapısı) ve gerek de olmadı: darwin/arm64 ikilileri tarball'ın içinde. Faz 4'ün
+bulgusuyla tutarlı.
+
+### `npm publish --dry-run` — ve bulduğu yayın engeli
+
+Üç scope'lu paket temiz. Dördüncüsü hata verdi ve sebebi önemli:
+
+```
+npm error Cannot implicitly apply the "latest" tag because previously
+published version 0.0.1 is higher than the new version 0.0.0.
+```
+
+Araştırınca: **`agentfuse` adı npm'de başkasına ait.** 2026-03-07'de
+kaydedilmiş, sürüm 0.0.1, açıklaması "Intelligent LLM agent cost optimization
+runtime. Coming soon." — yani komşu bir alanda bekleyen bir placeholder.
+`@agentfuse` scope'u boş (`@agentfuse/core` 404), yani üç scope'lu paket
+sorunsuz; engel yalnız scope'suz CLI adında.
+
+Bu bir **ürün adı kararı** ve `.ssot`'a girmesi gerekiyor. Ölçülen seçenekler:
+
+| seçenek | durum | bedeli |
+| --- | --- | --- |
+| `@agentfuse/cli` | scope boş | `npx @agentfuse/cli` daha uzun; **komut adı yine `agentfuse` kalır** (`bin` alanı bağımsız) |
+| `agent-fuse` | npm'de boş | scope'suz ve kısa; tire okunurluğu bölüyor |
+| `agentfuse-cli` | npm'de boş | scope'suz; `npx agentfuse-cli` |
+| adı talep etmek | belirsiz | npm dispute süreci, sonucu ve süresi garanti değil |
+
+Kod bugün hiçbirini varsaymıyor: `packages/cli/package.json` hâlâ `agentfuse`
+ve sürümler `0.0.0`. Karar verilmeden `changeset version` koşulmamalı.
+
+---
+
+## v0.1.0 nedir, ne değildir
+
+**Olan:** `agentfuse wrap -- <sunucu>` ile ajanla tek bir MCP sunucusu arasına
+giren saydam bir proxy ve her `tools/call` için bir karar. Varsayılan `warn`:
+her karar hesaplanır, her kesinti raporu yazılır, çağrı yine de iletilir — yani
+yanlış pozitif oranı gerçek trafikte ölçülebilir. İki kademeli döngü tespiti
+(deterministik kademe modelsiz ve ağsız çalışır), oturum bütçeleri, glob'lu
+araç politikaları, insan onayı (unix socket ya da HMAC imzalı webhook), kesinti
+raporları, OTLP telemetrisi.
+
+**Bilinçli olarak olmayan:**
+
+- **Korumalı HTTP gateway.** `serve` bir uç bağlar ve oturum kimliğini çözer,
+  ama araç çağrısı iletmez (ADR-008). Koruma `wrap` modundadır.
+- **Python süreç içi SDK** — ADR-005 çekirdek API kararlılaşana dek erteledi.
+- **Usage-ingest** (`POST /v1/usage`) — token rakamları o gelene dek tahmini
+  kalır (ADR-007).
+- **≥%90 tespit.** Ölçülen %87,0 ve karşılığında alınan %0,0 yanlış pozitif.
+  PRD §6 bunu artık ölçüm olarak yazıyor; %90'a giden iki yol (ADR-002'ye
+  ikinci kademe, ya da daha güçlü model) P1.
+- **A2A trafiği.**
+
+## Devralan kişiye
+
+1. **Yayın adı kararı verilmeden yayımlama.** Yukarıdaki tablo seçenekleri
+   ölçülmüş halde duruyor; karar `.ssot`'a yazılmalı, sonra
+   `packages/cli/package.json` ve README'lerdeki `npx` satırları güncellenmeli.
+2. Kalan tek P1 `.ssot` noktası: **upstream havuzunun anahtarı** (ADR-008 giriş
+   noktasını `packages/proxy` olarak kapattı, havuz anahtarını P1'e bıraktı).
+   Kısıt bugünden belli: downstream bağlantı başına bir upstream `Client`.
+3. Proxy'de birlikte alınacak **iki** kanca kaldı, ikisi de belgelenmiş ödünç:
+   `StdioWrapOptions.onChildExit` ve `StdioWrapHandle.onConnect`. Üçüncüsü
+   (`ToolCallGuardOptions.traceparentFor`) `a3e7752` ile eklendi; üçü aynı
+   deseni paylaşıyor ve McpGuard iskeleti paylaşılan bir pakete taşıdığında
+   tek bir `hooks` nesnesine katlanmaları doğru olur — önce değil.
+4. `wip/phase-3-5-partial` (`798720b`) ve `wip/phase-6-partial` (`56c5150`)
+   **tümüyle geçersiz**; içlerindeki her dosya değerlendirildi ve `main`'de
+   eksik hiçbir şey yok. Silinebilirler.
+5. **Faz 9'un kuralı geçerliliğini koruyor:** rakamlar yumuşatılmaz. CI
+   kapısındaki `GATE.recall` ulaşılanın kaydıdır, geçirilecek bir eşik değil.
+   Düşürülmesi tespitin kötüleştiği anlamına gelir; o zaman düşürülecek şey
+   kapı değil, konuşulacak şey algoritmadır.
 
 ---
 
