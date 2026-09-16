@@ -262,8 +262,10 @@ Two tiers, and the first one works entirely on its own.
 - **exact repeat** (`R1`): the same tool with byte-identical arguments, N times
   — *and* the results agreeing too. The rule's message says "the result will not
   change", and it now checks that before saying it. Without the check it stopped
-  every converging build-test session in the corpus: 31% false positives on the
-  single most common shape a working agent produces. With it, 9%.
+  every converging build-test session in the corpus. Measured at `window: 8`,
+  the pre-calibration default: 31% false positives from the rule tier alone
+  without the check, 9% with it. At the shipped `window: 5` the rule tier
+  produces none at all on this corpus.
 - **error repeat** (`R2`): the same error signature N times, with volatile
   parts (temp paths, hex ids) masked so two instances of one failure land
   together.
@@ -309,10 +311,15 @@ Here is what the three points cost and why they were not bought. All 13 missed
 sessions are one scenario — the same request asked again in different words —
 and on every axis measured they sit *below* the hardest honest sessions in the
 corpus (median 0.8491 against a negative maximum of 0.8982). The only threshold
-that catches them is 0.845, and there the false-positive rate is **16%**. The
-in-between points exist (0.890 gives 88% at 1%) but their margin to the nearest
-honest session falls below the ±0.002 resolution floor of the quantised model,
-which makes them properties of this corpus rather than of the product.
+that catches them is 0.845, and there the false-positive rate is **16%**.
+
+In-between points exist and are excluded for two different reasons, worth
+keeping apart. 0.870 reaches 88% at exactly **5.0%** false positives, and the
+requirement is `< 5%`, so it fails the target itself rather than anybody's
+judgement. 0.890 reaches 88% at 1%, and it is excluded because its margin to
+the nearest honest session falls below the ±0.002 resolution floor of the
+quantised model — which makes it a property of this corpus rather than of the
+product.
 
 **So: three points of recall, for 0% instead of 16% false positives.** That is
 a deliberate product decision, taken with the numbers on the table, not a
