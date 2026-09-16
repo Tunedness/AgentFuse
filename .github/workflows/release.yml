@@ -1,0 +1,81 @@
+name: Release
+
+# Changesets keeps a "Version Packages" pull request open: every changeset that
+# lands on `main` is folded into it, and merging it is the act of releasing.
+# Nothing here publishes on its own — a person decides, by merging that PR.
+on:
+  push:
+    branches: [main]
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+env:
+  # Same reason as `ci.yml`: on linux/x64 the `onnxruntime-node` postinstall
+  # fetches a 236 MB CUDA runtime that AgentFuse never loads, from outside the
+  # npm cache. `session.ts` pins `executionProviders: ['cpu']`.
+  ONNXRUNTIME_NODE_INSTALL: skip
+
+jobs:
+  # The gate runs here too rather than trusting that it ran on some earlier
+  # commit. A release is the one build where "it was green yesterday" is not
+  # good enough, and re-running it costs a couple of minutes.
+  verify:
+    name: verify
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - run: npm run lint
+      - run: npm run typecheck
+      - run: npm run build
+      - run: npm test
+      - run: npm run schema:check
+
+  release:
+    name: release
+    needs: verify
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write # to open and update the version pull request
+      pull-requests: write
+      id-token: write # npm --provenance signs against this workflow's identity
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # Changesets reads the log to work out what changed since the last tag.
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          registry-url: https://registry.npmjs.org
+
+      - run: npm ci
+
+      # Either opens/updates the "Version Packages" PR, or — when that PR has
+      # been merged and real version bumps are sitting on `main` — publishes.
+      # `npm run release` builds first; every package version is independent,
+      # so a release can touch one package and leave the other three alone.
+      - name: Version or publish
+        uses: changesets/action@v1
+        with:
+          version: npm run version
+          publish: npm run release
+          commit: Release
+          title: Release
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+          # Ties each tarball to this workflow run and this commit, so anyone
+          # can check that what is on npm was built from what is on GitHub.
+          NPM_CONFIG_PROVENANCE: 'true'
