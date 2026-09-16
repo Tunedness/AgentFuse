@@ -1,32 +1,55 @@
 name: Release
 
-# Changesets keeps a "Version Packages" pull request open: every changeset that
-# lands on `main` is folded into it, and merging it is the act of releasing.
-# Nothing here publishes on its own — a person decides, by merging that PR.
+# Publishing is a decision, so it is a button rather than a consequence of
+# merging. There is no `on: push` here on purpose: a workflow that publishes
+# whatever lands on `main` turns "we merged the version PR" into "we shipped",
+# and for a tool that sits in front of somebody's agent, the gap between those
+# two sentences is where the last look happens.
+#
+# Two steps, run in this order, days apart if you like:
+#
+#   1. `version` — consumes the files in `.changeset/`, bumps the manifests,
+#      writes the changelogs, and opens a pull request with the result. Nothing
+#      is published. Review the diff; that diff is the release notes.
+#   2. `publish` — after that PR is merged, uploads the four packages. Gated on
+#      the `npm` environment, so whoever owns the repository decides who may
+#      press it and whether it needs a second approval.
+#
+# Both steps run the full verification gate first. A release is the one moment
+# when "the tests passed on the commit before" is not good enough.
 on:
-  push:
-    branches: [main]
+  workflow_dispatch:
+    inputs:
+      step:
+        description: 'version = open the release PR · publish = upload to npm'
+        required: true
+        type: choice
+        options:
+          - version
+          - publish
+
+# Least privilege per job; see each one. Nothing here is workflow-wide.
+permissions: {}
 
 concurrency:
-  group: release-${{ github.ref }}
+  group: release
   cancel-in-progress: false
 
-permissions:
-  contents: read
-
 env:
-  # Same reason as `ci.yml`: on linux/x64 the `onnxruntime-node` postinstall
-  # fetches a 236 MB CUDA runtime that AgentFuse never loads, from outside the
-  # npm cache. `session.ts` pins `executionProviders: ['cpu']`.
+  # Same reasoning as ci.yml: on linux/x64 `onnxruntime-node`'s postinstall
+  # fetches a 236 MB CUDA runtime from nuget.org that this code never loads.
+  # `session.ts` pins `executionProviders: ['cpu']`.
   ONNXRUNTIME_NODE_INSTALL: skip
 
 jobs:
-  # The gate runs here too rather than trusting that it ran on some earlier
-  # commit. A release is the one build where "it was green yesterday" is not
-  # good enough, and re-running it costs a couple of minutes.
-  verify:
-    name: verify
+  # The same five commands the working agreement names, on the exact commit
+  # about to be released. Not a reuse of ci.yml's result: that ran on a merge
+  # commit, and this runs on what the tag will point at.
+  gate:
+    name: gate
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -40,42 +63,156 @@ jobs:
       - run: npm test
       - run: npm run schema:check
 
-  release:
-    name: release
-    needs: verify
+  # What `npm publish` would upload, printed in full where a human can read it.
+  #
+  # `packaging.test.ts` already asserts the file lists on every `npm test`, so
+  # this job is not the check — it is the receipt. The log carries the four
+  # file lists and byte counts, attached to the run that published them.
+  #
+  # `npm publish --dry-run` is deliberately not used: it contacts the registry
+  # and exits non-zero without credentials, which would make this job either
+  # permanently red or dependent on a token it has no business holding.
+  # `npm pack --dry-run` answers the packaging question and answers it offline.
+  pack:
+    name: pack
+    needs: gate
     runs-on: ubuntu-latest
     permissions:
-      contents: write # to open and update the version pull request
-      pull-requests: write
-      id-token: write # npm --provenance signs against this workflow's identity
+      contents: read
     steps:
       - uses: actions/checkout@v4
-        with:
-          # Changesets reads the log to work out what changed since the last tag.
-          fetch-depth: 0
-
       - uses: actions/setup-node@v4
         with:
           node-version: 24
           cache: npm
-          registry-url: https://registry.npmjs.org
+      - run: npm ci
+      - run: npm run build
+      - name: What each tarball would contain
+        run: npm pack --dry-run --workspaces
+      - name: Upload the tarballs for inspection
+        run: npm pack --workspaces --pack-destination dist-tarballs
+      - uses: actions/upload-artifact@v4
+        with:
+          name: tarballs
+          path: dist-tarballs/*.tgz
+          if-no-files-found: error
 
+  # Step 1. Turns `.changeset/*.md` into version bumps and changelogs, and
+  # opens a PR. Hand-written rather than delegated to a third-party action:
+  # `@changesets/cli` is already a devDependency and `gh` is on the runner, and
+  # this repository's habit is to own the code on its release path.
+  version:
+    name: version
+    if: inputs.step == 'version'
+    needs: [gate, pack]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # Changesets reads the log to work out what changed since the last
+          # release, so a shallow clone gives it the wrong answer.
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
       - run: npm ci
 
-      # Either opens/updates the "Version Packages" PR, or — when that PR has
-      # been merged and real version bumps are sitting on `main` — publishes.
-      # `npm run release` builds first; every package version is independent,
-      # so a release can touch one package and leave the other three alone.
-      - name: Version or publish
-        uses: changesets/action@v1
-        with:
-          version: npm run version
-          publish: npm run release
-          commit: Release
-          title: Release
+      - name: Bump the manifests and write the changelogs
+        run: npx changeset version
+
+      # The exported version constants are separate declarations from the
+      # manifest versions — deliberately, so no package reads JSON at runtime —
+      # and `changeset version` moves only the manifests. `packaging.test.ts`
+      # fails until both agree, which is exactly what should happen: an
+      # `agentfuse 0.1.0` that reports 0.0.0 in its own trip reports is worse
+      # than a red build.
+      - name: Point out what the bump did not move
+        run: |
+          echo "::notice::changeset version moved the manifests. The *_VERSION"
+          echo "::notice::constants in src/ have to follow, or packaging.test.ts fails."
+          npm test -- --coverage.enabled=false packaging || true
+
+      - name: Open the release pull request
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          branch="release/$(date -u +%Y%m%d-%H%M%S)"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git checkout -b "$branch"
+          # Explicit paths, never `git add -A`: the working tree after a
+          # `changeset version` also holds build output and a coverage
+          # directory, and neither belongs in a release commit.
+          git add .changeset packages/*/package.json packages/*/CHANGELOG.md
+          git commit -m "Release the versions the changesets asked for"
+          git push origin "$branch"
+          gh pr create \
+            --base main \
+            --head "$branch" \
+            --title "Release" \
+            --body "$(cat <<'BODY'
+          `changeset version` consumed the pending changesets. The diff below is
+          the release notes; read it as such.
+
+          Before merging, check that the `*_VERSION` constants in `src/` match the
+          manifest versions — `packaging.test.ts` is what fails if they do not.
+
+          Merging this PR publishes nothing. Run this workflow again with
+          `step: publish` when you mean to.
+          BODY
+          )"
+
+  # Step 2. The only job that can upload anything.
+  #
+  # `environment: npm` is the gate. Until somebody creates that environment and
+  # puts `NPM_TOKEN` in it, this job cannot run at all — and once it exists, it
+  # can carry required reviewers, so publishing needs a second pair of eyes
+  # without this file having an opinion about whose.
+  publish:
+    name: publish
+    if: inputs.step == 'publish'
+    needs: [gate, pack]
+    runs-on: ubuntu-latest
+    environment: npm
+    permissions:
+      contents: read
+      # npm provenance: the registry records which workflow, on which commit,
+      # built the tarball, and anybody can verify it afterwards. For a tool
+      # people install to enforce limits, a verifiable build origin is worth
+      # the one line it costs.
+      id-token: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          registry-url: 'https://registry.npmjs.org'
+      - run: npm ci
+      - run: npm run build
+
+      # A pending changeset means the version PR was not merged, so these
+      # manifests carry versions nobody reviewed.
+      - name: Refuse to publish with changesets still pending
+        run: |
+          set -euo pipefail
+          if compgen -G ".changeset/*.md" > /dev/null; then
+            echo "::error::.changeset/ is not empty — run step: version first, and merge the PR."
+            exit 1
+          fi
+
+      - name: Publish
+        run: npx changeset publish
+        env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
-          # Ties each tarball to this workflow run and this commit, so anyone
-          # can check that what is on npm was built from what is on GitHub.
           NPM_CONFIG_PROVENANCE: 'true'
+
+      - name: Push the tags changeset publish created
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: git push --follow-tags
