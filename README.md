@@ -116,16 +116,35 @@ gets removed, and then it catches nothing at all.** A loop it misses is only
 expensive.
 
 So `mode: warn` is a first-class code path, not a disabled one. The breaker
-machinery runs, every decision is computed, the trip reports are written — and
-the call is forwarded anyway. Each decision that *would* have broken the
+machinery runs, every decision is computed, the report is built and rendered —
+and the call is forwarded anyway. Each decision that *would* have broken the
 circuit is recorded with `wouldTrip: true` and emitted on stderr as a
-`would_trip` line. That number, on your own traffic, is what tells you whether
-`enforce` is safe for you:
+`would_trip` line. That count, on your own traffic, is what tells you whether
+`enforce` is safe for you.
+
+**Warn mode writes no report files.** `writeReport` fires for a block or for a
+call a human answered, and warn mode is neither, so `agentfuse report list`
+stays empty while you observe. The signal is on stderr — which, in `wrap` mode,
+is wherever your MCP client keeps that server's log:
 
 ```sh
-# Run your agent normally for a while, then look at what it would have stopped.
-npx agentfuse report list
+# Count what it would have stopped, from your client's log for this server.
+grep '"event":"would_trip"' mcp-server.log | wc -l
+
+# Or see them as they happen, if you drive the server yourself:
+agentfuse wrap -- node your-server.js 2>&1 >/dev/null | grep would_trip
 ```
+
+Each line names the session, the tool and the codes that fired:
+
+```
+[agentfuse] {"event":"would_trip","sessionId":"01M2MB…","tool":"echo","codes":["LOOP_EXACT_REPEAT"]}
+```
+
+If grepping a client log is not workable for you, turn on
+[telemetry](#telemetry): warn-mode decisions arrive as `tunedness.loop_detection`
+events with `loop.enforced: false`, which is the same information somewhere you
+can query it.
 
 Nothing in this repository asks you to trust our false-positive rate on your
 workload. The measured numbers below are on a corpus we wrote; the `warn`-mode
