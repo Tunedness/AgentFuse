@@ -361,8 +361,8 @@ difference against the same traffic with no proxy in between:
 | stdio · semantic · telemetry off | 4.455 | 4.737 | 7.388 |
 | **stdio · semantic · telemetry on** | **4.473** | **4.835** | **7.837** |
 
-All in milliseconds. The budget is p95 < 50 ms and the worst case uses a fifth
-of it.
+All in milliseconds. The budget is p95 < 50 ms and the worst case uses under a
+tenth of it — 4.835 of 50.
 
 **But do not read the 0.2 ms rows as the number for a real installation.** With
 the semantic tier on, through a real pipe, it is **~4.8 ms** — twenty times the
@@ -635,7 +635,10 @@ This is a deliberate second step, and the numbers are why.
   code will never touch. `ONNXRUNTIME_NODE_INSTALL=skip` skips it and costs
   nothing at all — the session is pinned to `executionProviders: ['cpu']`,
   because this is a background embedding queue on a developer's machine, not a
-  training rig. This repository's CI sets it workflow-wide.
+  training rig. This repository's CI sets it workflow-wide. Note that a **clone
+  pays this too**: a workspace `npm install` builds every package including the
+  companion, so set the variable when you clone on linux/x64, not only when you
+  opt into the semantic tier.
 - **The model is ~23 MB, downloaded on first use.** Three files under
   `~/.cache/agentfuse/models/<owner>--<model>/<revision>/` (`XDG_CACHE_HOME`
   and `AGENTFUSE_CACHE_DIR` are honoured), each verified against a pinned
