@@ -404,14 +404,26 @@ describe.runIf(built)('the unglamorous endings', () => {
   });
 
   it('exits 70 when the wrapped server dies under it', async () => {
-    const agent = startWrap({ env: { FIXTURE_DIE_AFTER_MS: '20', FIXTURE_EXIT_CODE: '9' } });
+    const agent = startWrap({ env: { FIXTURE_DIE_AFTER_MS: '250', FIXTURE_EXIT_CODE: '9' } });
     try {
-      await agent.initialize();
+      // The fixture arms its death timer when it sends its *first* message, so
+      // the handshake and the child's death are in a race the handshake
+      // normally wins — and "normally" is not a guarantee. Under load the wrap
+      // can decide its upstream is gone before it has flushed the handshake
+      // response, and then `initialize()` never resolves: this test timed out
+      // at 20 s having proved nothing, which is how phase 9 came to describe
+      // this file as fragile.
+      //
+      // So the exit is awaited directly and the handshake is allowed to lose.
+      // What is under test is that the wrap does not outlive its child, and
+      // that is true whichever of the two got there first.
+      const exited = agent.exit();
+      await Promise.race([agent.initialize(), exited]);
 
       // Without this the wrap would linger and answer every later call with an
       // error, so an MCP client would see a working server that always fails
       // rather than a dead one it could restart.
-      const { code } = await agent.exit();
+      const { code } = await exited;
       expect(code).toBe(70);
     } finally {
       await agent.dispose();

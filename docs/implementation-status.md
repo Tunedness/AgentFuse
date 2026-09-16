@@ -1,6 +1,7 @@
 # AgentFuse — uygulama durumu ve devir notu
 
-**Son güncelleme:** 2026-09-16 · **`main`'deki son kod commit'i:** `1539f3b`
+**Son güncelleme:** 2026-09-16 · **`main`'deki son kod commit'i:** `c47d398`
+(ardından iki README rötuşu: `06f7570` `5263fa3`)
 (`main` HEAD bunu izleyen bu doküman commit'i) · **Durum:** **on fazın onu da
 bitti.** v0.1.0 yayına hazır ama **yayımlanmadı** — ve bir yayın engeli var:
 `agentfuse` adı npm'de başkasına ait (bkz. Faz 10). **PRD §6'nın tespit hedefi
@@ -29,7 +30,7 @@ dosyasındadır.
 | 7 | Onay akışı + rapor UX | **Bitti** — `84b903e` `935146d` `a7a8ddc` |
 | 8 | Telemetri (OTLP) | **Bitti** — `0172deb` `3d36b9f` `3177f90` `3e791d4` |
 | 9 | Benchmark'lar (tespit + gecikme) | **Bitti** — `bdd1fff` `1f3992e` `b0e0c68` `7479363` `8c89a3d` |
-| 10 | Dokümanlar + v0.1.0 | **Bitti** — `dfe01ab` `76a1869` `e77c43c` `1a608b4` `1539f3b` |
+| 10 | Dokümanlar + v0.1.0 | **Bitti** — `dfe01ab` `76a1869` `e77c43c` `1a608b4` `1539f3b` `d67b835` `c47d398` `06f7570` `5263fa3` |
 | — | Faz 7/8'den kalan iki boşluk | **Bitti** — `a3e7752` `a92f06d` |
 
 Bağımlılık grafiği ve kritik yol:
@@ -42,26 +43,55 @@ kritik yol: 0-1-2-5-6-9-10
 ### `main` yeşil — 2026-09-16'da bizzat koşuldu
 
 ```
-npm run lint          → Checked 220 files. No fixes applied. (exit 0)
+npm run lint          → Checked 223 files. No fixes applied. (exit 0)
 npm run typecheck     → temiz (tsc -b && tsc -p tsconfig.test.json)
 npm run build         → temiz
-npm test              → Test Files 76 passed · Tests 1655 passed | 1 skipped (~7,9 s)
+npm test              → Test Files 79 passed · Tests 1735 passed | 1 skipped (~9 s)
 npm run schema:check  → schema up to date
 ```
 
-Faz 9 öncesindeki sayılar 74 dosya / 1614 test idi; bu faz iki dosya
-(`core/src/loop/novelty.test.ts`, `bench/src/detection/corpus.test.ts`) ve 41
-test ekledi. **Atlanan tek test** `model.test.ts`'teki soğuk indirme;
-`AGENTFUSE_TEST_DOWNLOAD=1` olmadan koşmuyor — aşağıya bakın. `lint`
-çıktısındaki 42 `info` (`useLiteralKeys`) Faz 7'den beri aynı ve exit 0'ı
-etkilemiyor. Faz 9 yeni `biome-ignore` eklemedi; `biome.json`'a iki satır
-ekledi (`bench/*/results.json`), gerekçesi `packages/core/schemas` ile aynı:
-dosya generator'ın ürünü, formatı da onun işi.
+**Üç kez art arda koşuldu, üçünde de yeşil.** Faz 10 öncesindeki sayılar 76
+dosya / 1655 test idi; bu faz üç dosya ve 80 test ekledi:
 
-**`wrap-process.test.ts` yük altında kırılgan.** Tam süiti art arda koşarken
-"exits 70 when the wrapped server dies under it" bir kez düştü, tek başına
-koşturulunca geçti. `a95209f` bu testlere duvar saati payı eklemişti; kalan
-kırılganlık ölçüm değil zamanlama. Faz 10 isterse payı bir kez daha artırabilir.
+| dosya | ne yapıyor |
+| --- | --- |
+| `cli/src/docs.test.ts` | README'leri gerçek bayrak bildirimlerine karşı koşturuyor, **iki yönde** |
+| `cli/src/packaging.test.ts` | `npm pack --dry-run --json --workspaces` çıktısını denetliyor |
+| `cli/src/tarball.test.ts` | dört tarball'ı depo dışında bir ağaca kurup CLI'ı oradan sürüyor |
+
+Ayrıca `trip-result.test.ts`'e 8 test (ADR-009 ret metni) eklendi.
+
+**Atlanan tek test** `model.test.ts`'teki soğuk indirme;
+`AGENTFUSE_TEST_DOWNLOAD=1` olmadan koşmuyor. `lint` çıktısındaki 43 `info`
+(`useLiteralKeys`) Faz 7'den beri aynı türden ve exit 0'ı etkilemiyor — Faz 10
+bir tane ekledi, yeni `biome-ignore` eklemedi, `biome.json`'a dokunmadı.
+
+### İki kırılgan test kapatıldı — pay büyütülerek değil, yarış kaldırılarak
+
+`tarball.test.ts` süite gerçek yük getiriyor (bir `npm pack`, dört `tar`, üç
+process), ve o yük Faz 9'un "kırılgan" dediği sınıftan iki testi düşürdü.
+İkisinde de sebep aynıydı ve ikisinde de çözüm payı büyütmek **değildi**:
+
+1. **`http.test.ts` › "streams a response rather than buffering it".** İkinci
+   SSE frame'ini birincinin 5 ms sonrasında üretiyor ve birincinin **tek
+   başına** geldiğini iddia ediyordu. Yüklü makinede iki frame de ilk `read()`
+   tamamlanmadan üretiliyor, tek segmentte geliyor, test hiçbir şey
+   kanıtlamadan düşüyor. Artık ikinci frame **birincisi okunduktan sonra**
+   üretiliyor: aynı özellik, duvar saati olmadan.
+2. **`wrap-process.test.ts` › "exits 70 when the wrapped server dies under
+   it".** Faz 9'un bir kez düştüğünü kaydettiği test; bu fazda tekrarlanabilir
+   hale geldi (altı koşumda bir, 20 s timeout). Sebep: fixture ölüm sayacını
+   **ilk mesajını gönderirken** kuruyor, yani handshake ile çocuğun ölümü
+   yarışıyor ve handshake genelde kazanıyor. Yüklü makinede wrap, handshake
+   yanıtını flush etmeden "upstream gitti" kararını veriyor ve `initialize()`
+   hiç çözülmüyor. Artık exit doğrudan bekleniyor ve **handshake'in kaybetmesine
+   izin veriliyor** — test edilen şey wrap'in çocuğundan uzun yaşamaması, ve o
+   hangisi önce vardıysa doğru. Sayaç 20 ms'den 250 ms'ye de çıktı, ama
+   taşıyıcı olan `Promise.race`.
+
+Payı büyütmek aynı yarışı daha seyrek yaşatır; yarışı kaldırmak onu bitirir.
+Düzeltmeden sonra tam süit **dört kez art arda** yeşil, ve iki test tek başına
+sekiz kez.
 
 Değişen tek CLI dosyası `packages/cli/src/embeddings.test.ts`, ve değişmek
 zorundaydı: "gerçek loader" testi, depo içinde çözülen paketin
@@ -79,16 +109,16 @@ Bu çalışmanın sonundaki ölçümler (`coverage/lcov.info` üzerinden, glob b
 | Paket | lines | functions | branches |
 | --- | --- | --- | --- |
 | `packages/core/src/**` (kapılı) | %99.90 | %100 | %94.72 |
-| `packages/proxy/src/**` (kapısız) | %98.90 | %100 | %91.51 |
+| `packages/proxy/src/**` (kapısız) | %98.92 | %100 | %91.67 |
 | `packages/cli/src/**` (kapısız) | %99.87 | %100 | %99.24 |
 | `packages/embeddings-local/src/**` (kapısız) | %98.03 | %96.55 | %87.25 |
 
 `core` branch'i %95.65'ten %94.72'ye indi: Faz 9 iki dosyaya dal ekledi
 (`loop/novelty.ts` %92.3, `guards/rule-loop.ts` %90.56) ve ikisi de %90'lık
-kapının üstünde. `proxy` rakamları **birebir aynı** — Faz 9 o pakete hiç
-dokunmadı. `cli` yalnız `telemetry/exporter.ts` değiştiği için oynadı
-(%99.2 statement, kapalı kalan tek satır serileştirilemeyen bir kaydın
-savunma yolu).
+kapının üstünde. **Faz 10 `core`'a hiç dokunmadı**, rakamı Faz 9'unkinin
+aynısı. `proxy` branch'i %91.51'den %91.67'ye çıktı — ADR-009'un ret metni
+dalları eklendi ve hepsi testli. `cli` rakamı değişmedi: Faz 10'un eklediği üç
+dosya `.test.ts` ve coverage'a girmiyor.
 
 `embeddings-local` kapısız ve kapıya alınmadı: kapı bilinçli olarak yalnız
 `core`'da, çünkü ürünün güvenlik ağı orası. Kapalı kalan satırlar iki türden:
@@ -122,7 +152,7 @@ Senkron yolun Faz 2'de ölçülen maliyeti (`beforeCall` + `afterCall` +
 ortalama 0.018 ms, **p95 0.023 ms**, p99 0.038 ms. **Faz 9 bunu gerçek MCP
 trafiğiyle ve gerçek modelle yeniden ölçtü**; tam tablo aşağıdaki Faz 9
 bölümünde ve `bench/latency/results.md`'de. Özet: eklenen gecikme en kötü
-yapılandırmada **p95 4,84 ms**, PRD §6'nın 50 ms bütçesinin onda ikisi.
+yapılandırmada **p95 4,84 ms**, PRD §6'nın 50 ms bütçesinin onda birinden azı.
 
 ---
 
@@ -2669,7 +2699,7 @@ darwin/arm64. Tam tablo `bench/latency/results.md`'de.
 | **stdio · semantic · telemetri açık** | 4.473 | **4.835** | 7.837 |
 
 PRD §6'nın çağrı başına p95 < 50 ms bütçesi **karşılanıyor**; en kötü
-yapılandırma bütçenin onda ikisinde.
+yapılandırma bütçenin onda birinden azında.
 
 **İki tier neden bu kadar farklı — ölçülerek cevaplandı.** Kuyruk sayaçları:
 in-memory 1200 çağrıda `offered 1200, embedded 0, droppedOverflow 1135`;
@@ -2772,8 +2802,32 @@ o sayı ulaşılanın kaydıdır.
 
 ## Faz 10 — dokümanlar ve v0.1.0 (bitti)
 
-İki yarıda yapıldı: dokümanlar bir ajanda (`dfe01ab` `76a1869` `e77c43c`),
-release plumbing ve temiz makine doğrulaması elle (`1a608b4` `1539f3b`).
+**İki oturum bu fazı aynı çalışma ağacında paralel koştu ve bunu bilmiyordu.**
+Kayda geçmesi gerekiyor, çünkü tek bir dosyada iş kayboldu:
+
+| commit | kim | ne |
+| --- | --- | --- |
+| `dfe01ab` | A | ADR-009 ret metni |
+| `76a1869` | A | beş README + `docs.test.ts` |
+| `e77c43c` | A | `npm pack` denetimi, LICENSE/NOTICE, `bin` düzeltmesi |
+| `1a608b4` | B | v0.1.0 changeset'i |
+| `1539f3b` | B | `release.yml` — **changesets/action, `push: main`** |
+| `d11ed57` | B | bu notun kapanışı |
+| `d67b835` | A | `release.yml` — **`workflow_dispatch`, ortam kapılı** |
+| `c47d398` | A | `tarball.test.ts` + `http.test.ts` yarışının kaldırılması |
+| `06f7570` `5263fa3` | B | README rötuşları — gecikme kesri ve kural katmanı penceresi |
+
+`d67b835`, `1539f3b`'nin dosyasını **görmeden üstüne yazdı**. B'nin sürümü
+kaybolmadı, `git show 1539f3b:.github/workflows/release.yml` ile duruyor, ve
+iki tasarım arasındaki seçim gerçek bir karardır — aşağıdaki `release.yml`
+bölümü ikisini karşılaştırıyor. Changeset dosyasında ters yönde aynı şey oldu:
+A'nın yazdığı `v0-1-0-baseline.md` B'nin sürümüyle değişti ve **B'nin sürümü
+kaldı**; ikisi de aynı şeyi söylüyordu, o yüzden burada kaybedilen bir karar
+yok.
+
+Ders Faz 5'in "paralelleştirme dersi"ne eklenir: ayrık *paketlere* dokunan iki
+ajan çakışmadı, ama aynı *fazı* koşan iki ajan aynı dosyayı iki kez yazdı.
+Paralellik paket sınırında güvenli, faz sınırında değil.
 
 ### Önce bir kod değişikliği: ret gerekçesi ajana da gidiyor
 
@@ -2805,6 +2859,62 @@ linux/x64'te 236 MB'lık CUDA fetch'i ve `ONNXRUNTIME_NODE_INSTALL=skip`.
 hiçbirinde `.test.`, `src/testing/`, `.map`, `.tsbuildinfo`, `.onnx` ya da
 `bench/` yok. `bench` `private: true`.
 
+**Denetim bir beyaz liste**, kara liste değil: her girdi bildirilmiş bir kökten
+(`dist/`, `schemas/`) ya da npm'in kendiliğinden eklediği dört dosyadan
+(`package.json`, `README.md`, `LICENSE`, `NOTICE`) gelmek zorunda. Kara liste
+yalnız birinin önceden düşündüğü şeyi yakalar, ve tarball'a sızacak bir sonraki
+şey kimsenin listelemediği olacaktır.
+
+**Düzeltilen üç şey, hepsi ölçülerek bulundu:**
+
+1. **91 source map ve bir `.tsbuildinfo` yayınlanıyordu** (yalnız `core`'da).
+   `../src/index.ts` diyen ama `src/` hiç gönderilmemiş bir map, map olmamasından
+   kötüdür — debugger onu izler ve düşer. Alternatif `src/`'yi de göndermekti,
+   ama o `src/testing/**`'i yayınlardı; önceki fazlar onu bilinçle public
+   kontratın dışında tuttu. `files`'a `!dist/**/*.map` ve `!dist/.tsbuildinfo`
+   eklendi (npm negasyonu destekliyor, `npm pack --dry-run` ile doğrulandı).
+2. **Her pakete `LICENSE` ve `NOTICE` kondu.** Apache-2.0 §4(a) ve §4(d)
+   yeniden dağıtılan bir kopyadan bunu istiyor. npm `LICENSE`'ı sormadan
+   ekliyor; `NOTICE` `files`'ta adı geçmek zorunda.
+3. **CLI'ın `bin` alanından `./` kaldırıldı.** npm'in normalize edicisi
+   (`@npmcli/package-json/lib/normalize.js`) `./dist/main.js`'i
+   `dist/main.js`'e çeviriyor ve bunu yaparken `"bin[agentfuse]" script name
+   dist/main.js was invalid and removed` diye **uyarıyor** — her publish'te,
+   giriş noktası düşürülüyormuş gibi okunan bir cümle. Hiçbir şey
+   düşürülmüyordu; npm'in yazacağı yolu yazmak dry-run'ı sessizleştirdi.
+
+Ayrıca her paketin **kendi ihtiyacı olan sürüm sabiti** manifest sürümüne
+pinlendi (`CORE_VERSION`, `PROXY_VERSION`, `EMBEDDINGS_LOCAL_VERSION`,
+`CLI_VERSION`). İkisi ayrı beyan — bilinçli, hiçbir paket runtime'da JSON
+okumasın diye — ve `changeset version` yalnız birini oynatıyor. **Bu test
+ötekinin de oynamasını zorunlu kılıyor:** kendi kesinti raporlarında `0.0.0`
+yazan bir `agentfuse 0.1.0`, kırmızı bir build'den kötüdür.
+
+### Dokümanlar bayrak ayrıştırıcısına karşı — iki yönde
+
+`docs.test.ts`, Faz 6b'nin `examples/claude-desktop.json`'a yaptığını beş
+README'ye yapıyor, ve **iki yönde** koşuyor:
+
+- dokümanda geçen hiçbir komut/bayrak ayrıştırıcıda eksik olamaz (yazım hatası,
+  ya da adı değişip metinde kalmış bir bayrak);
+- ayrıştırıcıdaki hiçbir bayrak dokümanda eksik olamaz.
+
+İkincisi sessizce çürüyen yön, ve yazılır yazılmaz bir şey yakaladı: `serve`'ün
+`--port`, `--host` ve `--path`'i yalnız varsayılanlarıyla anlatılıyordu, adları
+hiçbir yerde yazmıyordu. Okuyucu için var olmayan bir bayraktan ayırt edilemez.
+
+Aynı dosya rakamları da pinliyor: README'nin `%87,0`'ı ve `%0,0`'ı
+`bench/detection/results.md`'deki `recall 0.870` / `FP-rate 0.0%` ile,
+`4.84 ms`'i `bench/latency/results.md` ile karşılaştırılıyor, ve README'nin
+hedefi **hedef olarak** adlandırıp karşılanmadığını söylediği
+(`does not meet it`) ayrıca kontrol ediliyor. Faz 9'un kuralının doküman
+tarafındaki karşılığı bu: rakam yumuşatılırsa test düşer.
+
+**Yolda düzeltilen iki bayat yüzey:** `agentfuse init`'in yazdığı başlangıç
+dosyası telemetriyi "Not in this build yet" diye anlatıyordu (Faz 8 onu
+uygulamıştı), ve `approve --help` gerekçenin yalnız log'a gittiğini söylüyordu
+(`a92f06d` ve `dfe01ab` onu rapora ve ret metnine taşımıştı).
+
 | paket | tarball | açılmış | dosya |
 | --- | --- | --- | --- |
 | `@agentfuse/core` | 91,4 kB | 288,8 kB | 97 |
@@ -2812,15 +2922,66 @@ hiçbirinde `.test.`, `src/testing/`, `.map`, `.tsbuildinfo`, `.onnx` ya da
 | `@agentfuse/embeddings-local` | 29,3 kB | 86,8 kB | 22 |
 | `agentfuse` | 142,9 kB | 445,0 kB | 74 |
 
-### `release.yml`
+### `release.yml` — iki tasarım yazıldı, ağaçta biri var
 
-Changesets bir "version pull request" açık tutuyor ve **yayın onu merge etmek**
-— hiçbir push kendiliğinden yayımlamıyor. Kapı bu workflow'un içinde yeniden
-koşuyor; bir yayın, "dün yeşildi"nin yetmediği tek build'dir ve tekrar koşmak
-iki dakika. Yayın `--provenance` taşıyor, yani npm'deki tarball GitHub'daki
-commit'e ve workflow koşumuna kadar izlenebiliyor.
+İki oturum bunu bağımsız yazdı (yukarıdaki tablo). Ağaçtaki `d67b835`; öteki
+`git show 1539f3b:.github/workflows/release.yml` ile duruyor. **Seçim
+kullanıcının**, çünkü ikisi "yayın ne zaman olur" sorusuna farklı cevap
+veriyor:
 
-### Temiz makine doğrulaması — depo dışından, tarball'dan
+| | `1539f3b` (B) | `d67b835` (A, ağaçta) |
+| --- | --- | --- |
+| tetikleyici | `push: main` | `workflow_dispatch`, `step: version \| publish` |
+| yayın anı | "Version Packages" PR'ı merge edilince **kendiliğinden** | ikinci kez elle tetiklenince |
+| kim engelleyebilir | PR'ı merge etmeyen kişi | `npm` **ortamı** — yoksa job hiç koşmaz |
+| changesets | `changesets/action@v1` | elle: `npx changeset version` + `gh pr create` |
+| satır | 81 | 215 |
+
+İkisinde de ortak olan: kapı (beş komut) yayından **önce**, o commit üzerinde
+yeniden koşuyor — bir yayın "dün yeşildi"nin yetmediği tek build'dir — ve
+`NPM_CONFIG_PROVENANCE` açık, yani npm'deki tarball GitHub'daki commit'e ve
+workflow koşumuna kadar izlenebiliyor.
+
+Ağaçtakinin (A) gerekçesi iki maddeydi: bu fazın kısıtı "yayınlamak
+kullanıcının kararı ve verilmedi"ydi, ve `environment: npm` bunu *yapısal*
+olarak sağlıyor — ortam yaratılmadan publish job'ı koşamaz, ve yaratıldığında
+zorunlu onaylayıcı taşıyabilir. İkincisi, üçüncü parti bir action'ı yayın
+yoluna koymamak deponun kendi alışkanlığıydı (OTLP kodlayıcısı ve
+Node→Fetch köprüsü aynı gerekçeyle elle yazıldı). A ayrıca bir `pack` job'ı
+ekliyor: dört dosya listesini log'a basıyor ve tarball'ları artifact olarak
+yüklüyor — denetim değil **makbuz**, denetim `packaging.test.ts`'te.
+
+B'nin sürümü daha kısa ve ekosistemin standart akışı; bir kişi PR'ı merge
+ederek yayımlamayı tercih ediyorsa doğru olan o. **Karar verildiğinde
+diğerinin silinmesi gerekir — ikisi bir arada duramaz.**
+
+### Temiz makine doğrulaması — iki kez, biri test olarak
+
+Bu da iki kez yapıldı ve ikisi birbirini tamamlıyor: elle koşulan doğrulama
+(aşağıda) daha geniş — `models install`'a ve `exit 4` yoluna kadar gidiyor —
+ama bir kereye mahsus. `c47d398` daralttığını **her `npm test`'te** koşan bir
+teste çevirdi (`cli/src/tarball.test.ts`).
+
+Testin yaptığı: `npm pack --workspaces`, sonra `wrap`'in ihtiyaç duyduğu üç
+tarball `os.tmpdir()` altında bir ağaca açılıyor, **yalnız manifest'lerin adını
+verdiği** üçüncü parti paketler workspace'ten symlink'leniyor, ve CLI oradan
+`examples/claude-desktop.json`'un ilk girdisinin bayraklarıyla sürülüyor
+(yalnız politika yolu ve sarılan komut değiştirilmiş).
+
+Taşıyıcı ayrıntı **dizinin depo dışında olması**: Node'un yukarı yürüyüşü
+workspace `node_modules`'a hiç ulaşmıyor, yani `@agentfuse/core` gerçekten
+tarball'dan çözülüyor. Bir test bunu ayrıca iddia ediyor
+(`resolve(home).startsWith(resolve(ROOT)) === false`) — çünkü o olmadan dosya
+workspace'i başka bir adla test etmiş olurdu.
+
+Yan kazanç: symlink'lenen paketler yalnız beyan edilenler olduğu için test
+bağımlılık listesinin **yeterli** olduğunu da kanıtlıyor, yalnız minimal
+olduğunu değil. Ve `provider: none` + hiç `embeddings-local` olmayan bir ağaçta
+3. çağrının bloklanması, "kural katmanı ikinci kurulum adımı istemiyor"
+iddiasının (çatı ADR-001, crippleware yasak) tarball'dan kurulu bir sistemde
+doğrulanması.
+
+Elle koşulan, daha geniş doğrulama:
 
 Dört paket `npm pack` ile paketlenip depo dışında bir dizine kuruldu ve
 **workspace'e hiç bakmayan** bir JSON-RPC sürücüsüyle sürüldü. Bu adım
@@ -2905,18 +3066,27 @@ raporları, OTLP telemetrisi.
 1. **Yayın adı kararı verilmeden yayımlama.** Yukarıdaki tablo seçenekleri
    ölçülmüş halde duruyor; karar `.ssot`'a yazılmalı, sonra
    `packages/cli/package.json` ve README'lerdeki `npx` satırları güncellenmeli.
-2. Kalan tek P1 `.ssot` noktası: **upstream havuzunun anahtarı** (ADR-008 giriş
+2. **`release.yml` iki kez yazıldı ve biri seçilmeli.** Ağaçtaki `d67b835`
+   (`workflow_dispatch` + `environment: npm`), öteki `1539f3b`
+   (`changesets/action`, PR merge'iyle yayın). Karşılaştırma yukarıdaki
+   "`release.yml` — iki tasarım" bölümünde; seçilmeyenin silinmesi gerekir.
+3. **PRD §6 ve ADR-002 gecikmeyi "bütçenin onda ikisi" diye anlatıyor ve bu
+   aritmetik yanlış:** 4,84 / 50 = %9,7, yani onda *biri*nin altında. Rakamlar
+   (4,84 ms ve 50 ms) doğru, yalnız kesir yanlış. README doğrusunu yazıyor
+   ("under a tenth of it — 4.835 of 50"); `.ssot` bir cümlelik düzeltme
+   bekliyor ve bu kod değil metin işi.
+4. Kalan tek P1 `.ssot` noktası: **upstream havuzunun anahtarı** (ADR-008 giriş
    noktasını `packages/proxy` olarak kapattı, havuz anahtarını P1'e bıraktı).
    Kısıt bugünden belli: downstream bağlantı başına bir upstream `Client`.
-3. Proxy'de birlikte alınacak **iki** kanca kaldı, ikisi de belgelenmiş ödünç:
+5. Proxy'de birlikte alınacak **iki** kanca kaldı, ikisi de belgelenmiş ödünç:
    `StdioWrapOptions.onChildExit` ve `StdioWrapHandle.onConnect`. Üçüncüsü
    (`ToolCallGuardOptions.traceparentFor`) `a3e7752` ile eklendi; üçü aynı
    deseni paylaşıyor ve McpGuard iskeleti paylaşılan bir pakete taşıdığında
    tek bir `hooks` nesnesine katlanmaları doğru olur — önce değil.
-4. `wip/phase-3-5-partial` (`798720b`) ve `wip/phase-6-partial` (`56c5150`)
+6. `wip/phase-3-5-partial` (`798720b`) ve `wip/phase-6-partial` (`56c5150`)
    **tümüyle geçersiz**; içlerindeki her dosya değerlendirildi ve `main`'de
    eksik hiçbir şey yok. Silinebilirler.
-5. **Faz 9'un kuralı geçerliliğini koruyor:** rakamlar yumuşatılmaz. CI
+7. **Faz 9'un kuralı geçerliliğini koruyor:** rakamlar yumuşatılmaz. CI
    kapısındaki `GATE.recall` ulaşılanın kaydıdır, geçirilecek bir eşik değil.
    Düşürülmesi tespitin kötüleştiği anlamına gelir; o zaman düşürülecek şey
    kapı değil, konuşulacak şey algoritmadır.
