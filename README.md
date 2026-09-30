@@ -1,5 +1,7 @@
 # AgentFuse
 
+[![Designed & Maintained with Tan](https://www.muhammetsafak.com.tr/badges/designed-maintained-with-tan.svg)](https://www.muhammetsafak.com.tr/en/tan/)
+
 **A circuit breaker for an agent's tool calls.** AgentFuse is a transparent MCP
 proxy: it sits between your agent and one of its tool servers, sees every
 `tools/call`, and decides whether that call happens. It stops semantic loops —
