@@ -295,7 +295,18 @@ async function bind(
 
   // Narrow the file as soon as it exists. The 0700 directory is what covers the
   // window between `bind` and here; see the module doc.
-  chmodSync(path, 0o600);
+  try {
+    chmodSync(path, 0o600);
+  } catch (error) {
+    // Bound but not narrowed: do not leave a referenced listener behind for a
+    // caller that is about to report this path as unusable. Node 20 and 22 on
+    // Linux bind a path longer than `sun_path` at its truncated name and only
+    // fail here, on the full one.
+    await new Promise<void>((resolve) => {
+      server.close(() => resolve());
+    });
+    throw error;
+  }
   // The wrap's lifetime is the agent's pipe, never this. A referenced listener
   // would keep a finished wrap alive waiting for a verdict nobody will send.
   server.unref();
