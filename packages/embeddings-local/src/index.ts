@@ -66,4 +66,4 @@ export { defaultThreads, openSession } from './session.js';
 export const BACKEND_ID = 'local';
 
 /** Version of this package's contract, for reports and diagnostics. */
-export const EMBEDDINGS_LOCAL_VERSION = '0.0.0';
+export const EMBEDDINGS_LOCAL_VERSION = '0.1.0';
