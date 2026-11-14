@@ -17,7 +17,7 @@ the benchmark corpus on their own.
 ```sh
 # On linux/x64, do it this way:
 ONNXRUNTIME_NODE_INSTALL=skip npm install @agentfuse/embeddings-local
-npx agentfuse models install
+npx @agentfuse/cli models install
 ```
 
 This package is 27 kB. Its dependency is not.
@@ -25,7 +25,7 @@ This package is 27 kB. Its dependency is not.
 - **`onnxruntime-node` is 113.5 MB compressed, 292 MB unpacked.** It carries
   every platform's binaries in one tarball with no per-platform
   `optionalDependencies` to narrow it. That measurement is the entire reason
-  this is a separate package: a 300 MB `npx agentfuse` would end adoption for a
+  this is a separate package: a 300 MB `npx @agentfuse/cli` would end adoption for a
   tool whose pitch is a frictionless drop-in.
 - **On linux/x64 its postinstall fetches another 236 MB that AgentFuse never
   loads.** The per-platform manifest asks for `cuda12` there, and those

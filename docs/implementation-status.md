@@ -3,8 +3,9 @@
 **Son güncelleme:** 2026-09-16 · **`main`'deki son kod commit'i:** `c47d398`
 (ardından iki README rötuşu: `06f7570` `5263fa3`)
 (`main` HEAD bunu izleyen bu doküman commit'i) · **Durum:** **on fazın onu da
-bitti.** v0.1.0 yayına hazır ama **yayımlanmadı** — ve bir yayın engeli var:
-`agentfuse` adı npm'de başkasına ait (bkz. Faz 10). **PRD §6'nın tespit hedefi
+bitti.** v0.1.0 yayına hazır ama **yayımlanmadı**; yayın adımları bekliyor. Ad
+engeli çözüldü: `agentfuse` adı npm'de başkasına ait olduğundan CLI paketi
+`@agentfuse/cli` oldu (ADR-011, bkz. Faz 10). **PRD §6'nın tespit hedefi
 karşılanmıyor** (ölçülen %87, hedef %90) ve bu bilinçli bir takastır; bkz.
 Faz 9.
 
@@ -3025,7 +3026,7 @@ runtime. Coming soon." — yani komşu bir alanda bekleyen bir placeholder.
 `@agentfuse` scope'u boş (`@agentfuse/core` 404), yani üç scope'lu paket
 sorunsuz; engel yalnız scope'suz CLI adında.
 
-Bu bir **ürün adı kararı** ve `.ssot`'a girmesi gerekiyor. Ölçülen seçenekler:
+Bu bir **ürün adı kararıydı** ve `.ssot`'a girmesi gerekiyordu. Ölçülen seçenekler:
 
 | seçenek | durum | bedeli |
 | --- | --- | --- |
@@ -3034,8 +3035,14 @@ Bu bir **ürün adı kararı** ve `.ssot`'a girmesi gerekiyor. Ölçülen seçen
 | `agentfuse-cli` | npm'de boş | scope'suz; `npx agentfuse-cli` |
 | adı talep etmek | belirsiz | npm dispute süreci, sonucu ve süresi garanti değil |
 
-Kod bugün hiçbirini varsaymıyor: `packages/cli/package.json` hâlâ `agentfuse`
-ve sürümler `0.0.0`. Karar verilmeden `changeset version` koşulmamalı.
+**Karar verildi (2026-11-14, ADR-011): CLI paketinin npm adı `@agentfuse/cli`.**
+Komut adı `agentfuse` kalır (`bin.agentfuse` değişmez); telemetri `service.name`'i,
+`.agentfuse/` dizinleri, `[agentfuse]` log öneki ve `AGENTFUSE_*` değişkenleri
+paketin değil ürünün adıdır ve değişmez. Karar ADR-011'e kaydedildi; manifest,
+testler, README ve wiki yeni adı kullanır. Yayın hâlâ bekliyor.
+
+Karar öncesinde kod hiçbir seçeneği varsaymıyordu: `packages/cli/package.json`
+`agentfuse` diyordu ve sürümler `0.0.0`'dı.
 
 ---
 

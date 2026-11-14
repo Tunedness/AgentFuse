@@ -1,8 +1,9 @@
-# agentfuse
+# @agentfuse/cli
 
 The command line for [AgentFuse](https://github.com/tunedness/agentfuse): put a
-fuse in front of your agent's tools. This is the package `npx agentfuse`
-downloads.
+fuse in front of your agent's tools. This is the package `npx @agentfuse/cli`
+downloads. The package is `@agentfuse/cli`; the command it installs is
+`agentfuse`. For a global install, run `npm i -g @agentfuse/cli`.
 
 It wraps one MCP server, sees every `tools/call` between your agent and that
 server, and decides whether the call happens — stopping semantic loops,
@@ -10,15 +11,15 @@ enforcing budgets, and applying per-tool allow / deny / approve rules from a
 single YAML policy. No code change on either side.
 
 ```sh
-npx agentfuse init                         # write a starter fusepolicy.yaml
-npx agentfuse validate                     # check what it resolves to
-npx agentfuse wrap --name fs -- <server>   # run the server behind the breaker
-npx agentfuse report last                  # read what it would have stopped
+npx @agentfuse/cli init                         # write a starter fusepolicy.yaml
+npx @agentfuse/cli validate                     # check what it resolves to
+npx @agentfuse/cli wrap --name fs -- <server>   # run the server behind the breaker
+npx @agentfuse/cli report last                  # read what it would have stopped
 ```
 
 Requires Node.js ≥ 20.19. Four runtime dependencies and no more:
 `@agentfuse/core`, `@agentfuse/proxy`, `gpt-tokenizer`, `yaml`. That list is
-pinned by a test, because it is what `npx agentfuse` makes people download.
+pinned by a test, because it is what `npx @agentfuse/cli` makes people download.
 
 **Start in `mode: warn`.** It is the default, and the starter policy says so in
 a comment. AgentFuse observes, computes every decision and writes the trip
@@ -189,7 +190,7 @@ This package is a command, not a library. It exports two things, for a host
 that wants to report the same version string:
 
 ```ts
-import { CLI_VERSION, versionBanner } from 'agentfuse';
+import { CLI_VERSION, versionBanner } from '@agentfuse/cli';
 ```
 
 ## License
