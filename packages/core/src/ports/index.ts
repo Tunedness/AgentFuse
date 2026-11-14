@@ -1,7 +1,7 @@
 /**
  * Every edge of the engine, expressed as an interface.
  *
- * `@agentfuse/core` performs no I/O and reads no ambient state. Time, identity,
+ * `@tunedness/agentfuse-core` performs no I/O and reads no ambient state. Time, identity,
  * randomness, persistence, human approval, tokenisation, pricing, telemetry and
  * embeddings all arrive through these ports. That is what makes the engine
  * deterministically testable — and what will let McpGuard reuse it, and what
@@ -19,7 +19,7 @@ import type { SessionState } from '../domain/session.js';
  * Turns text into vectors for the semantic loop detector.
  *
  * Nothing in phase 2 implements this; it is declared now so
- * `@agentfuse/embeddings-local` has a fixed target.
+ * `@tunedness/agentfuse-embeddings-local` has a fixed target.
  */
 export interface EmbeddingProvider {
   /** Identifies the model in reports, e.g. `local:all-MiniLM-L6-v2`. */

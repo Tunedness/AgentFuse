@@ -50,7 +50,11 @@
  * ladder.
  */
 
-import { describeSessionRegime, detectRequestEra, SessionKeyResolver } from '@agentfuse/proxy';
+import {
+  describeSessionRegime,
+  detectRequestEra,
+  SessionKeyResolver,
+} from '@tunedness/agentfuse-proxy';
 import { parseArgs } from '../args.js';
 import { loadPolicy } from '../config.js';
 import { CliError, EXIT, messageOf } from '../errors.js';

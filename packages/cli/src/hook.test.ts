@@ -8,7 +8,7 @@ import {
   FuseEngine,
   parsePolicy,
   RecordingTelemetrySink,
-} from '@agentfuse/core';
+} from '@tunedness/agentfuse-core';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { CliError } from './errors.js';
 import { loadDecisionHook } from './hook.js';

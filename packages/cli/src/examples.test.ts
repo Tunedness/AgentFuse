@@ -69,7 +69,7 @@ describe('examples/claude-desktop.json', () => {
     expect(entry.command).toBe('npx');
     // `-y` so a machine that has never installed it does not sit waiting for a
     // confirmation nobody can see.
-    expect(entry.args.slice(0, 2)).toEqual(['-y', 'agentfuse']);
+    expect(entry.args.slice(0, 2)).toEqual(['-y', '@tunedness/agentfuse']);
   });
 
   it.each(entries)('%s names a command this build has', (_name, entry) => {

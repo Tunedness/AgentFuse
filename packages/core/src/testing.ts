@@ -1,7 +1,7 @@
 /**
- * Test helpers, exposed as the `@agentfuse/core/testing` subpath.
+ * Test helpers, exposed as the `@tunedness/agentfuse-core/testing` subpath.
  *
- * Kept off the main entry point so a production import of `@agentfuse/core`
+ * Kept off the main entry point so a production import of `@tunedness/agentfuse-core`
  * cannot accidentally pull a fake clock into a real proxy. Everything here is
  * pure and dependency-free, like the rest of the package.
  */

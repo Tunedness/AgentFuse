@@ -1,4 +1,4 @@
-# @agentfuse/core
+# @tunedness/agentfuse-core
 
 The decision engine behind [AgentFuse](https://github.com/tunedness/agentfuse):
 given a tool call, decide whether it happens. Loop detection, budget
@@ -6,12 +6,12 @@ accounting, per-tool policy, the circuit breaker state machine, and the trip
 report.
 
 **Most people do not install this.** It is the library the `agentfuse` command
-line and `@agentfuse/proxy` are built on. Install it directly when you are
+line and `@tunedness/agentfuse-proxy` are built on. Install it directly when you are
 embedding the breaker in something that is not an MCP proxy — an agent
 framework, a gateway, another Tunedness tool.
 
 ```sh
-npm install @agentfuse/core
+npm install @tunedness/agentfuse-core
 ```
 
 ## It is pure, and that is the design
@@ -35,7 +35,7 @@ stream.
 ## Using it
 
 ```ts
-import { FuseEngine, parsePolicy, compilePolicy, SystemClock, UlidGenerator } from '@agentfuse/core';
+import { FuseEngine, parsePolicy, compilePolicy, SystemClock, UlidGenerator } from '@tunedness/agentfuse-core';
 
 const policy = compilePolicy(parsePolicy(yamlText));
 const engine = new FuseEngine({ policy, ports: { clock: new SystemClock(), ids: new UlidGenerator() } });
@@ -76,10 +76,10 @@ types `FusePolicy`, `CompiledPolicy`, `CompiledRule`, `ToolRule`, `RuleAction`,
 `PolicyMode`, `LoopDetectionSettings`, `LoopDetectionOverride`,
 `TripDisposition`, `RuleEvaluation`
 
-Also on the `@agentfuse/core/policy` subpath, which additionally exports
+Also on the `@tunedness/agentfuse-core/policy` subpath, which additionally exports
 `DURATION_PATTERN` and `DURATION_MESSAGE`. The generated JSON Schema is a
 resolvable subpath too:
-`@agentfuse/core/schemas/fusepolicy.v1.schema.json`.
+`@tunedness/agentfuse-core/schemas/fusepolicy.v1.schema.json`.
 
 ### Ports (implement these to wire the engine into a host)
 
@@ -126,7 +126,7 @@ under one model.
 `sha256` · `stableStringify` · `toJsonValue` · `sanitizeFreeText` ·
 `JsonValue` · `CORE_VERSION`
 
-### `@agentfuse/core/testing`
+### `@tunedness/agentfuse-core/testing`
 
 Test doubles, on a subpath so they cannot be configured in production:
 `FakeClock` · `CounterIdGenerator` · `ScriptedApprovalGateway` ·

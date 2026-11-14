@@ -1,8 +1,8 @@
-# @agentfuse/proxy
+# @tunedness/agentfuse-proxy
 
 The MCP adapter for [AgentFuse](https://github.com/tunedness/agentfuse): a
 server/client pair that sits between an agent and one tool server, forwards
-everything untouched, and puts `@agentfuse/core`'s decision in front of every
+everything untouched, and puts `@tunedness/agentfuse-core`'s decision in front of every
 `tools/call`.
 
 **Most people do not install this.** Use the `agentfuse` command line, which
@@ -11,13 +11,13 @@ Install it directly when you are building a host of your own and want the
 guarded `tools/call` path without the CLI around it.
 
 ```sh
-npm install @agentfuse/proxy
+npm install @tunedness/agentfuse-proxy
 ```
 
 ## The whole product in one call
 
 ```ts
-import { wrapStdioServer } from '@agentfuse/proxy';
+import { wrapStdioServer } from '@tunedness/agentfuse-proxy';
 
 const handle = wrapStdioServer({
   command: 'npx',
@@ -74,7 +74,7 @@ through `Diagnostics`, one line of prefixed JSON at a time, rate-limited. A test
 forbids `console.*` and `process.stdout` in every source file.
 
 **Only two files know the engine exists.** `bridge.ts`, `era.ts`, `remap.ts`
-and `diagnostics.ts` never import `@agentfuse/core`; `tools-call.ts` and
+and `diagnostics.ts` never import `@tunedness/agentfuse-core`; `tools-call.ts` and
 `trip-result.ts` do. A test pins that list, so adding a file to it is a
 decision rather than a slip. It is what keeps this MCP plumbing liftable into a
 package shared with McpGuard later.

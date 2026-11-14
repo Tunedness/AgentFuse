@@ -1,5 +1,5 @@
 /**
- * `@agentfuse/core` — the decision engine.
+ * `@tunedness/agentfuse-core` — the decision engine.
  *
  * ## The purity invariant
  *

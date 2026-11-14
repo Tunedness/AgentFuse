@@ -1,4 +1,4 @@
-import { compilePolicy, type EmbeddingProvider, parsePolicy } from '@agentfuse/core';
+import { compilePolicy, type EmbeddingProvider, parsePolicy } from '@tunedness/agentfuse-core';
 import { describe, expect, it } from 'vitest';
 import {
   EMBEDDINGS_PACKAGE,
@@ -363,7 +363,7 @@ describe('the real loader', () => {
   it('goes through the companion package`s real specifier, whatever it resolves to', async () => {
     // Inside this monorepo the specifier *does* resolve: npm workspaces
     // symlinks every package into `node_modules`, so the import finds the real
-    // `@agentfuse/embeddings-local` — provided it has been built, which the
+    // `@tunedness/agentfuse-embeddings-local` — provided it has been built, which the
     // gate does before it runs the tests. A published `agentfuse` installed on
     // its own finds nothing and rejects instead. Both states are covered by
     // the tables above; what this pins is that the real loader is the only

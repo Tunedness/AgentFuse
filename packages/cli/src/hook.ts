@@ -34,7 +34,7 @@
 import { existsSync } from 'node:fs';
 import { isAbsolute, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
-import type { DecisionHook } from '@agentfuse/core';
+import type { DecisionHook } from '@tunedness/agentfuse-core';
 import { CliError, EXIT, messageOf } from './errors.js';
 
 /** The shape a hook module is allowed to have. */

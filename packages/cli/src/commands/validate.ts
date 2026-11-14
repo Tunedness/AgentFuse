@@ -19,7 +19,7 @@
  * back to the exact document that produced it.
  */
 
-import { compilePolicy, formatDuration } from '@agentfuse/core';
+import { compilePolicy, formatDuration } from '@tunedness/agentfuse-core';
 import { parseArgs } from '../args.js';
 import { loadPolicy, POLICY_ENV_VAR, type PolicyOrigin, resolveFromPolicy } from '../config.js';
 import { EMBEDDINGS_PACKAGE, semanticRequestOf } from '../embeddings.js';

@@ -6,7 +6,7 @@ import { describe, expect, it } from 'vitest';
 /**
  * The purity invariant, enforced.
  *
- * `@agentfuse/core` must stay free of I/O and free of protocol. That is what
+ * `@tunedness/agentfuse-core` must stay free of I/O and free of protocol. That is what
  * lets the proxy, the CLI, an in-process SDK and (later) McpGuard all reuse the
  * same engine, and what makes every decision reproducible under a fake clock.
  *
@@ -22,9 +22,9 @@ const SRC = fileURLToPath(new URL('.', import.meta.url));
  */
 const FORBIDDEN = [
   '@modelcontextprotocol',
-  '@agentfuse/embeddings-local',
-  '@agentfuse/proxy',
-  '@agentfuse/cli',
+  '@tunedness/agentfuse-embeddings-local',
+  '@tunedness/agentfuse-proxy',
+  '@tunedness/agentfuse',
   'node:fs',
   'node:net',
   'node:child_process',

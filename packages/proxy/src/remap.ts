@@ -36,7 +36,7 @@
  * notification belong to", and to be assertable — a settled request must leave
  * no entry behind, and {@link RequestRemap.size} is how a test says so.
  *
- * Like {@link era}, this module knows nothing about `@agentfuse/core`.
+ * Like {@link era}, this module knows nothing about `@tunedness/agentfuse-core`.
  */
 
 import {

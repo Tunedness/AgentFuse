@@ -1,4 +1,4 @@
-import { DIAGNOSTIC_PREFIX } from '@agentfuse/proxy';
+import { DIAGNOSTIC_PREFIX } from '@tunedness/agentfuse-proxy';
 import { describe, expect, it } from 'vitest';
 import { StringWriter, writeLine, writeLines, writeNotice } from './io.js';
 

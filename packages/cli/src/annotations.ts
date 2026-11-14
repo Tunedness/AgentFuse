@@ -25,7 +25,7 @@
  *    engine unannounced.
  */
 
-import type { ToolAnnotations } from '@agentfuse/core';
+import type { ToolAnnotations } from '@tunedness/agentfuse-core';
 
 /** The part of an upstream connection this needs. Satisfied by the SDK's `Client`. */
 export interface ToolLister {

@@ -1,9 +1,9 @@
 import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
-import { type EmbeddingProvider, NoopTelemetrySink } from '@agentfuse/core';
-import { HashingProvider, ScriptedApprovalGateway } from '@agentfuse/core/testing';
-import { DIAGNOSTIC_PREFIX } from '@agentfuse/proxy';
+import { type EmbeddingProvider, NoopTelemetrySink } from '@tunedness/agentfuse-core';
+import { HashingProvider, ScriptedApprovalGateway } from '@tunedness/agentfuse-core/testing';
+import { DIAGNOSTIC_PREFIX } from '@tunedness/agentfuse-proxy';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { sendCommand } from './approvals/socket.js';
 import { loadPolicy } from './config.js';
@@ -62,7 +62,7 @@ function policyFile(contents: string) {
 
 /** The loader shape for a package that is not there. */
 const missing: EmbeddingsLoader = async () => {
-  throw new Error("Cannot find package '@agentfuse/embeddings-local'");
+  throw new Error("Cannot find package '@tunedness/agentfuse-embeddings-local'");
 };
 
 /** A loader that supplies a provider, standing in for phase 4. */
@@ -754,8 +754,14 @@ describe('the writeReport hook the runtime hands the proxy', () => {
   });
 
   it('reports a failed write on stderr instead of throwing', async () => {
+    // A directory that cannot be created because one of its ancestors is a
+    // regular file (ENOTDIR). Not `/proc/...`: on Linux, Node 24 and earlier
+    // spin forever inside `mkdirSync(..., { recursive: true })` on a path
+    // under `/proc`, a synchronous loop no test timeout can interrupt, which
+    // hung CI for six hours.
+    write('blocker', 'not a directory\n');
     const loaded = policyFile(
-      'version: 1\nloop_detection:\n  semantic:\n    provider: none\nreport:\n  dir: /proc/agentfuse-cannot-write-here\n',
+      'version: 1\nloop_detection:\n  semantic:\n    provider: none\nreport:\n  dir: blocker/trips\n',
     );
     const runtime = await createRuntime({ loaded, context: context() });
 

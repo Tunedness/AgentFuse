@@ -54,8 +54,8 @@ import type {
   ApprovalGateway,
   ApprovalRequest,
   ApprovalVerdict,
-} from '@agentfuse/core';
-import type { Diagnostics } from '@agentfuse/proxy';
+} from '@tunedness/agentfuse-core';
+import type { Diagnostics } from '@tunedness/agentfuse-proxy';
 import { messageOf } from '../errors.js';
 
 /** The header the signature travels in. */

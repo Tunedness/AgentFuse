@@ -9,7 +9,7 @@ import { describe, expect, it } from 'vitest';
  * `boundary.test.ts` are the precedent: a rule that is only written down is a
  * rule that drifts.
  *
- * 1. **The CLI never depends on `@agentfuse/embeddings-local`.** ADR-003
+ * 1. **The CLI never depends on `@tunedness/agentfuse-embeddings-local`.** ADR-003
  *    measured the reason — `onnxruntime-node` unpacks to about 301 MB because
  *    it ships every platform's binaries in one tarball, and a 300 MB
  *    `npx agentfuse` is not the frictionless drop-in this product is sold as.
@@ -27,7 +27,7 @@ const SRC = fileURLToPath(new URL('.', import.meta.url));
 const PACKAGE_JSON = fileURLToPath(new URL('../package.json', import.meta.url));
 
 /** The package that must never appear in the CLI's manifest. */
-const EMBEDDINGS_PACKAGE = '@agentfuse/embeddings-local';
+const EMBEDDINGS_PACKAGE = '@tunedness/agentfuse-embeddings-local';
 
 /** The only file allowed to touch the process's real streams. */
 const ENTRY_POINT = 'main.ts';
@@ -85,8 +85,8 @@ describe('the embeddings dependency direction', () => {
     // table. Anything new here is a decision, not a formality: this package is
     // what `npx agentfuse` downloads.
     expect(declared.sort()).toEqual([
-      '@agentfuse/core',
-      '@agentfuse/proxy',
+      '@tunedness/agentfuse-core',
+      '@tunedness/agentfuse-proxy',
       'gpt-tokenizer',
       'yaml',
     ]);
@@ -106,10 +106,10 @@ describe('the embeddings dependency direction', () => {
   it('reaches the package only through a dynamic import of a runtime specifier', () => {
     const embeddings = stripComments(readFileSync(join(SRC, 'embeddings.ts'), 'utf8'));
 
-    // A static `import … from '@agentfuse/embeddings-local'` would reintroduce
+    // A static `import … from '@tunedness/agentfuse-embeddings-local'` would reintroduce
     // the dependency a bundler resolves eagerly, which is the whole thing the
     // design removes. The specifier is a constant so no static edge exists.
-    expect(embeddings).not.toMatch(/from\s*['"]@agentfuse\/embeddings-local['"]/);
+    expect(embeddings).not.toMatch(/from\s*['"]@tunedness\/agentfuse-embeddings-local['"]/);
     expect(embeddings).toMatch(/import\(EMBEDDINGS_PACKAGE\)/);
   });
 

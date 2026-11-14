@@ -3,7 +3,7 @@
  *
  * ## The invariant
  *
- * **`agentfuse` must never depend on `@agentfuse/embeddings-local`** — not in
+ * **`agentfuse` must never depend on `@tunedness/agentfuse-embeddings-local`** — not in
  * `dependencies`, not in `devDependencies`, not in `peerDependencies`.
  * `discipline.test.ts` fails the build if it ever does. ADR-003 measured the
  * reason: `onnxruntime-node` unpacks to about 301 MB because it ships every
@@ -35,7 +35,7 @@
  *
  * ## What phase 4 has to export
  *
- * This file is the contract. `@agentfuse/embeddings-local` must export:
+ * This file is the contract. `@tunedness/agentfuse-embeddings-local` must export:
  *
  * ```ts
  * createEmbeddingProvider(options: { model: string }): Promise<EmbeddingProvider>
@@ -49,11 +49,11 @@
  * "install it" and "upgrade it" are different instructions.
  */
 
-import type { EmbeddingProvider, PolicyMode } from '@agentfuse/core';
+import type { EmbeddingProvider, PolicyMode } from '@tunedness/agentfuse-core';
 import { CliError, EXIT, messageOf } from './errors.js';
 
 /** The package that carries the local backend. Named in every message. */
-export const EMBEDDINGS_PACKAGE = '@agentfuse/embeddings-local';
+export const EMBEDDINGS_PACKAGE = '@tunedness/agentfuse-embeddings-local';
 
 /** Progress notes `installModel` may report. */
 export interface InstallProgress {
@@ -298,7 +298,7 @@ export async function loadInstaller(
       exitCode: EXIT.missingDependency,
       hints: [
         'That export is how AgentFuse drives the download, so the installed copy is either older or newer than this CLI.',
-        `Update both: npm install ${EMBEDDINGS_PACKAGE}@latest agentfuse@latest`,
+        `Update both: npm install ${EMBEDDINGS_PACKAGE}@latest @tunedness/agentfuse@latest`,
       ],
     });
   }

@@ -26,7 +26,7 @@
  * noise in a stream the operator is reading for their own server's output.
  */
 
-import type { FusePolicy } from '@agentfuse/core';
+import type { FusePolicy } from '@tunedness/agentfuse-core';
 import { CLI_VERSION } from '../index.js';
 import {
   type ExporterDiagnostic,

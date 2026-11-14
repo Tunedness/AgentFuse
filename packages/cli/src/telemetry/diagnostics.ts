@@ -24,7 +24,7 @@
  * feature that is off by default.
  */
 
-import { Diagnostics, type DiagnosticsOptions } from '@agentfuse/proxy';
+import { Diagnostics, type DiagnosticsOptions } from '@tunedness/agentfuse-proxy';
 
 /** A second reader of the diagnostic stream. Must not throw; contained if it does. */
 export type DiagnosticObserver = (event: string, fields: Record<string, unknown>) => void;

@@ -13,7 +13,7 @@ import {
   normalizeArgs,
   type ToolCallRecord,
   type TripReport,
-} from '@agentfuse/core';
+} from '@tunedness/agentfuse-core';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { CliError } from './errors.js';
 import { FileReportStore, isTripReport, REPORT_SUFFIX } from './reports.js';

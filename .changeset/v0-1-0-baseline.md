@@ -1,8 +1,8 @@
 ---
-'@agentfuse/core': minor
-'@agentfuse/proxy': minor
-'@agentfuse/embeddings-local': minor
-'agentfuse': minor
+'@tunedness/agentfuse-core': minor
+'@tunedness/agentfuse-proxy': minor
+'@tunedness/agentfuse-embeddings-local': minor
+'@tunedness/agentfuse': minor
 ---
 
 First release: a circuit breaker for an agent's tool calls.
@@ -17,7 +17,7 @@ measured on real traffic before enforcement is turned on.
 the answers have stopped moving too, repeated error signatures, short cycles —
 needs no model and no network. The semantic tier embeds each completed call off
 the hot path and scores a sliding window as `min(average pairwise cosine,
-answer staleness)`; it needs the optional `@agentfuse/embeddings-local`
+answer staleness)`; it needs the optional `@tunedness/agentfuse-embeddings-local`
 companion, and the deterministic tier is complete without it.
 
 Measured on a committed 200-session corpus at the calibrated operating point

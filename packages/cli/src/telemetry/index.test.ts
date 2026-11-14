@@ -1,5 +1,5 @@
-import type { FusePolicy } from '@agentfuse/core';
-import { parsePolicy } from '@agentfuse/core';
+import type { FusePolicy } from '@tunedness/agentfuse-core';
+import { parsePolicy } from '@tunedness/agentfuse-core';
 import { describe, expect, it } from 'vitest';
 import { CLI_VERSION } from '../index.js';
 import { endpointProblem, resolveTelemetry, resourceFor, SCOPE } from './index.js';

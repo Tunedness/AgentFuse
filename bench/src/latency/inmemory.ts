@@ -18,7 +18,9 @@
  * is a second tier.
  */
 
-import type { EmbeddingProvider } from '@agentfuse/core';
+import { Client } from '@modelcontextprotocol/client';
+import { InMemoryTransport, Server } from '@modelcontextprotocol/server';
+import type { EmbeddingProvider } from '@tunedness/agentfuse-core';
 import {
   FuseEngine,
   type FusePolicy,
@@ -27,10 +29,8 @@ import {
   RecordingTelemetrySink,
   SemanticLoopDetector,
   type TelemetrySink,
-} from '@agentfuse/core';
-import { createBridge, createToolCallGuard } from '@agentfuse/proxy';
-import { Client } from '@modelcontextprotocol/client';
-import { InMemoryTransport, Server } from '@modelcontextprotocol/server';
+} from '@tunedness/agentfuse-core';
+import { createBridge, createToolCallGuard } from '@tunedness/agentfuse-proxy';
 
 /**
  * A ~256-byte answer carrying the request's own path back. Matches

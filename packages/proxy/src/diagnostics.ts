@@ -15,7 +15,7 @@
  *    bury the server's output under its own.
  *
  * Like the rest of the transport skeleton this file does not import
- * `@agentfuse/core`.
+ * `@tunedness/agentfuse-core`.
  */
 
 /** The minimum of a writable stream the diagnostics need. */

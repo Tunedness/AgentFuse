@@ -18,7 +18,7 @@
  * product rather than from a model of it.
  */
 
-import type { EmbeddingProvider } from '@agentfuse/core';
+import type { EmbeddingProvider } from '@tunedness/agentfuse-core';
 import {
   type BeforeCallInput,
   type CallOutcome,
@@ -34,7 +34,7 @@ import {
   semanticResultText,
   type ToolCallRecord,
   type TripCode,
-} from '@agentfuse/core';
+} from '@tunedness/agentfuse-core';
 import type { CorpusCall, CorpusSession } from './types.js';
 
 /** Milliseconds of simulated wall clock per call. */

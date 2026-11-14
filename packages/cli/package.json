@@ -1,5 +1,5 @@
 {
-  "name": "agentfuse",
+  "name": "@tunedness/agentfuse",
   "version": "0.0.0",
   "description": "Put a fuse in front of your agent's tools. The AgentFuse command line entry point.",
   "license": "Apache-2.0",
@@ -34,8 +34,8 @@
     "clean": "tsc -b --clean"
   },
   "dependencies": {
-    "@agentfuse/core": "*",
-    "@agentfuse/proxy": "*",
+    "@tunedness/agentfuse-core": "*",
+    "@tunedness/agentfuse-proxy": "*",
     "gpt-tokenizer": "^4.0.0",
     "yaml": "^2.9.1"
   },

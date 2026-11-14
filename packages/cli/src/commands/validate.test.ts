@@ -1,7 +1,7 @@
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
-import { compilePolicy, parsePolicy } from '@agentfuse/core';
+import { compilePolicy, parsePolicy } from '@tunedness/agentfuse-core';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { POLICY_ENV_VAR, PolicyFileError } from '../config.js';
 import type { CliError } from '../errors.js';
@@ -139,7 +139,7 @@ describe('runValidate on a good policy', () => {
 
     runValidate(context(), []);
 
-    expect(stdout.text).toContain('@agentfuse/embeddings-local');
+    expect(stdout.text).toContain('@tunedness/agentfuse-embeddings-local');
     expect(stdout.text).toContain('not a dependency of this CLI');
   });
 
@@ -149,7 +149,7 @@ describe('runValidate on a good policy', () => {
     runValidate(context(), []);
 
     expect(stdout.text).toContain('semantic                off');
-    expect(stdout.text).not.toContain('@agentfuse/embeddings-local');
+    expect(stdout.text).not.toContain('@tunedness/agentfuse-embeddings-local');
   });
 
   it('describes the semantic settings when it is on', () => {

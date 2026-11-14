@@ -17,7 +17,7 @@
  * silently passes everything would be worse than no test at all.
  *
  * Lives in `src/testing/`, which the package build and the coverage report
- * both exclude — the same exemption `@agentfuse/proxy` gives its scenario
+ * both exclude — the same exemption `@tunedness/agentfuse-proxy` gives its scenario
  * harnesses, and for the same reason: this is scaffolding that happens not to
  * end in `.test.ts`, and publishing it would turn it into a public contract.
  */

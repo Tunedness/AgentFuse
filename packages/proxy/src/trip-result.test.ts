@@ -1,3 +1,4 @@
+import type { CallToolResult } from '@modelcontextprotocol/server';
 import {
   APPROVAL_REASON_LIMIT,
   type ApprovalRecord,
@@ -6,8 +7,7 @@ import {
   type Reason,
   type TripCode,
   type TripReport,
-} from '@agentfuse/core';
-import type { CallToolResult } from '@modelcontextprotocol/server';
+} from '@tunedness/agentfuse-core';
 import { describe, expect, it } from 'vitest';
 import {
   buildTripResult,

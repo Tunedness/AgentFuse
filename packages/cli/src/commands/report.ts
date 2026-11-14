@@ -2,7 +2,7 @@
  * `agentfuse report` — read the trip reports back.
  *
  * The human text is **not** produced here. `renderTripReport` lives in
- * `@agentfuse/core` and is a pure string builder; the proxy prints it to stderr
+ * `@tunedness/agentfuse-core` and is a pure string builder; the proxy prints it to stderr
  * through `renderTripDiagnostic` when a circuit trips, this command prints the
  * same function's output when someone comes back to look, and the test suite
  * snapshots it. One renderer is what makes those three agree, and a second one
@@ -13,7 +13,7 @@
  * a Control Plane upload.
  */
 
-import { renderTripReport } from '@agentfuse/core';
+import { renderTripReport } from '@tunedness/agentfuse-core';
 import { parseArgs } from '../args.js';
 import { loadPolicy, resolveFromPolicy } from '../config.js';
 import { CliError, EXIT } from '../errors.js';

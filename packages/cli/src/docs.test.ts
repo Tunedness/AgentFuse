@@ -80,7 +80,10 @@ function logicalLines(text: string): string[] {
 }
 
 /**
- * Every `agentfuse …` invocation in a document, as `[command, tail]`.
+ * Every `agentfuse …` or `@tunedness/agentfuse …` invocation in a document, as
+ * `[command, tail]`. The scoped name is the package, the bare one is the binary;
+ * `npx @tunedness/agentfuse wrap` and `agentfuse wrap` are the same command, so both
+ * are read. Sibling packages (`@tunedness/agentfuse-core`) are not commands.
  *
  * Deliberately naive about where it looks: a command in prose is copied just
  * as often as one in a fenced block, and both have to be right. Lines that
@@ -91,12 +94,14 @@ function logicalLines(text: string): string[] {
 function invocations(text: string): { command: string; tail: string[] }[] {
   const found: { command: string; tail: string[] }[] = [];
   for (const line of logicalLines(text)) {
-    // `npx agentfuse …`, `agentfuse …`, and the same inside backticks.
-    for (const match of line.matchAll(/\bagentfuse\s+([^`\n|]*)/g)) {
+    // `npx @tunedness/agentfuse …`, `agentfuse …`, and the same inside backticks.
+    for (const match of line.matchAll(
+      /(?:@tunedness\/agentfuse(?![\w-])(?:@[^\s`]+)?|(?<![\w-])agentfuse)\s+([^`\n|]*)/g,
+    )) {
       const tokens = (match[1] ?? '').trim().split(/\s+/).filter(Boolean);
       const head = tokens[0];
       if (head === undefined) continue;
-      // A package name (`agentfuse/core`) or a version banner, not a command.
+      // A placeholder or a version banner, not a command.
       if (head.startsWith('<') || head.startsWith('[')) continue;
       if (GLOBAL_FLAGS.has(head)) continue;
       if (!COMMANDS.includes(head as (typeof COMMANDS)[number])) {
@@ -244,5 +249,51 @@ describe('the numbers the documentation quotes', () => {
   it('carries the McpGuard chaining contract by name', () => {
     expect(root).toContain('tunedness.session-id');
     expect(root).toContain('McpGuard');
+  });
+});
+
+describe('invocation extraction', () => {
+  it('reads the scoped package name and the bare binary name alike', () => {
+    const fixture = [
+      '    npx @tunedness/agentfuse wrap --name x -- cmd',
+      '',
+      'Then run `npx -y @tunedness/agentfuse validate` and `agentfuse report last`.',
+      '    ./node_modules/.bin/agentfuse serve --policy p.yaml',
+    ].join('\n');
+    expect(invocations(fixture).map((found) => found.command)).toEqual([
+      'wrap',
+      'validate',
+      'report',
+      'serve',
+    ]);
+  });
+
+  it('reads a call whose package name carries a version or a tag', () => {
+    const fixture = [
+      'npx -y @tunedness/agentfuse@latest wrap --nme x -- cmd',
+      'npx @tunedness/agentfuse@0.1.0 serve',
+    ].join('\n');
+    expect(invocations(fixture)).toEqual([
+      { command: 'wrap', tail: ['--nme', 'x', '--', 'cmd'] },
+      { command: 'serve', tail: [] },
+    ]);
+  });
+
+  it('does not take a sibling package name for a command', () => {
+    const fixture =
+      'Install `@tunedness/agentfuse-core`, `@tunedness/agentfuse-proxy` and `@tunedness/agentfuse-embeddings-local`.';
+    expect(invocations(fixture)).toEqual([]);
+  });
+
+  it('does not take a sibling package name followed by a word for a command', () => {
+    // A hyphen is a word boundary to `\b`, so `agentfuse-core` followed by a
+    // space would read as the binary name plus a command if the pattern leaned
+    // on `\b` alone.
+    const fixture = [
+      'npm install @tunedness/agentfuse-core validate',
+      'npm install @tunedness/agentfuse-proxy wrap',
+      'npm install @tunedness/agentfuse-embeddings-local models',
+    ].join('\n');
+    expect(invocations(fixture)).toEqual([]);
   });
 });

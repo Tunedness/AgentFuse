@@ -122,7 +122,7 @@ loop_detection:
   # The semantic tier: catches the loop that changes shape every turn but makes
   # no progress. Needs the optional companion package:
   #
-  #     npm install @agentfuse/embeddings-local
+  #     npm install @tunedness/agentfuse-embeddings-local
   #     agentfuse models install
   #
   # Without it, \`mode: warn\` prints a warning and carries on with the rules
@@ -312,7 +312,7 @@ export function runInit(context: CliContext, argv: readonly string[]): number {
     `  agentfuse wrap -- <your mcp server cmd>  # put the fuse in front of it`,
     '',
     'Semantic loop detection needs one more install, and says so if you leave it on:',
-    '  npm install @agentfuse/embeddings-local && agentfuse models install',
+    '  npm install @tunedness/agentfuse-embeddings-local && agentfuse models install',
   ]);
   return EXIT.ok;
 }

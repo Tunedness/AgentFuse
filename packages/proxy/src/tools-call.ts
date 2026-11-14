@@ -2,7 +2,7 @@
  * The guarded path: `tools/call` through the decision engine.
  *
  * This is the only place in the package where a tool call meets
- * `@agentfuse/core`. Everything before it is transport (see `bridge.ts`) and
+ * `@tunedness/agentfuse-core`. Everything before it is transport (see `bridge.ts`) and
  * everything after it is text (see `trip-result.ts`).
  *
  * The shape is fixed by the engine's contract and is deliberately boring:
@@ -19,6 +19,7 @@
  * session's call counter would drift below what the agent actually did.
  */
 
+import type { CallToolResult } from '@modelcontextprotocol/server';
 import {
   type BeforeCallInput,
   type CallOutcome,
@@ -27,8 +28,7 @@ import {
   type FuseEngine,
   type SessionSummary,
   type ToolAnnotations,
-} from '@agentfuse/core';
-import type { CallToolResult } from '@modelcontextprotocol/server';
+} from '@tunedness/agentfuse-core';
 import type { GuardedToolCall, ToolCallGate } from './bridge.js';
 import type { Diagnostics } from './diagnostics.js';
 import { traceparentOf } from './remap.js';

@@ -3,7 +3,7 @@
  *
  * ## Why not `bytes/4`
  *
- * `@agentfuse/core` ships a `HeuristicTokenizer` so it can meter a token budget
+ * `@tunedness/agentfuse-core` ships a `HeuristicTokenizer` so it can meter a token budget
  * with zero dependencies, and says in its own doc that it is a floor rather than
  * a measurement. ADR-007 is explicit about why the CLI replaces it: the
  * character heuristic was calibrated on prose, and what actually crosses a
@@ -37,7 +37,12 @@
  * counted so it cannot be silent.
  */
 
-import { type CostModel, type PricingTable, TableCostModel, type Tokenizer } from '@agentfuse/core';
+import {
+  type CostModel,
+  type PricingTable,
+  TableCostModel,
+  type Tokenizer,
+} from '@tunedness/agentfuse-core';
 import { ALL_SPECIAL_TOKENS, countTokens } from 'gpt-tokenizer/encoding/o200k_base';
 
 /** What `Tokenizer.id` reports. Appears in reports, so it is part of the record. */

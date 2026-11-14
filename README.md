@@ -26,7 +26,7 @@ between, with no code change on either side.
   [Why it is 4.8 ms and not 0.2](#latency).
 
 > **Not published to npm yet.** v0.1.0 is prepared but unreleased, so the
-> `npx agentfuse` lines below describe the shape of the command rather than
+> `npx @tunedness/agentfuse` lines below describe the shape of the command rather than
 > something you can run today. To try it now, clone this repository, run
 > `npm install && npm run build`, and use `node packages/cli/dist/main.js`
 > wherever the examples say `agentfuse`.
@@ -35,19 +35,21 @@ between, with no code change on either side.
 
 ## Quickstart
 
-Requires Node.js ≥ 20.19.
+Requires Node.js ≥ 20.19. The package is `@tunedness/agentfuse` and the command it
+installs is `agentfuse`; to have the command on your `PATH`, run
+`npm i -g @tunedness/agentfuse`.
 
 ### 1. Write a policy
 
 ```sh
-npx agentfuse init
+npx @tunedness/agentfuse init
 ```
 
 That writes `fusepolicy.yaml`: a commented starter file that spells out every
 default and starts in `mode: warn`. Check what it resolves to:
 
 ```sh
-npx agentfuse validate
+npx @tunedness/agentfuse validate
 ```
 
 ### 2. Put the fuse in front of one server
@@ -56,7 +58,7 @@ Everything after the bare `--` is the wrapped server's own command line,
 untouched:
 
 ```sh
-npx agentfuse wrap --name filesystem -- \
+npx @tunedness/agentfuse wrap --name filesystem -- \
   npx -y @modelcontextprotocol/server-filesystem /srv/projects
 ```
 
@@ -78,7 +80,7 @@ from is a support burden nobody can see.
     "filesystem": {
       "command": "npx",
       "args": [
-        "-y", "agentfuse", "wrap",
+        "-y", "@tunedness/agentfuse", "wrap",
         "--name", "filesystem",
         "--policy", "/absolute/path/to/fusepolicy.yaml",
         "--",
@@ -97,15 +99,15 @@ cannot be relied on there.
 ### 4. Read what it would have done
 
 ```sh
-npx agentfuse report list      # what is on disk, newest first
-npx agentfuse report last      # the most recent trip, rendered
-npx agentfuse report last --json
+npx @tunedness/agentfuse report list      # what is on disk, newest first
+npx @tunedness/agentfuse report last      # the most recent trip, rendered
+npx @tunedness/agentfuse report last --json
 ```
 
 ### 5. Only then enforce
 
 ```sh
-npx agentfuse wrap --mode enforce --name filesystem -- <server command>
+npx @tunedness/agentfuse wrap --mode enforce --name filesystem -- <server command>
 ```
 
 ---
@@ -310,7 +312,7 @@ reworded retry scores 0.9791. The most distant pair should have been the
 closest. Staleness — how much of each answer was already in one of the others —
 is what separates them.
 
-It requires the optional [`@agentfuse/embeddings-local`](./packages/embeddings-local)
+It requires the optional [`@tunedness/agentfuse-embeddings-local`](./packages/embeddings-local)
 package. The rule tier is fully functional without it.
 
 ### The measured numbers
@@ -426,8 +428,8 @@ reason for asking, the trimmed arguments, the approval id and the exact command
 to answer it:
 
 ```sh
-npx agentfuse approve <approval id> --reason "checked the path by hand"
-npx agentfuse deny    <approval id> --reason "not on prod"
+npx @tunedness/agentfuse approve <approval id> --reason "checked the path by hand"
+npx @tunedness/agentfuse deny    <approval id> --reason "not on prod"
 ```
 
 - **`--quiet` does not silence the prompt.** `--quiet` exists to stop
@@ -536,7 +538,7 @@ To see it work, with no collector to install:
 
 ```sh
 node examples/otlp-receiver.mjs            # prints what arrives
-npx agentfuse wrap --name fs -- <server>   # with telemetry.enabled: true
+npx @tunedness/agentfuse wrap --name fs -- <server>   # with telemetry.enabled: true
 ```
 
 ---
@@ -640,17 +642,17 @@ sends it.
 
 | Package | Role |
 | --- | --- |
-| [`@agentfuse/core`](./packages/core) | The decision engine. Pure: no I/O, no protocol, no clock of its own. Depends on `zod` and nothing else. |
-| [`@agentfuse/proxy`](./packages/proxy) | The MCP adapter — the server/client pair that does the intercepting. |
-| [`agentfuse`](./packages/cli) | The command line. What `npx agentfuse` downloads. |
-| [`@agentfuse/embeddings-local`](./packages/embeddings-local) | **Optional.** The local embedding backend for the semantic tier. Nothing depends on it. |
+| [`@tunedness/agentfuse-core`](./packages/core) | The decision engine. Pure: no I/O, no protocol, no clock of its own. Depends on `zod` and nothing else. |
+| [`@tunedness/agentfuse-proxy`](./packages/proxy) | The MCP adapter — the server/client pair that does the intercepting. |
+| [`@tunedness/agentfuse`](./packages/cli) | The command line; installs the `agentfuse` command. What `npx @tunedness/agentfuse` downloads. |
+| [`@tunedness/agentfuse-embeddings-local`](./packages/embeddings-local) | **Optional.** The local embedding backend for the semantic tier. Nothing depends on it. |
 
 ### Installing the semantic tier, and what it costs
 
 ```sh
 # On linux/x64, do it this way:
-ONNXRUNTIME_NODE_INSTALL=skip npm install @agentfuse/embeddings-local
-npx agentfuse models install
+ONNXRUNTIME_NODE_INSTALL=skip npm install @tunedness/agentfuse-embeddings-local
+npx @tunedness/agentfuse models install
 ```
 
 This is a deliberate second step, and the numbers are why.
@@ -660,7 +662,7 @@ This is a deliberate second step, and the numbers are why.
   it actually occupies once installed, so both figures are real and the CLI's
   own messages quote the larger one. It ships
   every platform's binaries in one tarball, with no per-platform
-  `optionalDependencies` to narrow it down. A 300 MB `npx agentfuse` would end
+  `optionalDependencies` to narrow it down. A 300 MB `npx @tunedness/agentfuse` would end
   adoption for a tool whose whole pitch is a frictionless drop-in, so the
   runtime lives in a companion package that no published AgentFuse package
   depends on. The CLI finds it by dynamic `import()` and, failing that, runs the
@@ -735,9 +737,9 @@ them for free.
 Benchmarks live in `bench/` (private, never published) and run separately:
 
 ```sh
-npm run bench:corpus     --workspace @agentfuse/bench
-npm run bench:detection  --workspace @agentfuse/bench
-npm run bench:latency    --workspace @agentfuse/bench
+npm run bench:corpus     --workspace @tunedness/agentfuse-bench
+npm run bench:detection  --workspace @tunedness/agentfuse-bench
+npm run bench:latency    --workspace @tunedness/agentfuse-bench
 ```
 
 Coverage is gated at 90% on `packages/core/src/**` only — that package is the

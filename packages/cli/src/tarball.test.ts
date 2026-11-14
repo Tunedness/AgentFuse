@@ -13,6 +13,7 @@ import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { parsePackOutput } from './testing/pack-output.js';
 import { nonProtocolLines, WireClient } from './testing/wire.js';
 
 /**
@@ -37,7 +38,7 @@ import { nonProtocolLines, WireClient } from './testing/wire.js';
  *
  * - the tarballs are complete — a missing file is an `ERR_MODULE_NOT_FOUND`
  *   on the first import rather than a test that mysteriously still passes;
- * - `agentfuse` finds `@agentfuse/core` and `@agentfuse/proxy` **in the
+ * - `@tunedness/agentfuse` finds `@tunedness/agentfuse-core` and `@tunedness/agentfuse-proxy` **in the
  *   tarballs**. The temp directory is outside the repository, so Node's
  *   upward walk never reaches the workspace `node_modules`;
  * - the declared dependency list is *sufficient*, not merely minimal. Only
@@ -71,7 +72,11 @@ const EXAMPLE = fileURLToPath(new URL('../../../examples/claude-desktop.json', H
 const runnable = existsSync(new URL('../dist/main.js', HERE)) && process.platform !== 'win32';
 
 /** The three packages a bare `agentfuse wrap` needs. `embeddings-local` is not one. */
-const NEEDED = ['agentfuse', '@agentfuse/core', '@agentfuse/proxy'] as const;
+const NEEDED = [
+  '@tunedness/agentfuse',
+  '@tunedness/agentfuse-core',
+  '@tunedness/agentfuse-proxy',
+] as const;
 
 interface Packed {
   readonly name: string;
@@ -104,7 +109,7 @@ function install(): void {
       maxBuffer: 16 * 1024 * 1024,
     },
   );
-  const packed = JSON.parse(stdout) as Packed[];
+  const packed = parsePackOutput<Packed>(stdout);
 
   const linked = new Set<string>();
   for (const name of NEEDED) {
@@ -127,7 +132,7 @@ function install(): void {
     for (const dependency of Object.keys(pkg.dependencies ?? {})) {
       // Ours come from the tarballs; everything else is linked from the
       // workspace, and only if a manifest asked for it by name.
-      if (dependency.startsWith('@agentfuse/') || dependency === 'agentfuse') continue;
+      if (dependency.startsWith('@tunedness/agentfuse')) continue;
       if (linked.has(dependency)) continue;
       linked.add(dependency);
       const source = join(ROOT, 'node_modules', dependency);
@@ -138,7 +143,7 @@ function install(): void {
     }
   }
 
-  bin = join(modules, 'agentfuse', 'dist', 'main.js');
+  bin = join(modules, '@tunedness', 'agentfuse', 'dist', 'main.js');
 
   // `enforce`, a two-call exact-repeat threshold, and the semantic tier off:
   // the tier needs a 292 MB companion and a 23 MB model, and the claim under
@@ -177,7 +182,7 @@ function exampleArgs(): string[] {
   const first = Object.values(config.mcpServers)[0];
   if (first === undefined) throw new Error('the example configuration has no entries');
 
-  // Drop `-y agentfuse`: the binary is named directly, because `npx` would
+  // Drop `-y @tunedness/agentfuse`: the binary is named directly, because `npx` would
   // reach for the registry.
   const args = first.args.slice(2);
   const separator = args.indexOf('--');
@@ -210,8 +215,8 @@ describe.runIf(runnable)('installed from the tarballs', () => {
 
   it('puts the binary and both libraries where node will find them', () => {
     expect(existsSync(bin)).toBe(true);
-    expect(existsSync(join(modules, '@agentfuse/core', 'dist', 'index.js'))).toBe(true);
-    expect(existsSync(join(modules, '@agentfuse/proxy', 'dist', 'index.js'))).toBe(true);
+    expect(existsSync(join(modules, '@tunedness/agentfuse-core', 'dist', 'index.js'))).toBe(true);
+    expect(existsSync(join(modules, '@tunedness/agentfuse-proxy', 'dist', 'index.js'))).toBe(true);
 
     // And the tree really is somewhere else. If it were inside the repository,
     // Node's upward walk would find the workspace `node_modules` and this whole
@@ -222,7 +227,12 @@ describe.runIf(runnable)('installed from the tarballs', () => {
   it('ships the JSON Schema on the subpath the manifest advertises', () => {
     // People's editors resolve this path to validate their policy file as they
     // type; it is a published surface, not an internal file.
-    const schema = join(modules, '@agentfuse/core', 'schemas', 'fusepolicy.v1.schema.json');
+    const schema = join(
+      modules,
+      '@tunedness/agentfuse-core',
+      'schemas',
+      'fusepolicy.v1.schema.json',
+    );
 
     expect(existsSync(schema)).toBe(true);
     expect(JSON.parse(readFileSync(schema, 'utf8'))).toMatchObject({ type: 'object' });
@@ -280,12 +290,12 @@ describe.runIf(runnable)('installed from the tarballs', () => {
       };
 
       // A refusal, not a protocol error, with the one load-bearing sentence in
-      // it — and no `@agentfuse/embeddings-local` anywhere in this tree.
+      // it — and no `@tunedness/agentfuse-embeddings-local` anywhere in this tree.
       expect(second.isError).toBe(true);
       expect(second.content?.[0]?.text).toContain('AgentFuse circuit breaker OPEN');
       expect(second.content?.[0]?.text).toContain('Retrying this call unchanged');
       expect(JSON.stringify(second.structuredContent)).toContain('LOOP_EXACT_REPEAT');
-      expect(existsSync(join(modules, '@agentfuse/embeddings-local'))).toBe(false);
+      expect(existsSync(join(modules, '@tunedness/agentfuse-embeddings-local'))).toBe(false);
 
       // And through all of that stdout carried protocol frames and nothing
       // else, which is the claim a packaging mistake could silently break: a

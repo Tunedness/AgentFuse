@@ -1,5 +1,5 @@
-import { CORE_VERSION } from '@agentfuse/core';
-import { PROXY_VERSION } from '@agentfuse/proxy';
+import { CORE_VERSION } from '@tunedness/agentfuse-core';
+import { PROXY_VERSION } from '@tunedness/agentfuse-proxy';
 
 /** Version of the `agentfuse` command line tool. */
 export const CLI_VERSION = '0.0.0';

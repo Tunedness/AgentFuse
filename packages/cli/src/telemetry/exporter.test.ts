@@ -229,6 +229,10 @@ describe('what a collector actually receives', () => {
 
     subject.enqueueSpan(span());
     await collector.waitFor(() => collector.spans.length === 1);
+    // The receiver sees the request before the exporter sees the response, and
+    // `exported` is counted only on the response. Waiting for the collector
+    // alone made this assertion a race that Linux runners lost.
+    await collector.waitFor(() => subject.stats.exported === 1);
 
     expect(subject.stats.exported).toBe(1);
   });

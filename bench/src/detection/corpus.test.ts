@@ -1,7 +1,7 @@
 import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
-import { errorSignature, fingerprint, normalizeArgs } from '@agentfuse/core';
+import { errorSignature, fingerprint, normalizeArgs } from '@tunedness/agentfuse-core';
 import { describe, expect, it } from 'vitest';
 import {
   ALL_SCENARIOS,

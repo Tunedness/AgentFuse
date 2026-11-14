@@ -18,7 +18,7 @@ export default defineConfig({
       // that happens not to end in `.test.ts`. It is excluded from the package
       // builds too, so it never ships.
       exclude: ['**/*.test.ts', '**/dist/**', 'packages/*/src/testing/**'],
-      // `@agentfuse/core` is the whole product's safety net: if its decisions
+      // `@tunedness/agentfuse-core` is the whole product's safety net: if its decisions
       // are wrong, a working agent gets halted or a runaway one does not. The
       // gate is deliberately only on core — the proxy and CLI are thin, and
       // padding their numbers would tell nobody anything.

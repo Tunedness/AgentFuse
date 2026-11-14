@@ -1,5 +1,5 @@
 /**
- * `@agentfuse/core`'s `EmbeddingProvider`, implemented over a real model.
+ * `@tunedness/agentfuse-core`'s `EmbeddingProvider`, implemented over a real model.
  *
  * The provider is written against two seams — a {@link Tokenizing} and an
  * {@link EmbeddingSession} — rather than against `@huggingface/tokenizers` and
@@ -15,7 +15,7 @@
  * the whole run of the proxy.
  */
 
-import type { EmbeddingProvider } from '@agentfuse/core';
+import type { EmbeddingProvider } from '@tunedness/agentfuse-core';
 import { type Encoding, meanPool, packBatch, type SpecialTokens } from './batch.js';
 import type { ModelSpec } from './models.js';
 import type { EmbeddingSession } from './session.js';

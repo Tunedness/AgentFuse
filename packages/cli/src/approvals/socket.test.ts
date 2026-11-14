@@ -1,5 +1,13 @@
 import { spawn } from 'node:child_process';
-import { chmodSync, mkdirSync, mkdtempSync, rmSync, statSync, writeFileSync } from 'node:fs';
+import {
+  chmodSync,
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  rmSync,
+  statSync,
+  writeFileSync,
+} from 'node:fs';
 import { createConnection, createServer, type Socket } from 'node:net';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -14,6 +22,14 @@ import {
   probeSocket,
   sendCommand,
 } from './socket.js';
+
+// Delegates to the real `chmodSync` unless a test says otherwise. Lets one test
+// make the narrowing of a freshly bound socket fail on demand, which no real
+// permission arrangement can do portably: the same process owns the file.
+vi.mock('node:fs', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('node:fs')>();
+  return { ...actual, chmodSync: vi.fn(actual.chmodSync) };
+});
 
 // These tests spawn real processes over real pipes, so their wall clock is the
 // machine's, not the code's. Vitest's 5 s default is enough in isolation and
@@ -400,8 +416,37 @@ describe('listenApprovalSocket', () => {
     } catch (error) {
       expect((error as CliError).message).toContain('cannot open the approval socket');
       expect(events.map(([event]) => event)).toContain('approval_socket_bind_failed');
-      expect(events.map(([event]) => event)).toContain('approval_socket_error');
+      // Not asserted: `approval_socket_error`. Node 24 refuses the path at
+      // `listen` and emits it; Node 20 and 22 on Linux truncate the path to
+      // `sun_path`, bind that, and fail later in `chmod` on the full name, with
+      // no server error at all. What is promised is the CliError and the
+      // `bind_failed` event, which both paths produce.
     }
+  });
+
+  it('closes the listener it bound when narrowing the socket fails', async () => {
+    // Bound but not chmod'ed: nobody is told about this listener, so nothing
+    // would ever close it. It would keep the process alive and the path taken.
+    const path = join(root, 'a.sock');
+    const real = vi.mocked(chmodSync).getMockImplementation();
+    vi.mocked(chmodSync).mockImplementation((target, mode) => {
+      if (String(target) === path) throw new Error('EPERM: simulated chmod failure');
+      return real?.(target, mode);
+    });
+
+    try {
+      await listen(path);
+      expect.unreachable('a socket that cannot be narrowed is not usable');
+    } catch (error) {
+      expect((error as CliError).message).toContain('cannot open the approval socket');
+      expect(events.map(([event]) => event)).toContain('approval_socket_bind_failed');
+    } finally {
+      vi.mocked(chmodSync).mockImplementation(real ?? chmodSync);
+    }
+
+    // Closed, not merely unreferenced: nothing answers and the file is gone.
+    expect(await probeSocket(path)).toBe(false);
+    expect(existsSync(path)).toBe(false);
   });
 
   it('reports a stale socket it removed, so the log says what happened', async () => {
@@ -533,6 +578,25 @@ describe('sendCommand', () => {
     } catch (error) {
       const cli = error as CliError;
       expect(cli.message).toContain('nothing is waiting for an approval');
+      expect(cli.hints.join(' ')).toContain('mode: enforce');
+    }
+  });
+
+  it('still says nothing is waiting for a stale socket nobody listens on', async () => {
+    // The mirror of the test below. A crashed wrap leaves a real socket file
+    // with no listener, and `connect(2)` answers ECONNREFUSED on both macOS and
+    // Linux. Linux gives the same code for a regular file, so the client has to
+    // look at the file type; it must not mistake this one for "not a socket".
+    const path = join(root, 'stale.sock');
+    await staleSocket(path);
+
+    try {
+      await sendCommand(path, { v: 1, type: 'reset', sessionId: '01S', reason: 'x' });
+      expect.unreachable('nothing is listening on a stale socket');
+    } catch (error) {
+      const cli = error as CliError;
+      expect(cli.message).toContain('nothing is waiting for an approval');
+      expect(cli.message).not.toContain('cannot reach');
       expect(cli.hints.join(' ')).toContain('mode: enforce');
     }
   });

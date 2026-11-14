@@ -1,5 +1,5 @@
 {
-  "name": "@agentfuse/embeddings-local",
+  "name": "@tunedness/agentfuse-embeddings-local",
   "version": "0.0.0",
   "description": "Optional local (on-device) embedding backend for AgentFuse semantic loop detection. Nothing depends on it; the CLI finds it by dynamic import.",
   "license": "Apache-2.0",
@@ -25,7 +25,7 @@
     "clean": "tsc -b --clean"
   },
   "dependencies": {
-    "@agentfuse/core": "*",
+    "@tunedness/agentfuse-core": "*",
     "@huggingface/tokenizers": "^0.2.0",
     "onnxruntime-node": "^1.30.0"
   },

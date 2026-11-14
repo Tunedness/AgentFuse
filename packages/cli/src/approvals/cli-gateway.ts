@@ -56,8 +56,8 @@
  * so nothing is added there. `proxy/src/trip-result.ts` renders it.
  */
 
-import type { ApprovalAnswer, ApprovalGateway, ApprovalRequest } from '@agentfuse/core';
-import type { Diagnostics } from '@agentfuse/proxy';
+import type { ApprovalAnswer, ApprovalGateway, ApprovalRequest } from '@tunedness/agentfuse-core';
+import type { Diagnostics } from '@tunedness/agentfuse-proxy';
 import { type Writer, writeNotice } from '../io.js';
 import type { CommandFrame, ReplyFrame } from './protocol.js';
 import { type ApprovalSocket, listenApprovalSocket, type SocketListener } from './socket.js';

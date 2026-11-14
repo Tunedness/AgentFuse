@@ -4,7 +4,7 @@
       "command": "npx",
       "args": [
         "-y",
-        "agentfuse",
+        "@tunedness/agentfuse",
         "wrap",
         "--name",
         "filesystem",
@@ -21,7 +21,7 @@
       "command": "npx",
       "args": [
         "-y",
-        "agentfuse",
+        "@tunedness/agentfuse",
         "wrap",
         "--name",
         "github",
@@ -41,7 +41,7 @@
       "command": "npx",
       "args": [
         "-y",
-        "agentfuse",
+        "@tunedness/agentfuse",
         "wrap",
         "--name",
         "reports",

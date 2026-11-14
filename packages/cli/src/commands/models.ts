@@ -2,7 +2,7 @@
  * `agentfuse models install` — fetch the embedding model.
  *
  * This command does almost nothing itself, and that is the design. The download
- * lives in `@agentfuse/embeddings-local` along with the ONNX runtime it needs,
+ * lives in `@tunedness/agentfuse-embeddings-local` along with the ONNX runtime it needs,
  * because ADR-003 measured what putting it here would cost: `onnxruntime-node`
  * unpacks to roughly 301 MB, in one tarball carrying every platform's binaries.
  * A `npx agentfuse` that dragged that in would not be a drop-in, and the CLI

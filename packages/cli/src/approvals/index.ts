@@ -39,8 +39,8 @@
  * tool whose job is enforcement should say so out loud every time it starts.
  */
 
-import type { ApprovalGateway, FusePolicy } from '@agentfuse/core';
-import type { Diagnostics } from '@agentfuse/proxy';
+import type { ApprovalGateway, FusePolicy } from '@tunedness/agentfuse-core';
+import type { Diagnostics } from '@tunedness/agentfuse-proxy';
 import { CliError, messageOf } from '../errors.js';
 import type { Writer } from '../io.js';
 import { type ApprovalHost, CliApprovalGateway } from './cli-gateway.js';

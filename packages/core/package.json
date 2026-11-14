@@ -1,5 +1,5 @@
 {
-  "name": "@agentfuse/core",
+  "name": "@tunedness/agentfuse-core",
   "version": "0.0.0",
   "description": "Pure decision engine for AgentFuse: policy, budgets, loop detection and the circuit breaker. No I/O, no protocol.",
   "license": "Apache-2.0",
