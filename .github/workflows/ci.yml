@@ -27,6 +27,12 @@ jobs:
   verify:
     name: verify (node ${{ matrix.node }})
     runs-on: ubuntu-latest
+    # The whole job takes about two minutes. Without a limit a hung test holds
+    # the runner for GitHub's six-hour default before it is cancelled, and
+    # vitest's own `testTimeout` cannot help: it is a timer on the event loop,
+    # and a synchronous loop (see the `/proc` note in `runtime.test.ts`) never
+    # lets it fire.
+    timeout-minutes: 15
     strategy:
       fail-fast: false
       matrix:

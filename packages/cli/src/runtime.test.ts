@@ -754,8 +754,14 @@ describe('the writeReport hook the runtime hands the proxy', () => {
   });
 
   it('reports a failed write on stderr instead of throwing', async () => {
+    // A directory that cannot be created because one of its ancestors is a
+    // regular file (ENOTDIR). Not `/proc/...`: on Linux, Node 24 and earlier
+    // spin forever inside `mkdirSync(..., { recursive: true })` on a path
+    // under `/proc`, a synchronous loop no test timeout can interrupt, which
+    // hung CI for six hours.
+    write('blocker', 'not a directory\n');
     const loaded = policyFile(
-      'version: 1\nloop_detection:\n  semantic:\n    provider: none\nreport:\n  dir: /proc/agentfuse-cannot-write-here\n',
+      'version: 1\nloop_detection:\n  semantic:\n    provider: none\nreport:\n  dir: blocker/trips\n',
     );
     const runtime = await createRuntime({ loaded, context: context() });
 

@@ -537,6 +537,25 @@ describe('sendCommand', () => {
     }
   });
 
+  it('still says nothing is waiting for a stale socket nobody listens on', async () => {
+    // The mirror of the test below. A crashed wrap leaves a real socket file
+    // with no listener, and `connect(2)` answers ECONNREFUSED on both macOS and
+    // Linux. Linux gives the same code for a regular file, so the client has to
+    // look at the file type; it must not mistake this one for "not a socket".
+    const path = join(root, 'stale.sock');
+    await staleSocket(path);
+
+    try {
+      await sendCommand(path, { v: 1, type: 'reset', sessionId: '01S', reason: 'x' });
+      expect.unreachable('nothing is listening on a stale socket');
+    } catch (error) {
+      const cli = error as CliError;
+      expect(cli.message).toContain('nothing is waiting for an approval');
+      expect(cli.message).not.toContain('cannot reach');
+      expect(cli.hints.join(' ')).toContain('mode: enforce');
+    }
+  });
+
   it('reports a path that is not a socket at all', async () => {
     // Neither ENOENT nor ECONNREFUSED: a different error, and a different
     // sentence — "nothing is waiting here" would be a lie.

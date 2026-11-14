@@ -369,6 +369,15 @@ export interface SendResult {
   readonly reply: ReplyFrame;
 }
 
+/** Whether something that is not a socket sits at `path`. */
+function existsAsNonSocket(path: string): boolean {
+  try {
+    return !statSync(path).isSocket();
+  } catch {
+    return false;
+  }
+}
+
 /**
  * Sends one command and reads the answer.
  *
@@ -438,7 +447,11 @@ export async function sendCommand(
 
     socket.once('error', (error) => {
       const code = (error as { code?: unknown }).code;
-      const missing = code === 'ENOENT' || code === 'ECONNREFUSED';
+      // `connect(2)` on a path that exists but is not a socket says ENOTSOCK on
+      // macOS and ECONNREFUSED on Linux. The second is also what a stale
+      // socket file says, so the code alone cannot tell "nobody is listening"
+      // from "that is not a socket"; the filesystem can.
+      const missing = code === 'ENOENT' || (code === 'ECONNREFUSED' && !existsAsNonSocket(path));
       finish({
         error: new CliError(
           missing
