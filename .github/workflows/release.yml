@@ -90,7 +90,7 @@ jobs:
       - name: What each tarball would contain
         run: npm pack --dry-run --workspaces
       - name: Upload the tarballs for inspection
-        run: npm pack --workspaces --pack-destination dist-tarballs
+        run: mkdir -p dist-tarballs && npm pack --workspaces --pack-destination dist-tarballs
       - uses: actions/upload-artifact@v4
         with:
           name: tarballs
