@@ -13,6 +13,7 @@ import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { parsePackOutput } from './testing/pack-output.js';
 import { nonProtocolLines, WireClient } from './testing/wire.js';
 
 /**
@@ -37,7 +38,7 @@ import { nonProtocolLines, WireClient } from './testing/wire.js';
  *
  * - the tarballs are complete — a missing file is an `ERR_MODULE_NOT_FOUND`
  *   on the first import rather than a test that mysteriously still passes;
- * - `agentfuse` finds `@agentfuse/core` and `@agentfuse/proxy` **in the
+ * - `@agentfuse/cli` finds `@agentfuse/core` and `@agentfuse/proxy` **in the
  *   tarballs**. The temp directory is outside the repository, so Node's
  *   upward walk never reaches the workspace `node_modules`;
  * - the declared dependency list is *sufficient*, not merely minimal. Only
@@ -71,7 +72,7 @@ const EXAMPLE = fileURLToPath(new URL('../../../examples/claude-desktop.json', H
 const runnable = existsSync(new URL('../dist/main.js', HERE)) && process.platform !== 'win32';
 
 /** The three packages a bare `agentfuse wrap` needs. `embeddings-local` is not one. */
-const NEEDED = ['agentfuse', '@agentfuse/core', '@agentfuse/proxy'] as const;
+const NEEDED = ['@agentfuse/cli', '@agentfuse/core', '@agentfuse/proxy'] as const;
 
 interface Packed {
   readonly name: string;
@@ -104,7 +105,7 @@ function install(): void {
       maxBuffer: 16 * 1024 * 1024,
     },
   );
-  const packed = JSON.parse(stdout) as Packed[];
+  const packed = parsePackOutput<Packed>(stdout);
 
   const linked = new Set<string>();
   for (const name of NEEDED) {
@@ -127,7 +128,7 @@ function install(): void {
     for (const dependency of Object.keys(pkg.dependencies ?? {})) {
       // Ours come from the tarballs; everything else is linked from the
       // workspace, and only if a manifest asked for it by name.
-      if (dependency.startsWith('@agentfuse/') || dependency === 'agentfuse') continue;
+      if (dependency.startsWith('@agentfuse/')) continue;
       if (linked.has(dependency)) continue;
       linked.add(dependency);
       const source = join(ROOT, 'node_modules', dependency);
@@ -138,7 +139,7 @@ function install(): void {
     }
   }
 
-  bin = join(modules, 'agentfuse', 'dist', 'main.js');
+  bin = join(modules, '@agentfuse', 'cli', 'dist', 'main.js');
 
   // `enforce`, a two-call exact-repeat threshold, and the semantic tier off:
   // the tier needs a 292 MB companion and a 23 MB model, and the claim under
@@ -177,7 +178,7 @@ function exampleArgs(): string[] {
   const first = Object.values(config.mcpServers)[0];
   if (first === undefined) throw new Error('the example configuration has no entries');
 
-  // Drop `-y agentfuse`: the binary is named directly, because `npx` would
+  // Drop `-y @agentfuse/cli`: the binary is named directly, because `npx` would
   // reach for the registry.
   const args = first.args.slice(2);
   const separator = args.indexOf('--');

@@ -298,7 +298,7 @@ export async function loadInstaller(
       exitCode: EXIT.missingDependency,
       hints: [
         'That export is how AgentFuse drives the download, so the installed copy is either older or newer than this CLI.',
-        `Update both: npm install ${EMBEDDINGS_PACKAGE}@latest agentfuse@latest`,
+        `Update both: npm install ${EMBEDDINGS_PACKAGE}@latest @agentfuse/cli@latest`,
       ],
     });
   }

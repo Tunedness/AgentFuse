@@ -2,7 +2,7 @@
 '@agentfuse/core': minor
 '@agentfuse/proxy': minor
 '@agentfuse/embeddings-local': minor
-'agentfuse': minor
+'@agentfuse/cli': minor
 ---
 
 First release: a circuit breaker for an agent's tool calls.

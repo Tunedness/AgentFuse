@@ -2,6 +2,7 @@ import { execFileSync } from 'node:child_process';
 import { existsSync, readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
+import { parsePackOutput } from './testing/pack-output.js';
 
 /**
  * What `npm publish` would actually upload — asserted, not eyeballed.
@@ -39,7 +40,7 @@ import { describe, expect, it } from 'vitest';
  * tarball will be the one nobody listed.
  *
  * It lives in this package because these four tarballs are what `npx
- * agentfuse` downloads, and this is the package that gets downloaded.
+ * @agentfuse/cli` downloads, and this is the package that gets downloaded.
  */
 
 const ROOT_URL = new URL('../../../', import.meta.url);
@@ -107,7 +108,7 @@ function packAll(): readonly Packed[] {
     stdio: ['ignore', 'pipe', 'ignore'],
     maxBuffer: 16 * 1024 * 1024,
   });
-  return JSON.parse(stdout) as Packed[];
+  return parsePackOutput<Packed>(stdout);
 }
 
 const packed = built ? packAll() : [];
@@ -126,7 +127,7 @@ const PUBLISHABLE = [
   { dir: 'packages/core', name: '@agentfuse/core', roots: ['dist/', 'schemas/'] },
   { dir: 'packages/proxy', name: '@agentfuse/proxy', roots: ['dist/'] },
   { dir: 'packages/embeddings-local', name: '@agentfuse/embeddings-local', roots: ['dist/'] },
-  { dir: 'packages/cli', name: 'agentfuse', roots: ['dist/'] },
+  { dir: 'packages/cli', name: '@agentfuse/cli', roots: ['dist/'] },
 ] as const;
 
 /**
@@ -236,7 +237,7 @@ describe.runIf(built)('the published tarballs', () => {
       '@agentfuse/core': 97,
       '@agentfuse/proxy': 24,
       '@agentfuse/embeddings-local': 22,
-      agentfuse: 74,
+      '@agentfuse/cli': 74,
     });
   });
 });
