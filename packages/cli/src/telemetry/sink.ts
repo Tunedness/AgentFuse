@@ -78,7 +78,7 @@
  * the timestamps.
  */
 
-import type { BudgetDimension, FuseEvent, TelemetrySink } from '@agentfuse/core';
+import type { BudgetDimension, FuseEvent, TelemetrySink } from '@tunedness/agentfuse-core';
 import type { OtlpExporter } from './exporter.js';
 import {
   attributes,

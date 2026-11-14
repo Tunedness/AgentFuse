@@ -1,8 +1,8 @@
 import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import type { StdioWrapHandle, StdioWrapOptions } from '@agentfuse/proxy';
-import { wrapStdioServer } from '@agentfuse/proxy';
+import type { StdioWrapHandle, StdioWrapOptions } from '@tunedness/agentfuse-proxy';
+import { wrapStdioServer } from '@tunedness/agentfuse-proxy';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { CliError } from '../errors.js';
 import type { EventSource, ForwardedSignal, ProcessHost } from '../host.js';

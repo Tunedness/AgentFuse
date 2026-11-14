@@ -107,7 +107,7 @@ export function packBatch(
  * looking for the line that would silently ruin the vectors should look at the
  * `continue` above, not at the division.
  *
- * **L2 normalisation is not optional.** `@agentfuse/core`'s `EmbeddingProvider`
+ * **L2 normalisation is not optional.** `@tunedness/agentfuse-core`'s `EmbeddingProvider`
  * says so, and phase 3's closed-form window score
  * `(‖S‖² − W) / (W · (W − 1))` is only the mean pairwise cosine when every
  * vector has unit length.

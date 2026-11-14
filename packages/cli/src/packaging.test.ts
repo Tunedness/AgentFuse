@@ -23,7 +23,7 @@ import { parsePackOutput } from './testing/pack-output.js';
  *   model is downloaded to a cache on first use, and the runtime is a
  *   dependency of the optional companion. The size ceiling below is the
  *   backstop — nothing that large can pass it, whatever the file list says.
- * - **No benchmarks.** `@agentfuse/bench` carries a 200-session corpus and is
+ * - **No benchmarks.** `@tunedness/agentfuse-bench` carries a 200-session corpus and is
  *   `private: true`; it is also in the Changesets ignore list, so it can
  *   neither be published nor versioned by accident.
  * - **No test files.** `src/testing/` holds scenario doubles and harnesses that
@@ -40,7 +40,7 @@ import { parsePackOutput } from './testing/pack-output.js';
  * tarball will be the one nobody listed.
  *
  * It lives in this package because these four tarballs are what `npx
- * @agentfuse/cli` downloads, and this is the package that gets downloaded.
+ * @tunedness/agentfuse` downloads, and this is the package that gets downloaded.
  */
 
 const ROOT_URL = new URL('../../../', import.meta.url);
@@ -124,10 +124,14 @@ const ALWAYS = ['package.json', 'README.md', 'LICENSE', 'NOTICE'];
 
 /** The publishable packages, and the directories their tarballs may draw from. */
 const PUBLISHABLE = [
-  { dir: 'packages/core', name: '@agentfuse/core', roots: ['dist/', 'schemas/'] },
-  { dir: 'packages/proxy', name: '@agentfuse/proxy', roots: ['dist/'] },
-  { dir: 'packages/embeddings-local', name: '@agentfuse/embeddings-local', roots: ['dist/'] },
-  { dir: 'packages/cli', name: '@agentfuse/cli', roots: ['dist/'] },
+  { dir: 'packages/core', name: '@tunedness/agentfuse-core', roots: ['dist/', 'schemas/'] },
+  { dir: 'packages/proxy', name: '@tunedness/agentfuse-proxy', roots: ['dist/'] },
+  {
+    dir: 'packages/embeddings-local',
+    name: '@tunedness/agentfuse-embeddings-local',
+    roots: ['dist/'],
+  },
+  { dir: 'packages/cli', name: '@tunedness/agentfuse', roots: ['dist/'] },
 ] as const;
 
 /**
@@ -234,10 +238,10 @@ describe.runIf(built)('the published tarballs', () => {
     // File counts rather than byte counts: bytes move with every edit, while a
     // count changes only when the shape of the package does.
     expect(sizes).toEqual({
-      '@agentfuse/core': 97,
-      '@agentfuse/proxy': 24,
-      '@agentfuse/embeddings-local': 22,
-      '@agentfuse/cli': 74,
+      '@tunedness/agentfuse-core': 97,
+      '@tunedness/agentfuse-proxy': 24,
+      '@tunedness/agentfuse-embeddings-local': 22,
+      '@tunedness/agentfuse': 74,
     });
   });
 });
@@ -255,7 +259,7 @@ describe('the benchmark harness', () => {
       readFileSync(new URL('.changeset/config.json', ROOT_URL), 'utf8'),
     ) as { ignore?: string[] };
 
-    expect(config.ignore).toContain('@agentfuse/bench');
+    expect(config.ignore).toContain('@tunedness/agentfuse-bench');
   });
 
   it('declares no files array, so nothing about it looks publishable', () => {

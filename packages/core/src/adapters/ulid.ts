@@ -74,7 +74,7 @@ function increment(bytes: Uint8Array<ArrayBuffer>): boolean {
 /**
  * Monotonic ULID generator.
  *
- * Written by hand rather than pulled in as a dependency: `@agentfuse/core` has
+ * Written by hand rather than pulled in as a dependency: `@tunedness/agentfuse-core` has
  * exactly one runtime dependency (zod) and that is a property worth ~40 lines.
  *
  * Within a single millisecond the random component is incremented rather than

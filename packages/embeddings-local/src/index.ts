@@ -8,7 +8,7 @@
  * `optionalDependencies` to split them. A `npx agentfuse` that dragged that in
  * would not be the frictionless drop-in this product is sold as. So the runtime
  * lives here, and **nothing depends on this package**: `agentfuse` finds it at
- * run time through `await import('@agentfuse/embeddings-local')` and does
+ * run time through `await import('@tunedness/agentfuse-embeddings-local')` and does
  * without it when it is not there. `discipline.test.ts` fails the build if any
  * manifest in the workspace ever names it.
  *
@@ -27,7 +27,7 @@
  *   : Promise<{ path: string; bytes: number }>
  * ```
  *
- * `EmbeddingProvider` is `@agentfuse/core`'s frozen port. Its vectors are
+ * `EmbeddingProvider` is `@tunedness/agentfuse-core`'s frozen port. Its vectors are
  * L2-normalised — not as a nicety but because phase 3's window score,
  * `(‖S‖² − W) / (W · (W − 1))`, is the mean pairwise cosine only for unit
  * vectors and is quietly meaningless otherwise.

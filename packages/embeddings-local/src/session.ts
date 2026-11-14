@@ -6,7 +6,7 @@
  *
  * ## Why the import is dynamic
  *
- * `@agentfuse/embeddings-local`'s entry point is imported by the CLI just to
+ * `@tunedness/agentfuse-embeddings-local`'s entry point is imported by the CLI just to
  * find out whether the package is installed at all, and `agentfuse models
  * install` imports it to download a model it has not got yet. Neither needs an
  * inference session. Loading `onnxruntime-node` at module scope would make both

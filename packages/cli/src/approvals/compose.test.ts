@@ -1,5 +1,5 @@
-import type { ApprovalGateway, ApprovalRequest, ApprovalVerdict } from '@agentfuse/core';
-import { DIAGNOSTIC_PREFIX, Diagnostics } from '@agentfuse/proxy';
+import type { ApprovalGateway, ApprovalRequest, ApprovalVerdict } from '@tunedness/agentfuse-core';
+import { DIAGNOSTIC_PREFIX, Diagnostics } from '@tunedness/agentfuse-proxy';
 import { describe, expect, it } from 'vitest';
 import { StringWriter } from '../io.js';
 import { CompositeApprovalGateway } from './compose.js';

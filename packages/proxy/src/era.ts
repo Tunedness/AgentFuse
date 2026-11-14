@@ -17,7 +17,7 @@
  * negotiated to match it, and a residual disagreement is reported loudly
  * rather than papered over.
  *
- * This module imports neither `@agentfuse/core` nor anything else of the
+ * This module imports neither `@tunedness/agentfuse-core` nor anything else of the
  * proxy's own. It is part of the transport skeleton McpGuard's ADR anticipates
  * lifting into a shared internal package, and knowing about the decision engine
  * would make that a rewrite instead of a move.

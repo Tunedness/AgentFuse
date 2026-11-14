@@ -1,9 +1,9 @@
 import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
-import { type EmbeddingProvider, NoopTelemetrySink } from '@agentfuse/core';
-import { HashingProvider, ScriptedApprovalGateway } from '@agentfuse/core/testing';
-import { DIAGNOSTIC_PREFIX } from '@agentfuse/proxy';
+import { type EmbeddingProvider, NoopTelemetrySink } from '@tunedness/agentfuse-core';
+import { HashingProvider, ScriptedApprovalGateway } from '@tunedness/agentfuse-core/testing';
+import { DIAGNOSTIC_PREFIX } from '@tunedness/agentfuse-proxy';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { sendCommand } from './approvals/socket.js';
 import { loadPolicy } from './config.js';
@@ -62,7 +62,7 @@ function policyFile(contents: string) {
 
 /** The loader shape for a package that is not there. */
 const missing: EmbeddingsLoader = async () => {
-  throw new Error("Cannot find package '@agentfuse/embeddings-local'");
+  throw new Error("Cannot find package '@tunedness/agentfuse-embeddings-local'");
 };
 
 /** A loader that supplies a provider, standing in for phase 4. */

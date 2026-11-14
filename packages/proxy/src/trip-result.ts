@@ -41,12 +41,13 @@
  *
  * ## The human report is not reimplemented here
  *
- * `@agentfuse/core`'s `renderTripReport` already renders the operator-facing
+ * `@tunedness/agentfuse-core`'s `renderTripReport` already renders the operator-facing
  * report, and {@link renderTripDiagnostic} is a thin pass-through to it. The
  * proxy writes that to stderr and puts the report's id and path in the result;
  * it does not build a second, divergent description of the same trip.
  */
 
+import type { CallToolResult } from '@modelcontextprotocol/server';
 import {
   APPROVAL_REASON_LIMIT,
   type ApprovalRecord,
@@ -59,8 +60,7 @@ import {
   TOKEN_ESTIMATE_NOTE,
   type TripCode,
   type TripReport,
-} from '@agentfuse/core';
-import type { CallToolResult } from '@modelcontextprotocol/server';
+} from '@tunedness/agentfuse-core';
 
 /** The reserved `_meta` key AgentFuse stamps a trip onto. */
 export const TRIP_META_KEY = 'io.tunedness.agentfuse/trip';
@@ -435,7 +435,7 @@ export function buildTripResult(input: TripResultInput): CallToolResult {
 }
 
 /**
- * The operator-facing report, rendered by `@agentfuse/core`.
+ * The operator-facing report, rendered by `@tunedness/agentfuse-core`.
  *
  * Deliberately a pass-through. There is one renderer for the human report and
  * it lives in core, where the CLI, the Control Plane and the test snapshots all

@@ -1,5 +1,5 @@
 /**
- * `@agentfuse/bench` — the private benchmark harness. Never published.
+ * `@tunedness/agentfuse-bench` — the private benchmark harness. Never published.
  *
  * Two benchmarks live here, and between them they are the evidence for PRD §6:
  *
@@ -15,7 +15,7 @@
  * processes and are run from `npm run bench:*`.
  */
 
-import type { BeforeCallInput } from '@agentfuse/core';
+import type { BeforeCallInput } from '@tunedness/agentfuse-core';
 
 export type { CorpusOptions } from './detection/corpus.js';
 export {
@@ -39,7 +39,7 @@ export { Rng, seedFrom } from './rng.js';
 /**
  * A named workload the benchmark harness replays through the engine.
  *
- * The call shape is `@agentfuse/core`'s own {@link BeforeCallInput}: phase 5
+ * The call shape is `@tunedness/agentfuse-core`'s own {@link BeforeCallInput}: phase 5
  * replaced the placeholder `ToolCall` the proxy used to declare, because a
  * benchmark that measures a shape nothing else uses measures nothing.
  */

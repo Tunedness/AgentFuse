@@ -36,8 +36,8 @@
  * of the two it got.
  */
 
-import type { Clock, FusePolicy, IdGenerator } from '@agentfuse/core';
-import { sha256 } from '@agentfuse/core';
+import type { Clock, FusePolicy, IdGenerator } from '@tunedness/agentfuse-core';
+import { sha256 } from '@tunedness/agentfuse-core';
 import type { GuardedToolCall } from './bridge.js';
 import type { MetaBag } from './era.js';
 import { baggageEntry, type ClientIdentity, clientInfoOf, traceparentOf } from './remap.js';
@@ -134,7 +134,7 @@ interface AddressBinding {
  * session id across requests — and that memory needs an expiry, or a
  * long-running gateway accumulates one entry per client that ever connected.
  * Expiry is lazy, compared against an injected {@link Clock}: the proxy holds
- * no timers of its own, for the same reason `@agentfuse/core` holds none.
+ * no timers of its own, for the same reason `@tunedness/agentfuse-core` holds none.
  */
 export class SessionKeyResolver {
   readonly #key: FusePolicy['session']['key'];

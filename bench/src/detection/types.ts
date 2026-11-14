@@ -4,7 +4,7 @@
  * One session per JSONL line. The shape is deliberately *not* AgentFuse's
  * `ToolCallRecord`: the corpus describes what an agent did and what came back,
  * and every derived quantity — `argsNormalized`, the fingerprint, the error
- * signature, the embedding text — is computed by `@agentfuse/core` at replay
+ * signature, the embedding text — is computed by `@tunedness/agentfuse-core` at replay
  * time. A corpus that carried pre-computed fingerprints would keep passing
  * after a normalizer regression.
  */

@@ -1,4 +1,4 @@
-import { HeuristicTokenizer } from '@agentfuse/core';
+import { HeuristicTokenizer } from '@tunedness/agentfuse-core';
 import { countTokens } from 'gpt-tokenizer/encoding/o200k_base';
 import { describe, expect, it } from 'vitest';
 import { costModelFor, GptTokenizer, TOKENIZER_ID } from './tokenizer.js';

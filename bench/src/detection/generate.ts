@@ -1,7 +1,7 @@
 /**
  * Writes the labelled corpus to `bench/detection/corpus.jsonl`.
  *
- * Run with `npm run bench:corpus --workspace @agentfuse/bench`. The file is
+ * Run with `npm run bench:corpus --workspace @tunedness/agentfuse-bench`. The file is
  * committed, and `corpus.test.ts` hashes the generator's output against it, so
  * regenerating is a deliberate act with a visible diff — which it has to be,
  * because the calibrated thresholds were fitted to those exact bytes.

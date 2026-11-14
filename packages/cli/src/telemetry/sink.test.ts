@@ -1,4 +1,4 @@
-import type { FuseEvent } from '@agentfuse/core';
+import type { FuseEvent } from '@tunedness/agentfuse-core';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { OtlpExporter } from './exporter.js';
 import { SCOPE } from './index.js';

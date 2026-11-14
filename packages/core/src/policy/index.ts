@@ -1,5 +1,5 @@
 /**
- * The FusePolicy surface, exposed as the `@agentfuse/core/policy` subpath.
+ * The FusePolicy surface, exposed as the `@tunedness/agentfuse-core/policy` subpath.
  *
  * `parsePolicy` takes an already-parsed object — core reads no files. The
  * generated JSON Schema in `schemas/fusepolicy.v1.schema.json` is produced from

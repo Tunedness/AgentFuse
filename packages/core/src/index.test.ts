@@ -3,7 +3,7 @@ import * as core from './index.js';
 import * as policy from './policy/index.js';
 import * as testing from './testing.js';
 
-describe('@agentfuse/core public surface', () => {
+describe('@tunedness/agentfuse-core public surface', () => {
   it('exposes a contract version', () => {
     expect(core.CORE_VERSION).toBe('0.0.0');
   });

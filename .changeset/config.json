@@ -7,5 +7,5 @@
   "updateInternalDependencies": "patch",
   "fixed": [],
   "linked": [],
-  "ignore": ["@agentfuse/bench"]
+  "ignore": ["@tunedness/agentfuse-bench"]
 }

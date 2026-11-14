@@ -16,8 +16,8 @@
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import type { EmbeddingProvider } from '@agentfuse/core';
-import { fingerprint, MASKS, normalizeArgs } from '@agentfuse/core';
+import type { EmbeddingProvider } from '@tunedness/agentfuse-core';
+import { fingerprint, MASKS, normalizeArgs } from '@tunedness/agentfuse-core';
 import { fromJsonl } from './corpus.js';
 import {
   deterministicPolicy,
@@ -40,7 +40,7 @@ import {
 import type { CorpusSession } from './types.js';
 
 /** The package that carries the local backend, found the way the CLI finds it. */
-const EMBEDDINGS_PACKAGE = '@agentfuse/embeddings-local';
+const EMBEDDINGS_PACKAGE = '@tunedness/agentfuse-embeddings-local';
 
 const CORPUS = fileURLToPath(new URL('../../detection/corpus.jsonl', import.meta.url));
 const RESULTS_JSON = fileURLToPath(new URL('../../detection/results.json', import.meta.url));

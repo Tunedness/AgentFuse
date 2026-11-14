@@ -21,7 +21,7 @@
  *    global.
  */
 
-import { DIAGNOSTIC_PREFIX } from '@agentfuse/proxy';
+import { DIAGNOSTIC_PREFIX } from '@tunedness/agentfuse-proxy';
 
 /** The minimum of a writable stream the CLI needs. */
 export interface Writer {

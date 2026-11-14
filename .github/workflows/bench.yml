@@ -86,14 +86,14 @@ jobs:
       # machine.
       - name: Check the corpus is what is committed
         run: |
-          npm run bench:corpus --workspace @agentfuse/bench
+          npm run bench:corpus --workspace @tunedness/agentfuse-bench
           git diff --exit-code -- bench/detection/corpus.jsonl
 
       - name: Detection benchmark
-        run: npm run bench:detection --workspace @agentfuse/bench
+        run: npm run bench:detection --workspace @tunedness/agentfuse-bench
 
       - name: Latency benchmark
-        run: npm run bench:latency --workspace @agentfuse/bench
+        run: npm run bench:latency --workspace @tunedness/agentfuse-bench
 
       # The committed results are the baseline the next run is read against, so
       # a diff here is a signal rather than noise: it means the numbers moved.

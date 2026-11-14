@@ -1,10 +1,10 @@
 /**
- * `@agentfuse/proxy` — the transparent MCP proxy.
+ * `@tunedness/agentfuse-proxy` — the transparent MCP proxy.
  *
  * AgentFuse is a man-in-the-middle: it presents an MCP *server* to the agent
  * and holds an MCP *client* against the real upstream server. Everything the
  * agent sends arrives on the server side; `tools/call` gets a decision from
- * `@agentfuse/core` and is either forwarded or answered with a structured
+ * `@tunedness/agentfuse-core` and is either forwarded or answered with a structured
  * refusal, and every other method passes through blind.
  *
  * ## The layering, which is enforced rather than described
@@ -13,7 +13,7 @@
  * era.ts  remap.ts  bridge.ts  diagnostics.ts   ← MCP plumbing. No engine.
  *                      │
  *          tools-call.ts   trip-result.ts       ← the only files that know
- *                      │                          @agentfuse/core exists
+ *                      │                          @tunedness/agentfuse-core exists
  *          stdio-wrap.ts   http-serve.ts        ← serving entries
  * ```
  *

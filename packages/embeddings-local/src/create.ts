@@ -18,7 +18,7 @@
  * imports it to download a model it cannot yet run.
  */
 
-import type { EmbeddingProvider } from '@agentfuse/core';
+import type { EmbeddingProvider } from '@tunedness/agentfuse-core';
 import type { SpecialTokens } from './batch.js';
 import { cacheRoot, type Env, filePath } from './cache.js';
 import { ensureModelFiles } from './install.js';

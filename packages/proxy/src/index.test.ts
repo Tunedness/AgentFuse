@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import * as proxy from './index.js';
 
-describe('@agentfuse/proxy public surface', () => {
+describe('@tunedness/agentfuse-proxy public surface', () => {
   it('exposes a contract version', () => {
     expect(proxy.PROXY_VERSION).toBe('0.0.0');
   });

@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { repeatedCallScenario } from './index.js';
 
-describe('@agentfuse/bench', () => {
+describe('@tunedness/agentfuse-bench', () => {
   it('builds a scenario of the requested size', () => {
     const scenario = repeatedCallScenario(3);
 

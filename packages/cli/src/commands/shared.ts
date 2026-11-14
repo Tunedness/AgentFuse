@@ -7,7 +7,7 @@
  * kind for a tool whose job is enforcement.
  */
 
-import type { PolicyMode } from '@agentfuse/core';
+import type { PolicyMode } from '@tunedness/agentfuse-core';
 import { CliError } from '../errors.js';
 
 /** The accepted `--mode` values. */

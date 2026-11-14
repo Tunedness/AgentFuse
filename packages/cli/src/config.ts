@@ -7,7 +7,7 @@
  * yaml.parseDocument → FusePolicySchemaV1.safeParse → compilePolicy (in core)
  * ```
  *
- * The defaults live in **one** place: the Zod schema in `@agentfuse/core`. This
+ * The defaults live in **one** place: the Zod schema in `@tunedness/agentfuse-core`. This
  * file never supplies a fallback value of its own, because a second copy of the
  * defaults drifts from the first and the published JSON Schema then tells
  * people's editors something the runtime does not believe.
@@ -25,7 +25,7 @@
 
 import { existsSync, readFileSync } from 'node:fs';
 import { dirname, isAbsolute, parse as parsePath, resolve } from 'node:path';
-import { type FusePolicy, FusePolicySchemaV1 } from '@agentfuse/core';
+import { type FusePolicy, FusePolicySchemaV1 } from '@tunedness/agentfuse-core';
 import { isMap, isSeq, LineCounter, type Node, parseDocument } from 'yaml';
 import type { z } from 'zod';
 import { CliError, EXIT, messageOf } from './errors.js';

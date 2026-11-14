@@ -1,5 +1,5 @@
 {
-  "name": "@agentfuse/bench",
+  "name": "@tunedness/agentfuse-bench",
   "version": "0.0.0",
   "private": true,
   "description": "Private benchmark harness for AgentFuse. Never published.",
@@ -22,8 +22,8 @@
     "bench:latency": "npm run build && node dist/latency/run.js"
   },
   "dependencies": {
-    "@agentfuse/core": "*",
-    "@agentfuse/proxy": "*"
+    "@tunedness/agentfuse-core": "*",
+    "@tunedness/agentfuse-proxy": "*"
   },
   "devDependencies": {
     "@modelcontextprotocol/client": "^2.0.0",

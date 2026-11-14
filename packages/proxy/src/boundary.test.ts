@@ -8,7 +8,7 @@ import { describe, expect, it } from 'vitest';
  *
  * `bridge.ts`, `era.ts`, `remap.ts` and `diagnostics.ts` are pure MCP plumbing.
  * McpGuard's ADR anticipates lifting exactly this skeleton into a shared
- * internal package, and a single `@agentfuse/core` import anywhere in it turns
+ * internal package, and a single `@tunedness/agentfuse-core` import anywhere in it turns
  * that move into a rewrite. Only `tools-call.ts` and `trip-result.ts` — plus
  * the two serving entries that wire them up — know the decision engine exists.
  *
@@ -61,9 +61,11 @@ function read(file: string): string {
 }
 
 describe('the transport/engine boundary', () => {
-  it.each(ENGINE_FREE)('%s does not import @agentfuse/core', (file) => {
+  it.each(ENGINE_FREE)('%s does not import @tunedness/agentfuse-core', (file) => {
     const offenders = specifiers(read(file)).filter(
-      (specifier) => specifier === '@agentfuse/core' || specifier.startsWith('@agentfuse/core/'),
+      (specifier) =>
+        specifier === '@tunedness/agentfuse-core' ||
+        specifier.startsWith('@tunedness/agentfuse-core/'),
     );
 
     expect(offenders).toEqual([]);
@@ -92,7 +94,8 @@ describe('the transport/engine boundary', () => {
       .filter((file) =>
         specifiers(stripComments(readFileSync(file, 'utf8'))).some(
           (specifier) =>
-            specifier === '@agentfuse/core' || specifier.startsWith('@agentfuse/core/'),
+            specifier === '@tunedness/agentfuse-core' ||
+            specifier.startsWith('@tunedness/agentfuse-core/'),
         ),
       )
       .map((file) => file.slice(SRC.length))

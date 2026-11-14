@@ -1,8 +1,8 @@
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
-import { renderTripReport, type TripReport } from '@agentfuse/core';
-import { DIAGNOSTIC_PREFIX } from '@agentfuse/proxy';
+import { renderTripReport, type TripReport } from '@tunedness/agentfuse-core';
+import { DIAGNOSTIC_PREFIX } from '@tunedness/agentfuse-proxy';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import type { CliError } from '../errors.js';
 import { type CliContext, StringWriter } from '../io.js';

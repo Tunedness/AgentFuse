@@ -1,9 +1,9 @@
 /**
  * Trip reports on disk. The CLI's half of a seam the proxy deliberately left.
  *
- * `@agentfuse/proxy` does **no file I/O**: `ToolCallGuardOptions.writeReport`
+ * `@tunedness/agentfuse-proxy` does **no file I/O**: `ToolCallGuardOptions.writeReport`
  * takes a decision and returns a path, and the path the agent is shown in the
- * refusal text is whatever comes back. That is this file. `@agentfuse/core`
+ * refusal text is whatever comes back. That is this file. `@tunedness/agentfuse-core`
  * builds the report object and renders the human view; nothing is re-rendered
  * here, because one renderer is what keeps the CLI, the Control Plane and the
  * snapshots agreeing on a single piece of text.
@@ -31,7 +31,7 @@
 
 import { mkdirSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { basename, join, resolve } from 'node:path';
-import type { Decision, TripReport } from '@agentfuse/core';
+import type { Decision, TripReport } from '@tunedness/agentfuse-core';
 import { CliError, EXIT, messageOf } from './errors.js';
 
 /** Suffix every report file carries. */

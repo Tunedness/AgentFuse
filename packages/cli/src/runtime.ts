@@ -62,8 +62,8 @@ import {
   type PolicyMode,
   type SemanticLoopDetector,
   type SessionSummary,
-} from '@agentfuse/core';
-import type { Diagnostics, StdioWrapOptions } from '@agentfuse/proxy';
+} from '@tunedness/agentfuse-core';
+import type { Diagnostics, StdioWrapOptions } from '@tunedness/agentfuse-proxy';
 import { type ApprovalResolution, resolveApprovalGateway } from './approvals/index.js';
 import { type LoadedPolicy, resolveFromPolicy } from './config.js';
 import {

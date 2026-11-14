@@ -1,8 +1,8 @@
 import { createHmac } from 'node:crypto';
 import { createServer, type Server } from 'node:http';
 import type { AddressInfo } from 'node:net';
-import type { ApprovalRequest } from '@agentfuse/core';
-import { DIAGNOSTIC_PREFIX, Diagnostics } from '@agentfuse/proxy';
+import type { ApprovalRequest } from '@tunedness/agentfuse-core';
+import { DIAGNOSTIC_PREFIX, Diagnostics } from '@tunedness/agentfuse-proxy';
 import { afterEach, describe, expect, it } from 'vitest';
 import { StringWriter } from '../io.js';
 import {

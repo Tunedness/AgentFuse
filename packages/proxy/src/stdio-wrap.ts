@@ -40,7 +40,6 @@
  * itself.
  */
 
-import type { SessionSummary } from '@agentfuse/core';
 import { Client } from '@modelcontextprotocol/client';
 import { StdioClientTransport } from '@modelcontextprotocol/client/stdio';
 import type {
@@ -50,6 +49,7 @@ import type {
   Transport,
 } from '@modelcontextprotocol/server';
 import { type StdioServerHandle, serveStdio } from '@modelcontextprotocol/server/stdio';
+import type { SessionSummary } from '@tunedness/agentfuse-core';
 import { type Bridge, createBridge } from './bridge.js';
 import { Diagnostics } from './diagnostics.js';
 import { assertSameEra, eraOfConnection, FIRST_MODERN_PROTOCOL_VERSION } from './era.js';

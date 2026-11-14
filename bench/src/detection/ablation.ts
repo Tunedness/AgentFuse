@@ -28,7 +28,7 @@
 
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
-import type { EmbeddingProvider, ToolCallRecord } from '@agentfuse/core';
+import type { EmbeddingProvider, ToolCallRecord } from '@tunedness/agentfuse-core';
 import {
   EmbeddingWindow,
   errorSignature,
@@ -37,13 +37,13 @@ import {
   normalizeArgs,
   semanticEmbeddingText,
   toolKey,
-} from '@agentfuse/core';
+} from '@tunedness/agentfuse-core';
 import { fromJsonl } from './corpus.js';
 import { criticalThreshold } from './sweep.js';
 import type { CorpusCall, CorpusSession } from './types.js';
 
 const CORPUS = fileURLToPath(new URL('../../detection/corpus.jsonl', import.meta.url));
-const EMBEDDINGS_PACKAGE = '@agentfuse/embeddings-local';
+const EMBEDDINGS_PACKAGE = '@tunedness/agentfuse-embeddings-local';
 const NOW = 1_770_000_000_000;
 
 function clip(text: string, max: number): string {

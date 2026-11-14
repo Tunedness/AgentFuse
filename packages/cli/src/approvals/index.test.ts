@@ -1,8 +1,8 @@
 import { existsSync, mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { type FusePolicy, parsePolicy } from '@agentfuse/core';
-import { DIAGNOSTIC_PREFIX, Diagnostics } from '@agentfuse/proxy';
+import { type FusePolicy, parsePolicy } from '@tunedness/agentfuse-core';
+import { DIAGNOSTIC_PREFIX, Diagnostics } from '@tunedness/agentfuse-proxy';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { parse as parseYaml } from 'yaml';
 import { StringWriter, writeNotice } from '../io.js';

@@ -41,8 +41,8 @@ import type {
   ApprovalGateway,
   ApprovalRequest,
   ApprovalVerdict,
-} from '@agentfuse/core';
-import type { Diagnostics } from '@agentfuse/proxy';
+} from '@tunedness/agentfuse-core';
+import type { Diagnostics } from '@tunedness/agentfuse-proxy';
 import { messageOf } from '../errors.js';
 
 /** One channel, named for the log. */

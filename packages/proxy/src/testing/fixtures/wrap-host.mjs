@@ -9,7 +9,7 @@
  *
  * It imports the **built** packages, because it runs under bare `node` with no
  * transform. The gate runs `npm run build` before `npm test`, and every proxy
- * test already reads `@agentfuse/core` from `dist`; the test that spawns this
+ * test already reads `@tunedness/agentfuse-core` from `dist`; the test that spawns this
  * fails with a pointed message if `dist` is missing.
  *
  * Arguments: the path to the child MCP server to wrap. Env: `AGENTFUSE_QUIET=1`
@@ -17,8 +17,8 @@
  * possible.
  */
 
-import { CounterIdGenerator, FuseEngine, parsePolicy } from '@agentfuse/core';
-import { wrapStdioServer } from '@agentfuse/proxy';
+import { CounterIdGenerator, FuseEngine, parsePolicy } from '@tunedness/agentfuse-core';
+import { wrapStdioServer } from '@tunedness/agentfuse-proxy';
 
 const childPath = process.argv[2];
 if (childPath === undefined) {

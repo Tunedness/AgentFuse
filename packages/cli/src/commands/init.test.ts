@@ -2,7 +2,7 @@ import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { parsePolicy } from '@agentfuse/core';
+import { parsePolicy } from '@tunedness/agentfuse-core';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { parse as parseYaml } from 'yaml';
 import type { CliError } from '../errors.js';
@@ -100,7 +100,7 @@ describe('the starter policy', () => {
   it('says the semantic tier needs a second install, and what happens without it', () => {
     const source = starterPolicy();
 
-    expect(source).toContain('npm install @agentfuse/embeddings-local');
+    expect(source).toContain('npm install @tunedness/agentfuse-embeddings-local');
     expect(source).toContain('agentfuse models install');
     expect(source).toContain('provider: none');
     // Both halves of the decision table, where the reader will meet them.
@@ -242,7 +242,7 @@ describe('runInit', () => {
 
     expect(stdout.text).toContain('agentfuse validate');
     expect(stdout.text).toContain('agentfuse wrap');
-    expect(stdout.text).toContain('@agentfuse/embeddings-local');
+    expect(stdout.text).toContain('@tunedness/agentfuse-embeddings-local');
   });
 
   it('reports a write it cannot do, with the runtime exit code', () => {

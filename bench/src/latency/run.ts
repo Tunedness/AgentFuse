@@ -23,7 +23,7 @@
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import type { EmbeddingProvider } from '@agentfuse/core';
+import type { EmbeddingProvider } from '@tunedness/agentfuse-core';
 import { directRig, proxiedRig, type Rig, type TelemetryMode } from './inmemory.js';
 import { added, type Distribution, ms, summarise } from './stats.js';
 import {
@@ -34,7 +34,7 @@ import {
   wrappedStdioRig,
 } from './stdio.js';
 
-const EMBEDDINGS_PACKAGE = '@agentfuse/embeddings-local';
+const EMBEDDINGS_PACKAGE = '@tunedness/agentfuse-embeddings-local';
 const RESULTS_JSON = fileURLToPath(new URL('../../latency/results.json', import.meta.url));
 const RESULTS_MD = fileURLToPath(new URL('../../latency/results.md', import.meta.url));
 

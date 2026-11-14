@@ -26,7 +26,7 @@ import { describe, expect, it } from 'vitest';
 
 const SRC = fileURLToPath(new URL('.', import.meta.url));
 const WORKSPACE = fileURLToPath(new URL('../../..', import.meta.url));
-const SELF = '@agentfuse/embeddings-local';
+const SELF = '@tunedness/agentfuse-embeddings-local';
 
 interface Manifest {
   name?: string;
@@ -129,8 +129,8 @@ describe('the dependency direction', () => {
     // pinning an old runtime; `fastembed` for being unmaintained and pinned to
     // ORT 1.21. Anything new in this list is a decision, not a formality.
     expect(declared(self).sort()).toEqual([
-      '@agentfuse/core',
       '@huggingface/tokenizers',
+      '@tunedness/agentfuse-core',
       'onnxruntime-node',
     ]);
   });

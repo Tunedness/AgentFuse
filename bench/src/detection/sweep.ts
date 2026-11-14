@@ -21,7 +21,7 @@
  * run, and the two are required to agree.
  */
 
-import { EmbeddingWindow, ResultNoveltyWindow } from '@agentfuse/core';
+import { EmbeddingWindow, ResultNoveltyWindow } from '@tunedness/agentfuse-core';
 import type { LoopSettingsCandidate, ReplayOutcome } from './replay.js';
 import type { CorpusSession, ScenarioName } from './types.js';
 

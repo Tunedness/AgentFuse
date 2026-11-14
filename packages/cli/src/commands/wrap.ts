@@ -53,8 +53,8 @@
  * `StdioWrapOptions`; see the phase 6b section of `docs/implementation-status.md`.
  */
 
-import type { StdioWrapHandle, StdioWrapOptions } from '@agentfuse/proxy';
-import { wrapStdioServer } from '@agentfuse/proxy';
+import type { StdioWrapHandle, StdioWrapOptions } from '@tunedness/agentfuse-proxy';
+import { wrapStdioServer } from '@tunedness/agentfuse-proxy';
 import { ToolCatalogue } from '../annotations.js';
 import { parseArgs } from '../args.js';
 import { loadPolicy } from '../config.js';

@@ -1,9 +1,9 @@
-import { CounterIdGenerator, FakeClock } from '@agentfuse/core';
 import {
   BAGGAGE_META_KEY,
   CLIENT_INFO_META_KEY,
   TRACEPARENT_META_KEY,
 } from '@modelcontextprotocol/server';
+import { CounterIdGenerator, FakeClock } from '@tunedness/agentfuse-core';
 import { describe, expect, it } from 'vitest';
 import type { GuardedToolCall } from './bridge.js';
 import {

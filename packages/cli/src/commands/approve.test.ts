@@ -1,8 +1,8 @@
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import type { ApprovalAnswer } from '@agentfuse/core';
-import { Diagnostics } from '@agentfuse/proxy';
+import type { ApprovalAnswer } from '@tunedness/agentfuse-core';
+import { Diagnostics } from '@tunedness/agentfuse-proxy';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { CliApprovalGateway } from '../approvals/cli-gateway.js';
 import { SOCKET_ENV_VAR } from '../approvals/protocol.js';

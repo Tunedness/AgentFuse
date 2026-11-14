@@ -1,9 +1,9 @@
 import { type ChildProcessWithoutNullStreams, spawn } from 'node:child_process';
 import { existsSync, readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
-import { CounterIdGenerator, FuseEngine, parsePolicy } from '@agentfuse/core';
 import { Client } from '@modelcontextprotocol/client';
 import { InMemoryTransport } from '@modelcontextprotocol/server';
+import { CounterIdGenerator, FuseEngine, parsePolicy } from '@tunedness/agentfuse-core';
 import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
 import {
   RELAYABLE_CLIENT_CAPABILITIES,

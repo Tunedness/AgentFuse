@@ -1,3 +1,4 @@
+import { TRACEPARENT_META_KEY } from '@modelcontextprotocol/server';
 import {
   CounterIdGenerator,
   type Decision,
@@ -7,8 +8,7 @@ import {
   parsePolicy,
   RecordingTelemetrySink,
   type SessionSummary,
-} from '@agentfuse/core';
-import { TRACEPARENT_META_KEY } from '@modelcontextprotocol/server';
+} from '@tunedness/agentfuse-core';
 import { afterEach, describe, expect, it } from 'vitest';
 import { Diagnostics } from './diagnostics.js';
 import { createHarness, createServedHarness, type Harness } from './testing/scenarios.js';

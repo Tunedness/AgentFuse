@@ -41,7 +41,7 @@
  * internals (`setNegotiatedProtocolVersion`, `installModernOnlyHandlers`) that
  * are not part of the public surface.
  *
- * This module imports neither `@agentfuse/core` nor any file that does. See
+ * This module imports neither `@tunedness/agentfuse-core` nor any file that does. See
  * `boundary.test.ts`.
  */
 
@@ -124,7 +124,7 @@ export interface GuardedToolCall {
 /**
  * The guarded path.
  *
- * `tools-call.ts` implements this against `@agentfuse/core`; the bridge only
+ * `tools-call.ts` implements this against `@tunedness/agentfuse-core`; the bridge only
  * knows it is a function that turns an intercepted call into a result.
  */
 export type ToolCallGate = (call: GuardedToolCall) => Promise<CallToolResult>;
