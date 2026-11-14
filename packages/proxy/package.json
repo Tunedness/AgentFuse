@@ -1,6 +1,6 @@
 {
   "name": "@tunedness/agentfuse-proxy",
-  "version": "0.0.0",
+  "version": "0.1.0",
   "description": "The AgentFuse MCP proxy: a server/client pair that intercepts tools/call traffic and applies the breaker.",
   "license": "Apache-2.0",
   "type": "module",

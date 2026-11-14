@@ -1,6 +1,6 @@
 {
   "name": "@tunedness/agentfuse-embeddings-local",
-  "version": "0.0.0",
+  "version": "0.1.0",
   "description": "Optional local (on-device) embedding backend for AgentFuse semantic loop detection. Nothing depends on it; the CLI finds it by dynamic import.",
   "license": "Apache-2.0",
   "type": "module",
