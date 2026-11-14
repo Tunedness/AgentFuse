@@ -2,7 +2,7 @@ import { CORE_VERSION } from '@tunedness/agentfuse-core';
 import { PROXY_VERSION } from '@tunedness/agentfuse-proxy';
 
 /** Version of the `agentfuse` command line tool. */
-export const CLI_VERSION = '0.0.0';
+export const CLI_VERSION = '0.1.0';
 
 /**
  * One-line version string printed by `agentfuse --version`.

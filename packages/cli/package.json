@@ -1,6 +1,6 @@
 {
   "name": "@tunedness/agentfuse",
-  "version": "0.0.0",
+  "version": "0.1.0",
   "description": "Put a fuse in front of your agent's tools. The AgentFuse command line entry point.",
   "license": "Apache-2.0",
   "type": "module",

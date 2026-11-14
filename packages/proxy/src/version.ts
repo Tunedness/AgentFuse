@@ -6,4 +6,4 @@
  * JSON would add a resolution mode to think about, and reading a file would put
  * `node:fs` into a package whose stdio discipline is the point.
  */
-export const PROXY_VERSION = '0.0.0';
+export const PROXY_VERSION = '0.1.0';

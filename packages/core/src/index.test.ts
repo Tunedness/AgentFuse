@@ -5,7 +5,7 @@ import * as testing from './testing.js';
 
 describe('@tunedness/agentfuse-core public surface', () => {
   it('exposes a contract version', () => {
-    expect(core.CORE_VERSION).toBe('0.0.0');
+    expect(core.CORE_VERSION).toBe('0.1.0');
   });
 
   it('exposes the engine and the pieces a host needs to drive it', () => {
