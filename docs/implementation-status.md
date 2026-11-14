@@ -5,7 +5,9 @@
 (`main` HEAD bunu izleyen bu doküman commit'i) · **Durum:** **on fazın onu da
 bitti.** v0.1.0 yayına hazır ama **yayımlanmadı**; yayın adımları bekliyor. Ad
 engeli çözüldü: `agentfuse` adı npm'de başkasına ait olduğundan CLI paketi
-`@agentfuse/cli` oldu (ADR-011, bkz. Faz 10). **PRD §6'nın tespit hedefi
+`@tunedness/agentfuse` oldu; `@agentfuse` scope'u da npm'de başkasına ait
+çıktığı için bütün paketler `@tunedness` scope'una taşındı (ADR-012, ADR-011'in
+yerini aldı; bkz. Faz 10). **PRD §6'nın tespit hedefi
 karşılanmıyor** (ölçülen %87, hedef %90) ve bu bilinçli bir takastır; bkz.
 Faz 9.
 
@@ -25,8 +27,8 @@ dosyasındadır.
 | 1 | Workspace iskeleti | **Bitti** — `2e2c4a4` |
 | 2 | Çekirdek karar motoru | **Bitti** — `c5fa5d1` |
 | 3 | Asenkron semantik döngü katmanı | **Bitti** — `abd96d8` |
-| 4 | `@agentfuse/embeddings-local` | **Bitti** — `97c836c` `f999fb9` `146b709` |
-| 5 | `@agentfuse/proxy` (MCP adaptörü) | **Bitti** — `ebce8f0` |
+| 4 | `@tunedness/agentfuse-embeddings-local` | **Bitti** — `97c836c` `f999fb9` `146b709` |
+| 5 | `@tunedness/agentfuse-proxy` (MCP adaptörü) | **Bitti** — `ebce8f0` |
 | 6 | CLI (`agentfuse`) | **Bitti** — 6a: `373c240` `f503322` `58741ba` `c80c4db` · 6b: `54d858e` `19c96f8` `7447c48` |
 | 7 | Onay akışı + rapor UX | **Bitti** — `84b903e` `935146d` `a7a8ddc` |
 | 8 | Telemetri (OTLP) | **Bitti** — `0172deb` `3d36b9f` `3177f90` `3e791d4` |
@@ -175,7 +177,7 @@ Araştırma üç varsayımı geçersiz kıldığı için `.ssot` düzeltildi:
 - **ADR-003 güncellendi (embedding)** — "gömülü ~100 MB model" yanlıştı.
   `onnxruntime-node@1.30.0` tek başına **301 MB** (`dist.unpackedSize =
   301068136`) ve tüm platform ikililerini tek tarball'da taşıyor. Karar:
-  opsiyonel yardımcı paket `@agentfuse/embeddings-local`; kural katmanı onsuz
+  opsiyonel yardımcı paket `@tunedness/agentfuse-embeddings-local`; kural katmanı onsuz
   tam işlevli (çatı ADR-001 "crippleware yasak").
 - **ADR-007 eklendi (bütçe dürüstlüğü)** — proxy LLM token'larını göremez,
   ürettiği rakam araç I/O'sunun alt sınırı tahminidir. `_estimated` soneki
@@ -188,11 +190,11 @@ Araştırma üç varsayımı geçersiz kıldığı için `.ssot` düzeltildi:
 npm workspaces (pnpm yok), ESM-only, `engines: node >=20.19`.
 
 ```
-packages/core/              @agentfuse/core            — SAF karar motoru
-packages/proxy/             @agentfuse/proxy           — MCP adaptörü
-packages/embeddings-local/  @agentfuse/embeddings-local — OPSİYONEL
-packages/cli/               agentfuse (scope'suz)      — npx giriş noktası
-bench/                      @agentfuse/bench (private)
+packages/core/              @tunedness/agentfuse-core             — SAF karar motoru
+packages/proxy/             @tunedness/agentfuse-proxy            — MCP adaptörü
+packages/embeddings-local/  @tunedness/agentfuse-embeddings-local — OPSİYONEL
+packages/cli/               @tunedness/agentfuse                  — npx giriş noktası
+bench/                      @tunedness/agentfuse-bench (private)
 ```
 
 Araçlar: TypeScript 5.9.3 (`module: nodenext`, strict +
@@ -218,19 +220,19 @@ Paket manifest'lerinde zorlanıyor, konvansiyona bırakılmıyor:
 
 | Paket | dependencies |
 | --- | --- |
-| `@agentfuse/core` | `zod` **yalnızca** |
-| `@agentfuse/proxy` | `@agentfuse/core` + `@modelcontextprotocol/{server,client,core}` |
-| `agentfuse` | `@agentfuse/core`, `@agentfuse/proxy`, `yaml`, `gpt-tokenizer` |
-| `@agentfuse/embeddings-local` | `@agentfuse/core`, `onnxruntime-node`, `@huggingface/tokenizers` (Faz 4) |
+| `@tunedness/agentfuse-core` | `zod` **yalnızca** |
+| `@tunedness/agentfuse-proxy` | `@tunedness/agentfuse-core` + `@modelcontextprotocol/{server,client,core}` |
+| `@tunedness/agentfuse` | `@tunedness/agentfuse-core`, `@tunedness/agentfuse-proxy`, `yaml`, `gpt-tokenizer` |
+| `@tunedness/agentfuse-embeddings-local` | `@tunedness/agentfuse-core`, `onnxruntime-node`, `@huggingface/tokenizers` (Faz 4) |
 
-**`core` saftır:** `@modelcontextprotocol/*` yok, `@agentfuse/embeddings-local`
+**`core` saftır:** `@modelcontextprotocol/*` yok, `@tunedness/agentfuse-embeddings-local`
 yok, `node:fs`/`net`/`child_process` yok. `node:crypto` kabul. Zaman enjekte
 edilen `Clock`'tan, ID'ler `IdGenerator`'dan gelir — `Date.now()` ve
 `Math.random()` doğrudan kullanılmaz. `packages/core/src/purity.test.ts` bunu
 zorluyor; **gevşetilmemeli.** Bu saflık, P1'deki süreç içi SDK modunu ve
 McpGuard'ın motoru yeniden kullanmasını mümkün kılan şeydir.
 
-**CLI asla `@agentfuse/embeddings-local`'a bağlanmaz** — runtime'da dynamic
+**CLI asla `@tunedness/agentfuse-embeddings-local`'a bağlanmaz** — runtime'da dynamic
 `import()` ile bulunur, bulunamazsa kural katmanı tam çalışmaya devam eder.
 
 ---
@@ -323,7 +325,7 @@ guards/   semantic-loop
 
 Ürün yüzeyi: ana giriş noktasından `EmbeddingWindow`, `EmbeddingQueue`,
 `SemanticLoopDetector`, `attachSemanticLoopDetector`, `semanticEmbeddingText`;
-`@agentfuse/core/testing` alt yolundan `HashingProvider`.
+`@tunedness/agentfuse-core/testing` alt yolundan `HashingProvider`.
 
 ### Taslak dosyalar hakkında verilen kararlar
 
@@ -333,7 +335,7 @@ Branch'e dokunulmadı.
 | Dosya | Karar | Gerekçe |
 | --- | --- | --- |
 | `loop/window.ts` | **tutuldu**, testleri yazıldı | Kapalı form doğru, halka tamponu doğru, `ensureCapacity`'nin gerekçesi (kural bazlı `window` override'ı) geçerli. Savunabildiğimiz bir tasarımdı; değiştirmek için sebep yoktu. |
-| `loop/hashing-provider.ts` | **tutuldu**, testleri yazıldı | FNV-1a trigram + işaret biti hilesi ilgisiz metinleri gerçekten dik tutuyor. `@agentfuse/core/testing` alt yoluna taşındı — `FakeClock` hangi gerekçeyle oradaysa bu da öyle: üretimde provider olarak yapılandırılamasın. |
+| `loop/hashing-provider.ts` | **tutuldu**, testleri yazıldı | FNV-1a trigram + işaret biti hilesi ilgisiz metinleri gerçekten dik tutuyor. `@tunedness/agentfuse-core/testing` alt yoluna taşındı — `FakeClock` hangi gerekçeyle oradaysa bu da öyle: üretimde provider olarak yapılandırılamasın. |
 | `loop/queue.ts` | **yeniden yazıldı** (iskeleti korundu) | Sayaçlar, batch döngüsü, en-eskiyi-düşüren taşma mantığı iyiydi. Ama taslak, hata sonrası backoff için bir `Scheduler` portu ve **gerçek `setTimeout`** getiriyordu. |
 
 ### `Scheduler` portu neden atıldı
@@ -468,7 +470,7 @@ result: <özet, en çok 256 karakter>
   **Faz 6a'da yapıldı:** `runtime.ts` içinde `createRuntime`, ve
   `Runtime.onSessionEnd` o kancaya bağlanmış halde.
 - **Faz 6:** `provider: 'none'` ya da `semantic.enabled: false`, CLI dinamik
-  `import()` ile `@agentfuse/embeddings-local`'ı bulamadığında kullanacağı
+  `import()` ile `@tunedness/agentfuse-embeddings-local`'ı bulamadığında kullanacağı
   kapatma anahtarıdır; dedektör o çağrıları `skipped` sayar.
 - **Faz 8:** kuyruk hatası bilinçli olarak `TelemetrySink`'e yazılmaz — çatı
   ADR-003 şemayı dört olay tipinde sabitliyor ve "embedding backend hasta" bunların
@@ -481,7 +483,7 @@ result: <özet, en çok 256 karakter>
 
 ---
 
-## Faz 4 — `@agentfuse/embeddings-local` (bitti)
+## Faz 4 — `@tunedness/agentfuse-embeddings-local` (bitti)
 
 Üç commit: `97c836c` core'a bağlanma + model + sağlayıcı, `f999fb9` indirme
 kapısı + disiplin testleri, `146b709` CI'ın çekmediği CUDA çalışma zamanı.
@@ -656,7 +658,7 @@ için pinliyor:
 - Bu paketin dışındaki hiçbir kaynak dosya specifier'ı statik import edemez.
   Desen *import biçimleri* üzerinde, ad üzerinde değil: CLI mesajının paketi
   adıyla anması gerekiyor ve bu bir kenar değil.
-- Bu paketin bağımlılıkları tam olarak üç: `@agentfuse/core`,
+- Bu paketin bağımlılıkları tam olarak üç: `@tunedness/agentfuse-core`,
   `@huggingface/tokenizers`, `onnxruntime-node`.
 
 Ayrıca `session.ts`/`create.ts` sınırı ve stdout disiplini aynı dosyada pinli.
@@ -727,7 +729,7 @@ karar olarak alınmalı, çünkü bağımlılık listesini ve tip güvenliğini 
 değiştiriyor.
 
 **Faz 10 için not:** bu postinstall yalnız CI'ın derdi değil. `npm install
-@agentfuse/embeddings-local` yazan bir linux/x64 kullanıcısı da aynı 236 MB'lık
+@tunedness/agentfuse-embeddings-local` yazan bir linux/x64 kullanıcısı da aynı 236 MB'lık
 CUDA indirmesini yapar. Doküman bunu yazmalı ve
 `ONNXRUNTIME_NODE_INSTALL=skip` ile kurmayı önermeli; CPU yolunda hiçbir şey
 kaybedilmiyor.
@@ -769,7 +771,7 @@ rağmen 0.9971. Negatif corpus'ta bu vakanın ağırlığı yüksek olmalı.
 - **Gerçek bir embedder var ve `HashingProvider` gitmedi.** İkisi aynı porta
   yazıyor, yani ROC taraması ikisiyle de koşturulabilir; kalibrasyon yalnız
   gerçek modelle anlamlı, regresyon testi ikisiyle de.
-- Kurulum: `npm install @agentfuse/embeddings-local` (workspace içinde zaten
+- Kurulum: `npm install @tunedness/agentfuse-embeddings-local` (workspace içinde zaten
   kurulu) + `agentfuse models install`. Cache `AGENTFUSE_CACHE_DIR` ile ayrı
   bir dizine alınabilir.
 - **Eşik çözünürlüğü tabanı ±0.002** (yukarıdaki int8 bölümü). Bundan ince bir
@@ -798,7 +800,7 @@ testing/scenarios.ts testing/fixtures/     ← build ve coverage dışı
 
 ### Sınır kuralı bir testle zorlanıyor
 
-`bridge.ts`, `era.ts`, `remap.ts` ve `diagnostics.ts` `@agentfuse/core`'u import
+`bridge.ts`, `era.ts`, `remap.ts` ve `diagnostics.ts` `@tunedness/agentfuse-core`'u import
 etmez; `boundary.test.ts` bunu kırılan bir test haline getirir ve ayrıca motoru
 import eden dosyaların listesini pinler — yeni bir dosya o listeye eklenmek
 istiyorsa bu bir karar olur, formalite değil. McpGuard ADR'ı bu iskeletin
@@ -1251,7 +1253,7 @@ dördü de ayrı testle pinli.
 | `provider: openai` (herhangi bir mod) | — | bu sürümde backend yok; `warn`'da uyarı, `enforce`'ta hata. Hiç bağlamayıp raporun skorladığını ima etmesine izin vermekten iyi. |
 | paket var ama `createEmbeddingProvider` yok | — | yukarıdaki iki satırın aynısı, **farklı mesajla**: "kur" ile "güncelle" farklı talimatlardır. |
 
-**Faz 4 sonrası güncelleme:** bu monorepo içinde `@agentfuse/embeddings-local`
+**Faz 4 sonrası güncelleme:** bu monorepo içinde `@tunedness/agentfuse-embeddings-local`
 specifier'ı **çözülüyor** — npm workspaces her paketi `node_modules`'a
 symlink'liyor. Faz 6a yazıldığında import Faz 1'in stub'ını buluyordu ve stub
 iki factory'den hiçbirini export etmediği için CLI "kurulu ama eski" satırını
@@ -1265,11 +1267,11 @@ tarif ediyor ve gelecekte yine olabilir.
 **Bağımlılık yönü bir testle zorlanıyor.** `discipline.test.ts`
 `packages/cli/package.json`'ın `dependencies`, `devDependencies`,
 `peerDependencies` ve `optionalDependencies` alanlarının hiçbirinde
-`@agentfuse/embeddings-local` olmamasını; `tsconfig.json`'da ona project
+`@tunedness/agentfuse-embeddings-local` olmamasını; `tsconfig.json`'da ona project
 reference olmamasını; ve kaynakta yalnız `import(EMBEDDINGS_PACKAGE)` biçiminde
 geçmesini (statik specifier'lı `from '…'` biçiminde hiç geçmemesini)
 kontrol ediyor. Ayrıca CLI'nin bildirdiği bağımlılık listesinin tam olarak Faz
-1'in tablosu olmasını pinliyor: `@agentfuse/core`, `@agentfuse/proxy`,
+1'in tablosu olmasını pinliyor: `@tunedness/agentfuse-core`, `@tunedness/agentfuse-proxy`,
 `gpt-tokenizer`, `yaml`. Precedent core'un `purity.test.ts`'i.
 
 ### stdio disiplini
@@ -1588,7 +1590,7 @@ Sebep yapısal ve Faz 5'in çelişki kaydı #4'ün devamı:
 - **Ve CLI bunu bugün yazamaz:** `createBridge` önceden bağlanmış bir `Client`
   istiyor ve `createMcpHandler` `@modelcontextprotocol/server`'da. CLI'nin
   bildirdiği bağımlılık listesi `discipline.test.ts` tarafından dört pakete
-  pinli (`@agentfuse/core`, `@agentfuse/proxy`, `gpt-tokenizer`, `yaml`) ve o
+  pinli (`@tunedness/agentfuse-core`, `@tunedness/agentfuse-proxy`, `gpt-tokenizer`, `yaml`) ve o
   liste `npx agentfuse`'un indirdiği şeydir. Ayrıca korumalı HTTP girişinin
   doğru yeri `packages/proxy/src/http-serve.ts` — MCP tesisatı proxy'nin
   katmanı. Faz 6b'nin brifingi köprüyü `createMcpHandler` üzerine yazmayı
@@ -2377,7 +2379,7 @@ tools-call.ts  ToolCallGuardOptions.traceparentFor(call, decision)
 
 - **`forward()` bir override çantası alıyor, params değil.** Kapı ajanın
   isteğini yeniden yazamıyor; yalnız `remap.ts`'in bildiği bir `_meta`
-  anahtarına erişiyor. `bridge.ts` ve `remap.ts` hâlâ `@agentfuse/core`
+  anahtarına erişiyor. `bridge.ts` ve `remap.ts` hâlâ `@tunedness/agentfuse-core`
   görmüyor — `boundary.test.ts` yerinde ve geçiyor.
 - **Kanca `beforeCall`'dan *sonra* okunuyor ve `decision`'ı da alıyor.**
   Sebep zamanlama: span kimliği CLI'da `policy_decision` anında basılıyor
@@ -2918,10 +2920,10 @@ uygulamıştı), ve `approve --help` gerekçenin yalnız log'a gittiğini söyl�
 
 | paket | tarball | açılmış | dosya |
 | --- | --- | --- | --- |
-| `@agentfuse/core` | 91,4 kB | 288,8 kB | 97 |
-| `@agentfuse/proxy` | 49,8 kB | 156,8 kB | 24 |
-| `@agentfuse/embeddings-local` | 29,3 kB | 86,8 kB | 22 |
-| `agentfuse` | 142,9 kB | 445,0 kB | 74 |
+| `@tunedness/agentfuse-core` | 91,4 kB | 288,8 kB | 97 |
+| `@tunedness/agentfuse-proxy` | 49,8 kB | 156,8 kB | 24 |
+| `@tunedness/agentfuse-embeddings-local` | 29,3 kB | 86,8 kB | 22 |
+| `@tunedness/agentfuse` | 142,9 kB | 445,0 kB | 74 |
 
 ### `release.yml` — iki tasarım yazıldı, ağaçta biri var
 
@@ -2970,7 +2972,7 @@ verdiği** üçüncü parti paketler workspace'ten symlink'leniyor, ve CLI orada
 (yalnız politika yolu ve sarılan komut değiştirilmiş).
 
 Taşıyıcı ayrıntı **dizinin depo dışında olması**: Node'un yukarı yürüyüşü
-workspace `node_modules`'a hiç ulaşmıyor, yani `@agentfuse/core` gerçekten
+workspace `node_modules`'a hiç ulaşmıyor, yani `@tunedness/agentfuse-core` gerçekten
 tarball'dan çözülüyor. Bir test bunu ayrıca iddia ediyor
 (`resolve(home).startsWith(resolve(ROOT)) === false`) — çünkü o olmadan dosya
 workspace'i başka bir adla test etmiş olurdu.
@@ -3003,7 +3005,7 @@ Doğrulanan zincir:
    olarak değil; rapor `.agentfuse/reports/` altına düştü; `agentfuse report
    last` kutu çizgili raporu render etti; exit 0; stdout'ta protokol
    frame'inden başka satır yok.
-4. `@agentfuse/embeddings-local` tarball'ı kuruldu → `agentfuse models install`
+4. `@tunedness/agentfuse-embeddings-local` tarball'ı kuruldu → `agentfuse models install`
    modeli doğrulayıp yerleştirdi (23,7 MB), `provider: local` ile aynı senaryo
    yine bloklandı.
 
@@ -3023,23 +3025,33 @@ published version 0.0.1 is higher than the new version 0.0.0.
 Araştırınca: **`agentfuse` adı npm'de başkasına ait.** 2026-03-07'de
 kaydedilmiş, sürüm 0.0.1, açıklaması "Intelligent LLM agent cost optimization
 runtime. Coming soon." — yani komşu bir alanda bekleyen bir placeholder.
-`@agentfuse` scope'u boş (`@agentfuse/core` 404), yani üç scope'lu paket
-sorunsuz; engel yalnız scope'suz CLI adında.
+O sırada `@agentfuse` scope'unun boş olduğu sanıldı (`core` paketi 404 dönüyordu),
+yani üç scope'lu paket sorunsuz, engel yalnız scope'suz CLI adı sayıldı. Bu
+varsayım sonradan çürüdü; aşağıda ADR-012 paragrafına bakın.
 
 Bu bir **ürün adı kararıydı** ve `.ssot`'a girmesi gerekiyordu. Ölçülen seçenekler:
 
 | seçenek | durum | bedeli |
 | --- | --- | --- |
-| `@agentfuse/cli` | scope boş | `npx @agentfuse/cli` daha uzun; **komut adı yine `agentfuse` kalır** (`bin` alanı bağımsız) |
+| `@agentfuse/cli` | scope boş sanıldı (ADR-012'de çürüdü) | `npx @agentfuse/cli` daha uzun; **komut adı yine `agentfuse` kalır** (`bin` alanı bağımsız) |
 | `agent-fuse` | npm'de boş | scope'suz ve kısa; tire okunurluğu bölüyor |
 | `agentfuse-cli` | npm'de boş | scope'suz; `npx agentfuse-cli` |
 | adı talep etmek | belirsiz | npm dispute süreci, sonucu ve süresi garanti değil |
 
-**Karar verildi (2026-11-14, ADR-011): CLI paketinin npm adı `@agentfuse/cli`.**
-Komut adı `agentfuse` kalır (`bin.agentfuse` değişmez); telemetri `service.name`'i,
-`.agentfuse/` dizinleri, `[agentfuse]` log öneki ve `AGENTFUSE_*` değişkenleri
-paketin değil ürünün adıdır ve değişmez. Karar ADR-011'e kaydedildi; manifest,
-testler, README ve wiki yeni adı kullanır. Yayın hâlâ bekliyor.
+**Karar verildi (2026-11-14, ADR-011): CLI paketinin npm adı
+`@agentfuse/cli`.** Komut adı `agentfuse` kalır (`bin.agentfuse` değişmez); telemetri
+`service.name`'i, `.agentfuse/` dizinleri, `[agentfuse]` log öneki ve
+`AGENTFUSE_*` değişkenleri paketin değil ürünün adıdır ve değişmez.
+
+**Karar değişti (2026-11-14, ADR-012, ADR-011'in yerini aldı).** Yayın
+hazırlığında npm `agentfuse` organizasyonunu açmayı reddetti: `@agentfuse` scope'u
+npm'de başkasına ait. Bu yalnız CLI'ı değil, üç scope'lu paketi de yayımlanamaz
+kıldı. Kullanıcı `tunedness` organizasyonunu açtı ve bütün paketler o scope'a
+taşındı: `@tunedness/agentfuse` (CLI), `@tunedness/agentfuse-core`,
+`@tunedness/agentfuse-proxy`, `@tunedness/agentfuse-embeddings-local` ve private
+`@tunedness/agentfuse-bench`. Komut adı ve ürün adları (yukarıdaki liste) yine
+değişmez. Manifest, testler, README ve wiki yeni adları kullanır. Yayın hâlâ
+bekliyor.
 
 Karar öncesinde kod hiçbir seçeneği varsaymıyordu: `packages/cli/package.json`
 `agentfuse` diyordu ve sürümler `0.0.0`'dı.

@@ -1,9 +1,9 @@
-# @agentfuse/cli
+# @tunedness/agentfuse
 
 The command line for [AgentFuse](https://github.com/tunedness/agentfuse): put a
-fuse in front of your agent's tools. This is the package `npx @agentfuse/cli`
-downloads. The package is `@agentfuse/cli`; the command it installs is
-`agentfuse`. For a global install, run `npm i -g @agentfuse/cli`.
+fuse in front of your agent's tools. This is the package `npx @tunedness/agentfuse`
+downloads. The package is `@tunedness/agentfuse`; the command it installs is
+`agentfuse`. For a global install, run `npm i -g @tunedness/agentfuse`.
 
 It wraps one MCP server, sees every `tools/call` between your agent and that
 server, and decides whether the call happens — stopping semantic loops,
@@ -11,15 +11,15 @@ enforcing budgets, and applying per-tool allow / deny / approve rules from a
 single YAML policy. No code change on either side.
 
 ```sh
-npx @agentfuse/cli init                         # write a starter fusepolicy.yaml
-npx @agentfuse/cli validate                     # check what it resolves to
-npx @agentfuse/cli wrap --name fs -- <server>   # run the server behind the breaker
-npx @agentfuse/cli report last                  # read what it would have stopped
+npx @tunedness/agentfuse init                         # write a starter fusepolicy.yaml
+npx @tunedness/agentfuse validate                     # check what it resolves to
+npx @tunedness/agentfuse wrap --name fs -- <server>   # run the server behind the breaker
+npx @tunedness/agentfuse report last                  # read what it would have stopped
 ```
 
 Requires Node.js ≥ 20.19. Four runtime dependencies and no more:
-`@agentfuse/core`, `@agentfuse/proxy`, `gpt-tokenizer`, `yaml`. That list is
-pinned by a test, because it is what `npx @agentfuse/cli` makes people download.
+`@tunedness/agentfuse-core`, `@tunedness/agentfuse-proxy`, `gpt-tokenizer`, `yaml`. That list is
+pinned by a test, because it is what `npx @tunedness/agentfuse` makes people download.
 
 **Start in `mode: warn`.** It is the default, and the starter policy says so in
 a comment. AgentFuse observes, computes every decision and writes the trip
@@ -155,7 +155,7 @@ first.
 
 Downloads the ~23 MB embedding model the semantic tier uses, verifying each
 file against a pinned sha256. Needs the optional
-[`@agentfuse/embeddings-local`](https://www.npmjs.com/package/@agentfuse/embeddings-local)
+[`@tunedness/agentfuse-embeddings-local`](https://www.npmjs.com/package/@tunedness/agentfuse-embeddings-local)
 package, which AgentFuse deliberately does not depend on — it carries ~292 MB of
 ONNX runtime binaries. The deterministic loop rules need none of it.
 
@@ -190,7 +190,7 @@ This package is a command, not a library. It exports two things, for a host
 that wants to report the same version string:
 
 ```ts
-import { CLI_VERSION, versionBanner } from '@agentfuse/cli';
+import { CLI_VERSION, versionBanner } from '@tunedness/agentfuse';
 ```
 
 ## License
