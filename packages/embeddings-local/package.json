@@ -3,6 +3,11 @@
   "version": "0.1.0",
   "description": "Optional local (on-device) embedding backend for AgentFuse semantic loop detection. Nothing depends on it; the CLI finds it by dynamic import.",
   "license": "Apache-2.0",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Tunedness/AgentFuse.git",
+    "directory": "packages/embeddings-local"
+  },
   "type": "module",
   "engines": {
     "node": ">=20.19"

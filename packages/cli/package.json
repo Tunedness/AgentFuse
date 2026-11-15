@@ -3,6 +3,11 @@
   "version": "0.1.0",
   "description": "Put a fuse in front of your agent's tools. The AgentFuse command line entry point.",
   "license": "Apache-2.0",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Tunedness/AgentFuse.git",
+    "directory": "packages/cli"
+  },
   "type": "module",
   "engines": {
     "node": ">=20.19"
