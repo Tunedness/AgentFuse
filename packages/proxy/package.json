@@ -3,6 +3,11 @@
   "version": "0.1.0",
   "description": "The AgentFuse MCP proxy: a server/client pair that intercepts tools/call traffic and applies the breaker.",
   "license": "Apache-2.0",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Tunedness/AgentFuse.git",
+    "directory": "packages/proxy"
+  },
   "type": "module",
   "engines": {
     "node": ">=20.19"

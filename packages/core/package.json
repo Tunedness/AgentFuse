@@ -3,6 +3,11 @@
   "version": "0.1.0",
   "description": "Pure decision engine for AgentFuse: policy, budgets, loop detection and the circuit breaker. No I/O, no protocol.",
   "license": "Apache-2.0",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Tunedness/AgentFuse.git",
+    "directory": "packages/core"
+  },
   "type": "module",
   "engines": {
     "node": ">=20.19"
