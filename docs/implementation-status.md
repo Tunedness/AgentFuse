@@ -1,9 +1,16 @@
 # AgentFuse — uygulama durumu ve devir notu
 
-**Son güncelleme:** 2026-09-16 · **`main`'deki son kod commit'i:** `c47d398`
+**Yayın:** v0.1.0, `@tunedness/agentfuse`, `-core`, `-proxy` ve
+`-embeddings-local` olarak npm'de (`latest`), provenance ile; git tag'leri
+`@tunedness/<paket>@0.1.0` (commit `9dcf390`). 2026-11-16'da registry'den
+doğrulandı: `npx -y @tunedness/agentfuse@0.1.0 --version` →
+`agentfuse 0.1.0 (core 0.1.0, proxy 0.1.0)`; `init` ve `validate` çıkış kodu 0
+(Docker konteyneri, `node:24-slim`; ana oturumun 2026-11-16 doğrulama bildirimi).
+
+**Son güncelleme:** 2026-11-16 (yayın satırı; aşağıdaki geliştirme günlüğü 2026-09-16 durumudur) · **`main`'deki son kod commit'i (günlük için):** `c47d398`
 (ardından iki README rötuşu: `06f7570` `5263fa3`)
 (`main` HEAD bunu izleyen bu doküman commit'i) · **Durum:** **on fazın onu da
-bitti.** v0.1.0 yayına hazır ama **yayımlanmadı**; yayın adımları bekliyor. Ad
+bitti.** v0.1.0 **yayımlandı** (aşağıdaki "Yayın" satırı). Ad
 engeli çözüldü: `agentfuse` adı npm'de başkasına ait olduğundan CLI paketi
 `@tunedness/agentfuse` oldu; `@agentfuse` scope'u da npm'de başkasına ait
 çıktığı için bütün paketler `@tunedness` scope'una taşındı (ADR-012, ADR-011'in
