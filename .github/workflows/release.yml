@@ -180,7 +180,11 @@ jobs:
     runs-on: ubuntu-latest
     environment: npm
     permissions:
-      contents: read
+      # changeset publish tags every released package, and the job pushes
+      # those tags. With read-only contents the push is refused after the
+      # packages are already on npm, so the run fails and no tag reaches
+      # the repository.
+      contents: write
       # npm provenance: the registry records which workflow, on which commit,
       # built the tarball, and anybody can verify it afterwards. For a tool
       # people install to enforce limits, a verifiable build origin is worth
