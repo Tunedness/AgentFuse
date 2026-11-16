@@ -25,12 +25,6 @@ between, with no code change on either side.
   measured — a real stdio pipe with the semantic tier and telemetry both on.
   [Why it is 4.8 ms and not 0.2](#latency).
 
-> **Not published to npm yet.** v0.1.0 is prepared but unreleased, so the
-> `npx @tunedness/agentfuse` lines below describe the shape of the command rather than
-> something you can run today. To try it now, clone this repository, run
-> `npm install && npm run build`, and use `node packages/cli/dist/main.js`
-> wherever the examples say `agentfuse`.
-
 ---
 
 ## Quickstart
