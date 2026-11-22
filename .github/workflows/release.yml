@@ -121,20 +121,14 @@ jobs:
           cache: npm
       - run: npm ci
 
-      - name: Bump the manifests and write the changelogs
-        run: npx changeset version
-
-      # The exported version constants are separate declarations from the
-      # manifest versions — deliberately, so no package reads JSON at runtime —
-      # and `changeset version` moves only the manifests. `packaging.test.ts`
-      # fails until both agree, which is exactly what should happen: an
-      # `agentfuse 0.1.0` that reports 0.0.0 in its own trip reports is worse
-      # than a red build.
-      - name: Point out what the bump did not move
-        run: |
-          echo "::notice::changeset version moved the manifests. The *_VERSION"
-          echo "::notice::constants in src/ have to follow, or packaging.test.ts fails."
-          npm test -- --coverage.enabled=false packaging || true
+      # `npm run version` is `changeset version` followed by
+      # `scripts/sync-versions.mjs`. The exported `*_VERSION` constants are
+      # separate declarations from the manifest versions — deliberately, so no
+      # package reads JSON at runtime — and `changeset version` moves only the
+      # manifests. The sync script carries the new numbers over, so the release
+      # commit holds both and `packaging.test.ts` has nothing left to catch.
+      - name: Bump the manifests, write the changelogs, sync the constants
+        run: npm run version
 
       - name: Open the release pull request
         env:
@@ -148,7 +142,8 @@ jobs:
           # Explicit paths, never `git add -A`: the working tree after a
           # `changeset version` also holds build output and a coverage
           # directory, and neither belongs in a release commit.
-          git add .changeset packages/*/package.json packages/*/CHANGELOG.md
+          git add .changeset packages/*/package.json packages/*/CHANGELOG.md \
+            packages/*/src/version.ts packages/*/src/index.ts
           git commit -m "Release the versions the changesets asked for"
           git push origin "$branch"
           gh pr create \
@@ -158,9 +153,6 @@ jobs:
             --body "$(cat <<'BODY'
           `changeset version` consumed the pending changesets. The diff below is
           the release notes; read it as such.
-
-          Before merging, check that the `*_VERSION` constants in `src/` match the
-          manifest versions — `packaging.test.ts` is what fails if they do not.
 
           Merging this PR publishes nothing. Run this workflow again with
           `step: publish` when you mean to.

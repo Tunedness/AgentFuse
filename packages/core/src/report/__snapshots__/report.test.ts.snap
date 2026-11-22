@@ -20,13 +20,13 @@ exports[`renderTripReport > renders a compact terminal view 1`] = `
   1  fs__read_file               ok   1s      {"path":"/etc/hosts"} ×2
   →  fs__read_file               ok   —       {"path":"/etc/hosts"}
 
-  policy sha256=<sha12>  ·  trip=01TEST00000000000000000004  ·  agentfuse 0.1.0"
+  policy sha256=<sha12>  ·  trip=01TEST00000000000000000004  ·  agentfuse <version>"
 `;
 
 exports[`trip report > builds the documented shape 1`] = `
 {
   "agentfuse": {
-    "version": "0.1.0",
+    "version": "<version>",
   },
   "breaker": {
     "cooldown": {
