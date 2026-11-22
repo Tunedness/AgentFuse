@@ -337,7 +337,7 @@ guards/   semantic-loop
 ### Taslak dosyalar hakkında verilen kararlar
 
 `wip/phase-3-5-partial`'daki (`798720b`) üç Faz 3 dosyası tek tek değerlendirildi.
-Branch'e dokunulmadı.
+Branch'e dokunulmadı; branch sonradan silindi (v0.1.0 sonrası bakımda, 2026-11-22).
 
 | Dosya | Karar | Gerekçe |
 | --- | --- | --- |
@@ -821,7 +821,7 @@ JSON-RPC akışıdır ve tek bir `console.log` ondan sonraki her mesajı bozar.
 ### Taslak dosyalar hakkında verilen kararlar
 
 `wip/phase-3-5-partial`'daki (`798720b`) üç Faz 5 dosyası tek tek değerlendirildi.
-Branch'e dokunulmadı.
+Branch'e dokunulmadı; branch sonradan silindi (v0.1.0 sonrası bakımda, 2026-11-22).
 
 | Dosya | Karar | Gerekçe |
 | --- | --- | --- |
@@ -1120,7 +1120,7 @@ Faz 6'nın ayrıca bilmesi gerekenler: `@modelcontextprotocol/node` kurulu deği
 
 Branch'teki altı dosyanın hepsi ya tutuldu ya yeniden yazıldı — Faz 3 üçünü,
 Faz 5 diğer üçünü değerlendirdi ve kararlar yukarıdaki tablolarda. Branch'te
-`main`'e girmemiş hiçbir şey kalmadı; **silinebilir.**
+`main`'e girmemiş hiçbir şey kalmadı; **branch silindi** (`798720b`, bkz. "Devralan kişiye" 6. madde).
 
 ### Paralelleştirme dersi — hâlâ geçerli
 
@@ -1163,7 +1163,7 @@ wired up" testi, 6b bitince bu listenin boşalmasını zorunlu kılıyor.
 ### Taslak dosyalar hakkında verilen kararlar
 
 Devralınan 14 dosya tek tek değerlendirildi. `wip/phase-6-partial` branch'ine
-dokunulmadı.
+dokunulmadı; branch sonradan silindi (v0.1.0 sonrası bakımda, 2026-11-22).
 
 | Dosya | Karar | Gerekçe |
 | --- | --- | --- |
@@ -1753,7 +1753,7 @@ tabloda. Tek ertelenen parça `commands/shared.ts`'ten atılan `asPort`'du;
 6b onu `commands/serve.ts` içinde `--port`'un yanına, kendi testleriyle ve
 `Number('') === 0` tuzağına karşı korumalı olarak yazdı (`--port=` sessizce
 "işletim sistemine sor" demesin diye). **Branch'te `main`'e girmemiş hiçbir şey
-kalmadı; silinebilir.**
+kalmadı; branch silindi** (`56c5150`, bkz. "Devralan kişiye" 6. madde).
 
 ---
 
@@ -2934,9 +2934,13 @@ uygulamıştı), ve `approve --help` gerekçenin yalnız log'a gittiğini söyl�
 
 ### `release.yml` — iki tasarım yazıldı, ağaçta biri var
 
+**Karar verildi: ADR-013, tasarım A (`d67b835`, ağaçtaki).** Tasarım B
+(`1539f3b`) reddedildi; aşağıdaki karşılaştırma kararın bağlamı olarak duruyor.
+Sürüm adımı artık `npm run version` koşar (aşağıya bakın).
+
 İki oturum bunu bağımsız yazdı (yukarıdaki tablo). Ağaçtaki `d67b835`; öteki
 `git show 1539f3b:.github/workflows/release.yml` ile duruyor. **Seçim
-kullanıcının**, çünkü ikisi "yayın ne zaman olur" sorusuna farklı cevap
+kullanıcınındı** (ADR-013), çünkü ikisi "yayın ne zaman olur" sorusuna farklı cevap
 veriyor:
 
 | | `1539f3b` (B) | `d67b835` (A, ağaçta) |
@@ -2963,7 +2967,13 @@ yüklüyor — denetim değil **makbuz**, denetim `packaging.test.ts`'te.
 
 B'nin sürümü daha kısa ve ekosistemin standart akışı; bir kişi PR'ı merge
 ederek yayımlamayı tercih ediyorsa doğru olan o. **Karar verildiğinde
-diğerinin silinmesi gerekir — ikisi bir arada duramaz.**
+diğerinin silinmesi gerekir — ikisi bir arada duramaz.** (ADR-013 A'yı seçti;
+B yalnız `git show 1539f3b:.github/workflows/release.yml` ile duruyor.)
+
+**Sürüm sabitleri (`5edcd50`):** `*_VERSION` sabitleri artık elle taşınmıyor.
+`npm run version` = `changeset version && node scripts/sync-versions.mjs`;
+sabitleri manifest sürümlerine hizalar. `npm run versions:check` sapmayı yerelde
+raporlar (henüz CI'ya bağlı değil).
 
 ### Temiz makine doğrulaması — iki kez, biri test olarak
 
@@ -3089,18 +3099,14 @@ raporları, OTLP telemetrisi.
 
 ## Devralan kişiye
 
-1. **Yayın adı kararı verilmeden yayımlama.** Yukarıdaki tablo seçenekleri
-   ölçülmüş halde duruyor; karar `.ssot`'a yazılmalı, sonra
-   `packages/cli/package.json` ve README'lerdeki `npx` satırları güncellenmeli.
-2. **`release.yml` iki kez yazıldı ve biri seçilmeli.** Ağaçtaki `d67b835`
-   (`workflow_dispatch` + `environment: npm`), öteki `1539f3b`
-   (`changesets/action`, PR merge'iyle yayın). Karşılaştırma yukarıdaki
-   "`release.yml` — iki tasarım" bölümünde; seçilmeyenin silinmesi gerekir.
-3. **PRD §6 ve ADR-002 gecikmeyi "bütçenin onda ikisi" diye anlatıyor ve bu
-   aritmetik yanlış:** 4,84 / 50 = %9,7, yani onda *biri*nin altında. Rakamlar
-   (4,84 ms ve 50 ms) doğru, yalnız kesir yanlış. README doğrusunu yazıyor
-   ("under a tenth of it — 4.835 of 50"); `.ssot` bir cümlelik düzeltme
-   bekliyor ve bu kod değil metin işi.
+1. ~~Yayın adı kararı.~~ **Çözüldü:** ad ADR-012 ile verildi (ADR-011'in yerini
+   aldı); bütün paketler `@tunedness` scope'unda ve v0.1.0 yayımlandı.
+2. ~~`release.yml` iki kez yazıldı ve biri seçilmeli.~~ **Çözüldü:** ADR-013 ile
+   tasarım A (`d67b835`, `workflow_dispatch` + `environment: npm`) seçildi.
+   Sürüm sabitleri `npm run version` ile taşınıyor (`5edcd50`).
+3. ~~PRD §6 ve ADR-002'deki gecikme kesri.~~ **Çözüldü:** `.ssot` metinleri artık
+   "bütçenin onda ikisi" kesrini içermiyor. Doğru oran 4,84 / 50 = %9,7, yani
+   onda birin altında; README de bunu yazıyor.
 4. Kalan tek P1 `.ssot` noktası: **upstream havuzunun anahtarı** (ADR-008 giriş
    noktasını `packages/proxy` olarak kapattı, havuz anahtarını P1'e bıraktı).
    Kısıt bugünden belli: downstream bağlantı başına bir upstream `Client`.
@@ -3109,9 +3115,9 @@ raporları, OTLP telemetrisi.
    (`ToolCallGuardOptions.traceparentFor`) `a3e7752` ile eklendi; üçü aynı
    deseni paylaşıyor ve McpGuard iskeleti paylaşılan bir pakete taşıdığında
    tek bir `hooks` nesnesine katlanmaları doğru olur — önce değil.
-6. `wip/phase-3-5-partial` (`798720b`) ve `wip/phase-6-partial` (`56c5150`)
-   **tümüyle geçersiz**; içlerindeki her dosya değerlendirildi ve `main`'de
-   eksik hiçbir şey yok. Silinebilirler.
+6. ~~`wip/*` branch'leri.~~ **Çözüldü:** `wip/phase-3-5-partial` (`798720b`) ve
+   `wip/phase-6-partial` (`56c5150`) v0.1.0 sonrası bakımda (2026-11-22) silindi; içlerindeki her dosya
+   değerlendirilmişti, `main`'de eksik bir şey yoktu.
 7. **Faz 9'un kuralı geçerliliğini koruyor:** rakamlar yumuşatılmaz. CI
    kapısındaki `GATE.recall` ulaşılanın kaydıdır, geçirilecek bir eşik değil.
    Düşürülmesi tespitin kötüleştiği anlamına gelir; o zaman düşürülecek şey

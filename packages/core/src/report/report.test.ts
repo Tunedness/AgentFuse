@@ -3,6 +3,7 @@ import { FakeClock } from '../adapters/clock.js';
 import { CounterIdGenerator } from '../adapters/ulid.js';
 import { FuseEngine } from '../engine.js';
 import { parsePolicy } from '../policy/compile.js';
+import { CORE_VERSION } from '../version.js';
 import { renderTripReport } from './render.js';
 import type { TripReport } from './trip-report.js';
 
@@ -53,9 +54,13 @@ async function tripped(document: Record<string, unknown> = {}): Promise<Built> {
   return { report, engine, clock };
 }
 
-/** The policy hash changes whenever the schema does; that is not this snapshot's job. */
+/**
+ * The policy hash changes whenever the schema does, and the package version
+ * changes with every release; neither is this snapshot's job.
+ */
 function scrub(value: string): string {
   return value
+    .replaceAll(CORE_VERSION, '<version>')
     .replace(/(?<![0-9a-f])[0-9a-f]{64}(?![0-9a-f])/g, '<sha256>')
     .replace(/(?<![0-9a-f])[0-9a-f]{12}(?![0-9a-f])/g, '<sha12>');
 }

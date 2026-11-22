@@ -3,7 +3,7 @@ import * as proxy from './index.js';
 
 describe('@tunedness/agentfuse-proxy public surface', () => {
   it('exposes a contract version', () => {
-    expect(proxy.PROXY_VERSION).toBe('0.1.0');
+    expect(proxy.PROXY_VERSION).toMatch(/^\d+\.\d+\.\d+/);
   });
 
   it('exposes the two serving entries and the layer under them', () => {
