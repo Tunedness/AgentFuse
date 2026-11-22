@@ -49,13 +49,13 @@ jobs:
     timeout-minutes: 30
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       # Node 24 only. The matrix in `ci.yml` proves the product runs on 20, 22
       # and 24; a benchmark run on three Node versions would produce three
       # different sets of numbers and no way to say which is *the* measurement.
       - name: Set up Node 24
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v7
         with:
           node-version: 24
           cache: npm
@@ -68,7 +68,7 @@ jobs:
       # cache miss rather than a stale hit.
       - name: Restore the model
         id: model
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: ${{ env.AGENTFUSE_CACHE_DIR }}
           key: agentfuse-model-Xenova-all-MiniLM-L6-v2-751bff37182d3f1213fa05d7196b954e230abad9
@@ -105,7 +105,7 @@ jobs:
 
       - name: Upload the results
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: benchmark-results
           path: |
